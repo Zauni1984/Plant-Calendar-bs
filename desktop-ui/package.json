@@ -1,0 +1,19 @@
+{
+  "name": "plants-calendar-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "node --check src/main.js",
+    "test:smoke": "node scripts/smoke-status-tests.mjs"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.7.0"
+  }
+}

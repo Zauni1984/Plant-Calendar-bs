@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vite-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "desktop-ui", "run", "dev", "--", "--host"],
+      "port": 1420
+    },
+    {
+      "name": "backend-api",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-p", "backend"],
+      "port": 8080
+    },
+    {
+      "name": "tauri-desktop",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["tauri", "dev"],
+      "port": 1420
+    }
+  ]
+}
