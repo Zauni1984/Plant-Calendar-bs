@@ -97,6 +97,20 @@ fn is_encrypted_open(conn: &Connection) -> bool {
     conn.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(())).is_ok()
 }
 
+/// True if the file begins with SQLite's plaintext magic header.
+/// An empty/short file counts as "not plaintext" so it is never migrated.
+fn is_plaintext_sqlite(path: &std::path::Path) -> anyhow::Result<bool> {
+    use std::io::Read;
+    const MAGIC: &[u8] = b"SQLite format 3\0";
+    let mut f = std::fs::File::open(path)?;
+    let mut head = [0u8; 16];
+    match f.read_exact(&mut head) {
+        Ok(()) => Ok(head == MAGIC),
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => Ok(false),
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Open the local database with SQLCipher encryption, performing a one-shot
 /// migration from plaintext if required.
 ///
@@ -118,8 +132,22 @@ pub fn open_or_migrate(path: &std::path::Path) -> anyhow::Result<Connection> {
         if is_encrypted_open(&conn) {
             return Ok(conn);
         }
-        // Not encrypted (or wrong key). Drop and attempt plaintext->encrypted migration.
+        // Either genuinely plaintext, or encrypted with a key we no longer have.
         drop(conn);
+    }
+
+    // Distinguish those two cases before doing anything destructive. A real
+    // SQLite file starts with the literal header "SQLite format 3\0"; an
+    // encrypted one does not. Running the migration on an encrypted file used
+    // to fail deep inside sqlcipher_export and abort startup with an opaque
+    // "file is not a database".
+    if !is_plaintext_sqlite(path)? {
+        anyhow::bail!(
+            "the local database at {} is encrypted, but its key is missing from the OS keychain. \
+             Refusing to touch the file. Restore the keychain entry, or move the file aside to \
+             start with an empty database (the data in it cannot be recovered without the key).",
+            path.display()
+        );
     }
 
     eprintln!("[local_db] migrating plaintext DB to SQLCipher: {}", path.display());

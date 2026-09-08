@@ -26,6 +26,19 @@ tuya-rs.workspace = true
 url = "2"
 urlencoding = "2"
 once_cell = "1"
-keyring = "3"
 rand = "0.8"
 hex = { workspace = true }
+
+# keyring MUST carry a platform feature. Without one, keyring 3.x silently
+# compiles an in-memory mock store: set() reports success, get() works within
+# the same process, and the secret is gone on the next launch. That regenerates
+# the SQLCipher master key every start and makes the existing encrypted
+# database permanently unreadable. Keep these per-target.
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service"] }

@@ -3000,8 +3000,29 @@ fn main() {
 
             let _ = APP_DATA_DIR.set(base.clone());
 
-            let store = LocalStore::open(&db_path)
-                .expect("failed to initialize local store");
+            // A panic here closes the window instantly with no visible reason.
+            // Surface the actual cause (most often: the SQLCipher key is gone
+            // from the OS keychain) so the user can act on it.
+            let store = match LocalStore::open(&db_path) {
+                Ok(store) => store,
+                Err(err) => {
+                    let msg = format!(
+                        "The local database could not be opened.\n\n{err}\n\nLocation:\n{}",
+                        db_path.display()
+                    );
+                    eprintln!("[startup] {msg}");
+                    use tauri::async_runtime::block_on;
+                    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                    let _ = block_on(async {
+                        app.dialog()
+                            .message(&msg)
+                            .kind(MessageDialogKind::Error)
+                            .title("Plants Calendar — database error")
+                            .blocking_show()
+                    });
+                    return Err(err.into());
+                }
+            };
             app.manage(AppLocalState { store: Mutex::new(store) });
             Ok(())
         })
