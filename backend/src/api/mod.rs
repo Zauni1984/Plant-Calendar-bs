@@ -75,15 +75,32 @@ fn pseudonymize_email(email: &str) -> String {
     format!("{prefix}***@***{tld}")
 }
 
+/// Maximum accepted repeat interval: one year in hours.
+/// Anything larger is rejected rather than clamped, so a bogus client value
+/// surfaces as a validation error instead of silently becoming a huge series.
+pub const MAX_REPEAT_INTERVAL_HOURS: i32 = 8760;
+
 fn next_recurring_due_after(current_due: chrono::DateTime<Utc>, repeat_interval_hours: Option<i32>, now: chrono::DateTime<Utc>) -> Option<chrono::DateTime<Utc>> {
     let hours = repeat_interval_hours?;
-    if hours <= 0 {
+    if hours <= 0 || hours > MAX_REPEAT_INTERVAL_HOURS {
         return None;
     }
-    let step = chrono::Duration::hours(hours as i64);
-    let mut next_due = current_due + step;
-    while next_due <= now {
-        next_due += step;
+    let step = chrono::Duration::try_hours(hours as i64)?;
+
+    // Jump straight to the first slot after `now` instead of stepping one
+    // interval at a time — a due date far in the past used to spin for
+    // millions of iterations and block a Tokio worker.
+    let mut next_due = current_due.checked_add_signed(step)?;
+    if next_due <= now {
+        let gap_secs = (now - next_due).num_seconds();
+        let step_secs = step.num_seconds();
+        if step_secs <= 0 {
+            return None;
+        }
+        // +1 so the result is strictly after `now`.
+        let skips = gap_secs / step_secs + 1;
+        let advance = chrono::Duration::try_seconds(skips.checked_mul(step_secs)?)?;
+        next_due = next_due.checked_add_signed(advance)?;
     }
     Some(next_due)
 }
@@ -199,10 +216,15 @@ pub struct LogoutPayload {
     pub refresh_token: Option<String>,
 }
 
-pub async fn auth_logout(State(state): State<AppState>, _session: SessionUser, Json(payload): Json<LogoutPayload>) -> impl IntoResponse {
+pub async fn auth_logout(State(state): State<AppState>, session: SessionUser, Json(payload): Json<LogoutPayload>) -> impl IntoResponse {
     if let Some(raw_token) = payload.refresh_token {
         let hash = hex::encode(sha2::Sha256::digest(raw_token.as_bytes()));
-        let _ = repos::revoke_refresh_token(&state, &hash).await;
+        // Scope the revoke to the caller: revoking purely by hash would let a
+        // logged-in user invalidate another account's session.
+        match repos::revoke_refresh_token_for_user(&state, &hash, session.user_id).await {
+            Ok(_) => {}
+            Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+        }
     }
     StatusCode::NO_CONTENT.into_response()
 }
@@ -232,8 +254,12 @@ pub async fn auth_refresh(State(state): State<AppState>, Json(payload): Json<Ref
         return api_error(StatusCode::UNAUTHORIZED, "refresh token has expired");
     }
 
-    // Revoke old refresh token (rotation)
-    let _ = repos::revoke_refresh_token(&state, &token_hash).await;
+    // Revoke old refresh token (rotation).
+    // This must succeed before a new pair is handed out — swallowing the error
+    // would leave the presented token valid for its full 90-day lifetime.
+    if let Err(err) = repos::revoke_refresh_token(&state, &token_hash).await {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
+    }
 
     // Look up user to get auth_mode
     let user = match repos::get_user(&state, stored.user_id).await {
@@ -1036,9 +1062,19 @@ pub async fn post_subscription_portal(State(state): State<AppState>, session: Se
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
 
-    let return_url = payload.return_url.unwrap_or_else(|| {
-        std::env::var("CHECKOUT_BASE_URL").unwrap_or_else(|_| "http://localhost:1420".to_string())
-    });
+    // The client-supplied return_url is reflected into Stripe's redirect, so an
+    // arbitrary value would turn this endpoint into an open redirect. Only
+    // accept URLs under the configured checkout base.
+    let base_url = std::env::var("CHECKOUT_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:1420".to_string());
+    let return_url = match payload.return_url {
+        Some(candidate) if candidate.starts_with(&base_url) => candidate,
+        Some(rejected) => {
+            eprintln!("[Stripe] rejected off-site return_url: {rejected}");
+            base_url
+        }
+        None => base_url,
+    };
 
     match stripe.create_portal_session(&customer_id, &return_url).await {
         Ok(url) => Json(serde_json::json!({ "portal_url": url })).into_response(),

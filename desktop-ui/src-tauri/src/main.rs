@@ -1971,11 +1971,17 @@ async fn tuya_read_status(state: State<'_, AppLocalState>, device_id: String) ->
         if let Some((_ip, key)) = stripped.split_once(':') {
             if !key.starts_with("keyring:") {
                 let mut migrated = device.clone();
-                redact_tuya_secret_for_storage(&mut migrated);
-                if migrated.ble_address != device.ble_address {
-                    let store = state.store.lock().map_err(|_| "lock".to_string())?;
-                    let _ = store.upsert_device(&migrated);
-                    device = migrated;
+                // Best-effort here: if the keychain is unavailable we keep using
+                // the in-memory key for this read rather than failing the call,
+                // but we never rewrite the row to claim it was migrated.
+                match redact_tuya_secret_for_storage(&mut migrated) {
+                    Ok(()) if migrated.ble_address != device.ble_address => {
+                        let store = state.store.lock().map_err(|_| "lock".to_string())?;
+                        let _ = store.upsert_device(&migrated);
+                        device = migrated;
+                    }
+                    Ok(()) => {}
+                    Err(e) => eprintln!("[tuya] keychain migration skipped: {e}"),
                 }
             }
         }
@@ -2047,17 +2053,22 @@ fn parse_tuya_config(address: &str) -> Option<(String, String)> {
 /// Prepare a Device's `ble_address` for storage. If it carries a plaintext
 /// Tuya local_key, move the key into the OS keychain (GDPR Art. 32) and
 /// rewrite the column to the `keyring:<device_id>` pointer.
-fn redact_tuya_secret_for_storage(device: &mut shared::Device) {
-    let Some(stripped) = device.ble_address.strip_prefix("tuya:") else { return; };
+/// Move a Tuya `local_key` out of the DB row and into the OS keychain.
+/// Returns Err if the keychain write fails — the caller must NOT persist the
+/// device in that case, otherwise the secret silently stays in plaintext.
+fn redact_tuya_secret_for_storage(device: &mut shared::Device) -> Result<(), String> {
+    let Some(stripped) = device.ble_address.strip_prefix("tuya:") else { return Ok(()); };
     let parts: Vec<&str> = stripped.splitn(2, ':').collect();
-    if parts.len() != 2 { return; }
+    if parts.len() != 2 { return Ok(()); }
     let ip = parts[0];
     let key = parts[1];
-    if key.starts_with("keyring:") { return; } // already redacted
+    if key.starts_with("keyring:") { return Ok(()); } // already redacted
     let secret_name = format!("tuya_{}", device.device_id);
-    if secrets::set(&secret_name, key).is_ok() {
-        device.ble_address = format!("tuya:{}:keyring:{}", ip, device.device_id);
-    }
+    secrets::set(&secret_name, key).map_err(|e| {
+        format!("could not store Tuya key in the OS keychain: {e}")
+    })?;
+    device.ble_address = format!("tuya:{}:keyring:{}", ip, device.device_id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -2069,7 +2080,8 @@ fn list_devices(state: State<AppLocalState>) -> Result<Vec<Device>, String> {
 #[tauri::command]
 fn save_device(state: State<AppLocalState>, mut device: Device) -> Result<(), String> {
     // GDPR Art. 32: never persist Tuya local_key in plaintext.
-    redact_tuya_secret_for_storage(&mut device);
+    // Refuse the save outright if the keychain is unavailable.
+    redact_tuya_secret_for_storage(&mut device)?;
     let store = state.store.lock().map_err(|_| "lock".to_string())?;
     store.upsert_device(&device).map_err(|e| e.to_string())
 }
@@ -2814,12 +2826,21 @@ async fn set_consent_smart(state: State<'_, AppLocalState>, consent_type: String
 /// Used for privacy-policy and imprint links.
 #[tauri::command]
 fn open_external_path(path: String) -> Result<(), String> {
+    // Only ever open something that actually exists as a file on disk.
+    let candidate = std::path::Path::new(&path);
+    if !candidate.is_file() {
+        return Err(format!("not a file: {path}"));
+    }
+
+    // NOTE: deliberately not `cmd /C start`. cmd.exe re-parses its command line,
+    // so shell metacharacters in the path (&, |, ^, ...) would survive Rust's
+    // argument escaping and execute. explorer.exe takes the path verbatim.
     #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("cmd").args(["/C", "start", "", &path]).spawn();
+    let result = std::process::Command::new("explorer.exe").arg(candidate).spawn();
     #[cfg(target_os = "macos")]
-    let result = std::process::Command::new("open").arg(&path).spawn();
+    let result = std::process::Command::new("open").arg(candidate).spawn();
     #[cfg(all(unix, not(target_os = "macos")))]
-    let result = std::process::Command::new("xdg-open").arg(&path).spawn();
+    let result = std::process::Command::new("xdg-open").arg(candidate).spawn();
     result.map(|_| ()).map_err(|e| e.to_string())
 }
 
@@ -2829,6 +2850,21 @@ fn open_external_path(path: String) -> Result<(), String> {
 /// the first hit.
 #[tauri::command]
 fn resolve_doc_path(filename: String) -> Result<String, String> {
+    // The result is handed straight to open_external_path, so the name must be
+    // a plain file name — no traversal, no absolute paths, no separators.
+    let is_safe = !filename.is_empty()
+        && filename.len() <= 128
+        && !filename.contains("..")
+        && !filename.contains('/')
+        && !filename.contains('\\')
+        && !filename.contains(':')
+        && filename
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+    if !is_safe {
+        return Err(format!("invalid doc name: {filename}"));
+    }
+
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -2885,7 +2921,10 @@ fn build_local_export(state: &AppLocalState) -> Result<serde_json::Value, String
     let tasks = store.list_tasks().map_err(|e| e.to_string())?;
     let logs = store.list_logs().map_err(|e| e.to_string())?;
     let locations = store.list_locations().map_err(|e| e.to_string())?;
-    let consents: Vec<ConsentRecord> = store.list_consents(Uuid::nil()).unwrap_or_default();
+    // Must use the real session user, not Uuid::nil() — otherwise a logged-in
+    // user's export silently omits all their consent records (Art. 15/20 GDPR).
+    let consents: Vec<ConsentRecord> =
+        store.list_consents(current_user_id(&store)).unwrap_or_default();
     Ok(serde_json::json!({
         "schema_version": 1,
         "exported_at": chrono::Utc::now().to_rfc3339(),

@@ -742,16 +742,34 @@ pub async fn merge_guest_data(state: &AppState, guest_user_id: Uuid, account_use
     if guest_user_id == account_user_id {
         return Ok(());
     }
+
+    // SECURITY: the caller supplies guest_user_id, so it must never be trusted.
+    // Only an account that is still genuinely anonymous may be absorbed —
+    // otherwise any authenticated user could pass a stranger's UUID and both
+    // steal their plants and cascade-delete their account.
+    let source_auth_mode: Option<String> =
+        sqlx::query_scalar("SELECT auth_mode FROM users WHERE user_id = $1")
+            .bind(guest_user_id)
+            .fetch_optional(&state.pg)
+            .await?;
+    match source_auth_mode.as_deref() {
+        Some("anonymous") => {}
+        // Unknown user or a real (email/google) account: refuse silently-safely.
+        _ => anyhow::bail!("merge source is not an anonymous guest account"),
+    }
+
+    let mut tx = state.pg.begin().await?;
     sqlx::query("UPDATE plants SET user_id = $2, updated_at = $3 WHERE user_id = $1")
         .bind(guest_user_id)
         .bind(account_user_id)
         .bind(Utc::now())
-        .execute(&state.pg)
+        .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM users WHERE user_id = $1")
+    sqlx::query("DELETE FROM users WHERE user_id = $1 AND auth_mode = 'anonymous'")
         .bind(guest_user_id)
-        .execute(&state.pg)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -896,6 +914,24 @@ pub async fn revoke_refresh_token(state: &AppState, token_hash: &str) -> anyhow:
         .execute(&state.pg)
         .await?;
     Ok(())
+}
+
+/// Revoke a refresh token that must belong to `user_id`.
+/// Used by /auth/logout so a caller cannot revoke a stranger's token by hash.
+pub async fn revoke_refresh_token_for_user(
+    state: &AppState,
+    token_hash: &str,
+    user_id: Uuid,
+) -> anyhow::Result<u64> {
+    let result = sqlx::query(
+        "UPDATE refresh_tokens SET revoked_at = $3 WHERE token_hash = $1 AND user_id = $2",
+    )
+    .bind(token_hash)
+    .bind(user_id)
+    .bind(Utc::now())
+    .execute(&state.pg)
+    .await?;
+    Ok(result.rows_affected())
 }
 
 pub async fn revoke_all_refresh_tokens(state: &AppState, user_id: Uuid) -> anyhow::Result<()> {
@@ -1263,8 +1299,8 @@ pub async fn get_password_hash_by_user_id(state: &AppState, user_id: Uuid) -> an
 pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, plant: &Plant) -> anyhow::Result<()> {
     let plant = plant.normalized_ref();
     sqlx::query(
-        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, catalog_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          ON CONFLICT (plant_id) DO UPDATE SET
             user_id = EXCLUDED.user_id,
             name = EXCLUDED.name,
@@ -1276,6 +1312,8 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
             is_active = EXCLUDED.is_active,
             archived = EXCLUDED.archived,
             location_id = EXCLUDED.location_id,
+            lifecycle = EXCLUDED.lifecycle,
+            plant_year = EXCLUDED.plant_year,
             catalog_id = EXCLUDED.catalog_id,
             updated_at = EXCLUDED.updated_at
          WHERE plants.updated_at < EXCLUDED.updated_at",
@@ -1291,6 +1329,8 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
     .bind(plant.is_active_state())
     .bind(plant.is_archived_state())
     .bind(plant.location_id)
+    .bind(lifecycle_str(plant.lifecycle))
+    .bind(plant.plant_year)
     .bind(&plant.catalog_id)
     .bind(plant.created_at)
     .bind(plant.updated_at)
@@ -1396,67 +1436,50 @@ pub async fn get_stripe_customer_id(state: &AppState, user_id: Uuid) -> anyhow::
 }
 
 pub async fn verify_plant_ownership(state: &AppState, user_id: Uuid, plant_id: Uuid) -> Result<(), String> {
-    use sqlx::Row;
-    let row = sqlx::query("SELECT user_id FROM plants WHERE plant_id = $1")
-        .bind(plant_id)
-        .fetch_optional(&state.pg)
-        .await
-        .map_err(|e| e.to_string())?;
-    match row {
-        Some(row) => {
-            let owner: String = row.get("user_id");
-            if Uuid::parse_str(&owner).unwrap_or(Uuid::nil()) == user_id {
-                Ok(())
-            } else {
-                Err("forbidden: not your plant".into())
-            }
-        }
-        None => Err("plant not found".into()),
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM plants WHERE plant_id = $1 AND user_id = $2",
+    )
+    .bind(plant_id)
+    .bind(user_id)
+    .fetch_one(&state.pg)
+    .await
+    .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("forbidden: not your plant".into());
     }
+    Ok(())
 }
 
 pub async fn verify_task_ownership(state: &AppState, user_id: Uuid, task_id: Uuid) -> Result<(), String> {
-    use sqlx::Row;
-    let row = sqlx::query(
-        "SELECT p.user_id FROM tasks t INNER JOIN plants p ON t.plant_id = p.plant_id WHERE t.task_id = $1"
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tasks t INNER JOIN plants p ON t.plant_id = p.plant_id \
+         WHERE t.task_id = $1 AND p.user_id = $2",
     )
-        .bind(task_id)
-        .fetch_optional(&state.pg)
-        .await
-        .map_err(|e| e.to_string())?;
-    match row {
-        Some(row) => {
-            let owner: String = row.get("user_id");
-            if Uuid::parse_str(&owner).unwrap_or(Uuid::nil()) == user_id {
-                Ok(())
-            } else {
-                Err("forbidden: not your task".into())
-            }
-        }
-        None => Err("task not found".into()),
+    .bind(task_id)
+    .bind(user_id)
+    .fetch_one(&state.pg)
+    .await
+    .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("forbidden: not your task".into());
     }
+    Ok(())
 }
 
 pub async fn verify_log_ownership(state: &AppState, user_id: Uuid, log_id: Uuid) -> Result<(), String> {
-    use sqlx::Row;
-    let row = sqlx::query(
-        "SELECT p.user_id FROM logs l INNER JOIN plants p ON l.plant_id = p.plant_id WHERE l.log_id = $1"
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM logs l INNER JOIN plants p ON l.plant_id = p.plant_id \
+         WHERE l.log_id = $1 AND p.user_id = $2",
     )
-        .bind(log_id)
-        .fetch_optional(&state.pg)
-        .await
-        .map_err(|e| e.to_string())?;
-    match row {
-        Some(row) => {
-            let owner: String = row.get("user_id");
-            if Uuid::parse_str(&owner).unwrap_or(Uuid::nil()) == user_id {
-                Ok(())
-            } else {
-                Err("forbidden: not your log".into())
-            }
-        }
-        None => Err("log not found".into()),
+    .bind(log_id)
+    .bind(user_id)
+    .fetch_one(&state.pg)
+    .await
+    .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("forbidden: not your log".into());
     }
+    Ok(())
 }
 
 // ── Location CRUD ─��

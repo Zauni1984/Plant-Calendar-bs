@@ -34,13 +34,18 @@ impl RateLimiter {
     }
 
     fn check(&self, key: &str) -> bool {
-        let mut map = self.state.lock().unwrap();
+        // Never propagate a poisoned mutex: a single panic while the lock was
+        // held would otherwise take down every auth endpoint until restart.
+        let mut map = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
 
-        // Clean up stale entries every 100 checks
+        // Clean up stale entries every 100 checks.
+        // `checked_sub` because on a freshly booted host `Instant::now()` can be
+        // smaller than the window, and plain subtraction would panic.
         if map.len() > 100 {
-            let cutoff = now - std::time::Duration::from_secs(self.window_secs * 2);
-            map.retain(|_, entry| entry.window_start > cutoff);
+            if let Some(cutoff) = now.checked_sub(std::time::Duration::from_secs(self.window_secs.saturating_mul(2))) {
+                map.retain(|_, entry| entry.window_start > cutoff);
+            }
         }
         let entry = map.entry(key.to_string()).or_insert(Entry {
             count: 0,

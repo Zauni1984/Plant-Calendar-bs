@@ -143,18 +143,58 @@ pub fn open_or_migrate(path: &std::path::Path) -> anyhow::Result<Connection> {
         plain.execute_batch("DETACH DATABASE encrypted")?;
     }
 
-    // Swap files: keep .bak as a safety net.
+    // Swap files, keeping the plaintext copy only until the encrypted DB is
+    // proven to open. Leaving it behind permanently would mean an unencrypted
+    // copy of all personal data stays on disk, defeating the at-rest encryption.
     let bak_path = path.with_extension("sqlite.bak");
     std::fs::rename(path, &bak_path)?;
     std::fs::rename(&enc_path, path)?;
-    eprintln!("[local_db] plaintext DB backed up to {}; encrypted DB live", bak_path.display());
 
     let conn = Connection::open(path)?;
     apply_key(&conn, &hex_key)?;
     if !is_encrypted_open(&conn) {
-        anyhow::bail!("post-migration: encrypted DB failed to open with key");
+        // Migration failed — restore the plaintext DB so the user keeps their data.
+        drop(conn);
+        std::fs::remove_file(path).ok();
+        std::fs::rename(&bak_path, path).ok();
+        anyhow::bail!("post-migration: encrypted DB failed to open with key; restored plaintext DB");
+    }
+
+    // Verified: shred the plaintext leftover.
+    match std::fs::remove_file(&bak_path) {
+        Ok(()) => eprintln!("[local_db] migration complete; plaintext copy removed"),
+        Err(e) => eprintln!(
+            "[local_db] WARNING: could not remove plaintext backup {}: {e}",
+            bak_path.display()
+        ),
     }
     Ok(conn)
+}
+
+/// Apply a migration statement-by-statement, tolerating columns that already
+/// exist.
+///
+/// `execute_batch` aborts the WHOLE batch on the first error, so a file with
+/// several `ALTER TABLE ... ADD COLUMN` guarded only by an outer
+/// `contains("duplicate column")` swallow would silently skip every statement
+/// after the first already-applied one. Splitting on `;` is safe here because
+/// none of these migration files contain a semicolon inside a string literal.
+fn apply_migration_tolerant(conn: &Connection, sql: &str) -> anyhow::Result<()> {
+    for statement in sql.split(';') {
+        let trimmed = statement.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Err(e) = conn.execute_batch(trimmed) {
+            let msg = e.to_string();
+            // "duplicate column name" — the column is already there, which is
+            // exactly the state we want. Anything else is a real failure.
+            if !msg.contains("duplicate column") {
+                return Err(e.into());
+            }
+        }
+    }
+    Ok(())
 }
 
 impl LocalStore {
@@ -162,53 +202,33 @@ impl LocalStore {
         let conn = open_or_migrate(path.as_ref())?;
         conn.execute_batch(include_str!("../../../migrations/001_sqlite_init.sql"))?;
         conn.execute_batch(include_str!("../../../migrations/002_sqlite_tombstones.sql"))?;
+        // 003: email/password_hash on users. Unused locally (auth lives in
+        // Postgres) but applied so the local schema stays a complete 001..021
+        // chain — a gap here would break any future migration that assumes it.
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/003_sqlite_auth.sql"))?;
         conn.execute_batch(include_str!("../../../migrations/004_sqlite_session.sql"))?;
         conn.execute_batch(include_str!("../../../migrations/005_sqlite_sync_cursor.sql"))?;
         // 006 uses ALTER TABLE ADD COLUMN which fails if column already exists;
         // ignore "duplicate column" errors to keep init idempotent.
-        match conn.execute_batch(include_str!("../../../migrations/006_sqlite_plant_status.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/006_sqlite_plant_status.sql"))?;
         conn.execute_batch(include_str!("../../../migrations/007_sqlite_plant_status_legacy_backfill.sql"))?;
         conn.execute_batch(include_str!("../../../migrations/008_sqlite_sync_state.sql"))?;
         // 009: add refresh_token column to app_session (ignore if already exists)
-        match conn.execute_batch(include_str!("../../../migrations/009_sqlite_refresh_token.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/009_sqlite_refresh_token.sql"))?;
         // 010: devices and device_readings tables for BLE integration
         conn.execute_batch(include_str!("../../../migrations/010_sqlite_devices.sql"))?;
         // 011: locations table and plants.location_id column
-        match conn.execute_batch(include_str!("../../../migrations/011_sqlite_locations.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/011_sqlite_locations.sql"))?;
         // 012: perennials – plant_seasons table and lifecycle/plant_year columns
-        match conn.execute_batch(include_str!("../../../migrations/012_sqlite_perennials.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/012_sqlite_perennials.sql"))?;
         // 013: photos table (local-only, never synced)
         conn.execute_batch(include_str!("../../../migrations/013_sqlite_photos.sql"))?;
         // 014: catalog_id column on plants
-        match conn.execute_batch(include_str!("../../../migrations/014_sqlite_catalog_id.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/014_sqlite_catalog_id.sql"))?;
         // 015: climate config table
         conn.execute_batch(include_str!("../../../migrations/015_sqlite_climate.sql"))?;
         // 016: repeat_until column on tasks
-        match conn.execute_batch(include_str!("../../../migrations/016_sqlite_repeat_until.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/016_sqlite_repeat_until.sql"))?;
         // 017: weather_history table and lat/lon columns on locations
         // Split into table create + per-ALTER to be robust against partial prior runs.
         conn.execute_batch(
@@ -224,17 +244,9 @@ impl LocalStore {
             }
         }
         // 018: pot_size_liters and soil_type columns on plants
-        match conn.execute_batch(include_str!("../../../migrations/018_sqlite_plant_care.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/018_sqlite_plant_care.sql"))?;
         // 019: local user profiles for multi-user support
-        match conn.execute_batch(include_str!("../../../migrations/019_sqlite_profiles.sql")) {
-            Ok(_) => {}
-            Err(e) if e.to_string().contains("duplicate column") => {}
-            Err(e) => return Err(e.into()),
-        }
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/019_sqlite_profiles.sql"))?;
         // 020: extended weather metrics — each ALTER applied independently so a
         // partially-applied migration can be resumed without aborting later columns.
         for sql in [
@@ -331,12 +343,31 @@ impl LocalStore {
     }
 
     pub fn mark_all_guest_records_dirty(&self, _new_user_id: Uuid) -> anyhow::Result<()> {
+        let now = Utc::now();
+        // Plants *and* every task/log. Marking only plants left all
+        // offline-created tasks and logs permanently unsynced after login.
         for plant in self.list_plants()? {
             self.mark_dirty(DirtyRecord {
                 record_id: plant.plant_id,
                 entity_kind: SyncEntityKind::Plant,
                 operation: SyncOperation::Upsert,
-                changed_at: Utc::now(),
+                changed_at: now,
+            })?;
+        }
+        for task in self.list_tasks()? {
+            self.mark_dirty(DirtyRecord {
+                record_id: task.task_id,
+                entity_kind: SyncEntityKind::Task,
+                operation: SyncOperation::Upsert,
+                changed_at: now,
+            })?;
+        }
+        for log in self.list_logs()? {
+            self.mark_dirty(DirtyRecord {
+                record_id: log.log_id,
+                entity_kind: SyncEntityKind::Log,
+                operation: SyncOperation::Upsert,
+                changed_at: now,
             })?;
         }
         Ok(())
@@ -591,7 +622,14 @@ impl LocalStore {
 
     pub fn replace_cached_plants(&self, plants: &[Plant]) -> anyhow::Result<()> {
         let tx = self.conn.unchecked_transaction()?;
-        tx.execute("DELETE FROM plants", [])?;
+        // Keep rows that still have unpushed local changes. A plain
+        // `DELETE FROM plants` destroyed everything a guest created offline as
+        // soon as the first pull after login returned an empty server list.
+        tx.execute(
+            "DELETE FROM plants WHERE plant_id NOT IN \
+             (SELECT record_id FROM sync_state WHERE entity_kind = 'plant')",
+            [],
+        )?;
         for plant in plants {
             tx.execute(
                 "INSERT OR REPLACE INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, created_at, updated_at, location_id, lifecycle, plant_year, catalog_id, pot_size_liters, soil_type)
@@ -854,7 +892,12 @@ impl LocalStore {
 
     pub fn replace_cached_tasks_for_plant(&self, plant_id: Uuid, tasks: &[Task]) -> anyhow::Result<()> {
         let tx = self.conn.unchecked_transaction()?;
-        tx.execute("DELETE FROM tasks WHERE plant_id = ?1", params![plant_id.to_string()])?;
+        // Preserve tasks that have not been pushed yet (see replace_cached_plants).
+        tx.execute(
+            "DELETE FROM tasks WHERE plant_id = ?1 AND task_id NOT IN \
+             (SELECT record_id FROM sync_state WHERE entity_kind = 'task')",
+            params![plant_id.to_string()],
+        )?;
         for task in tasks {
             tx.execute(
                 "INSERT OR REPLACE INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at)
@@ -910,7 +953,12 @@ impl LocalStore {
 
     pub fn replace_cached_logs_for_plant(&self, plant_id: Uuid, logs: &[LogEntry]) -> anyhow::Result<()> {
         let tx = self.conn.unchecked_transaction()?;
-        tx.execute("DELETE FROM logs WHERE plant_id = ?1", params![plant_id.to_string()])?;
+        // Preserve logs that have not been pushed yet (see replace_cached_plants).
+        tx.execute(
+            "DELETE FROM logs WHERE plant_id = ?1 AND log_id NOT IN \
+             (SELECT record_id FROM sync_state WHERE entity_kind = 'log')",
+            params![plant_id.to_string()],
+        )?;
         for log in logs {
             tx.execute(
                 "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
@@ -1369,10 +1417,13 @@ impl LocalStore {
                 continue;
             }
             let plant = plant.normalized_ref();
+            // INSERT OR REPLACE rewrites the whole row, so every column must be
+            // listed — omitting location_id/lifecycle/plant_year reset them to
+            // NULL on every single pull.
             tx.execute(
-                "INSERT OR REPLACE INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, created_at, updated_at, catalog_id, pot_size_liters, soil_type)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
-                params![plant.plant_id.to_string(), plant.user_id.to_string(), plant.name, plant.color_tag, plant.start_date, format!("{:?}", plant.phase).to_lowercase(), plant.phase_week, plant_status_str(plant.status), i64::from(plant.is_active_state()), i64::from(plant.is_archived_state()), plant.created_at, plant.updated_at, &plant.catalog_id, plant.pot_size_liters, &plant.soil_type],
+                "INSERT OR REPLACE INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, created_at, updated_at, location_id, lifecycle, plant_year, catalog_id, pot_size_liters, soil_type)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
+                params![plant.plant_id.to_string(), plant.user_id.to_string(), plant.name, plant.color_tag, plant.start_date, format!("{:?}", plant.phase).to_lowercase(), plant.phase_week, plant_status_str(plant.status), i64::from(plant.is_active_state()), i64::from(plant.is_archived_state()), plant.created_at, plant.updated_at, plant.location_id.map(|id| id.to_string()), lifecycle_str(plant.lifecycle), plant.plant_year, &plant.catalog_id, plant.pot_size_liters, &plant.soil_type],
             )?;
         }
         for task in &payload.tasks {
@@ -1380,8 +1431,8 @@ impl LocalStore {
                 continue;
             }
             tx.execute(
-                "INSERT OR REPLACE INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-                params![task.task_id.to_string(), task.plant_id.to_string(), task.title, format!("{:?}", task.category).to_lowercase(), task.due_at, task.repeat_interval_hours, i64::from(task.notification_enabled), format!("{:?}", task.status).to_lowercase(), task.created_at, task.updated_at],
+                "INSERT OR REPLACE INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                params![task.task_id.to_string(), task.plant_id.to_string(), task.title, format!("{:?}", task.category).to_lowercase(), task.due_at, task.repeat_interval_hours, task.repeat_until, i64::from(task.notification_enabled), format!("{:?}", task.status).to_lowercase(), task.created_at, task.updated_at],
             )?;
         }
         for log in &payload.logs {

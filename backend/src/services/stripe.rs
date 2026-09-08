@@ -83,7 +83,10 @@ impl StripeClient {
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|_| "system time error".to_string())?
             .as_secs() as i64;
-        if (now - ts).abs() > 300 {
+        // saturating_sub-based comparison: a hostile/rolled-over timestamp must
+        // not overflow the subtraction before .abs() sees it.
+        let skew = if now >= ts { now.saturating_sub(ts) } else { ts.saturating_sub(now) };
+        if skew > 300 {
             return Err("webhook timestamp expired (>5min)".to_string());
         }
 
@@ -96,8 +99,21 @@ impl StripeClient {
             .map_err(|e| e.to_string())?;
         mac.update(signed_payload.as_bytes());
 
-        let expected = hex::encode(mac.finalize().into_bytes());
-        if expected != signature {
+        // Constant-time compare: a plain `!=` on String leaks how many leading
+        // bytes matched, which is enough to forge a signature byte by byte.
+        let expected = mac.finalize().into_bytes();
+        let provided = match hex::decode(signature) {
+            Ok(bytes) => bytes,
+            Err(_) => return Err("webhook signature mismatch".into()),
+        };
+        if provided.len() != expected.len() {
+            return Err("webhook signature mismatch".into());
+        }
+        let mut diff = 0u8;
+        for (a, b) in expected.iter().zip(provided.iter()) {
+            diff |= a ^ b;
+        }
+        if diff != 0 {
             return Err("webhook signature mismatch".into());
         }
         Ok(())

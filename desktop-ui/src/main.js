@@ -42,10 +42,26 @@ const LOCALE_MAP = { de: localeDe, en: localeEn, fr: localeFr, la: localeLa, es:
 let currentLang = localStorage.getItem('plants_calendar_lang') || 'de';
 let localeData = LOCALE_MAP[currentLang] || LOCALE_MAP['de'];
 const fallbackLocale = LOCALE_MAP['de'];
+// index.html ships lang="de"; correct it before first paint for the saved language.
+try { document.documentElement.setAttribute('lang', currentLang); } catch (_) {}
 
 function t(key, ...args) {
   const str = localeData[key] || fallbackLocale[key] || key;
   return args.reduce((s, arg, i) => s.replace(`{${i}}`, String(arg)), str);
+}
+
+/**
+ * BCP-47 tag for Intl / toLocaleString, derived from the active UI language.
+ * Dates used to be formatted with a hardcoded localeTag() everywhere, so they
+ * stayed German no matter which language the user picked.
+ */
+function localeTag() {
+  switch (currentLang) {
+    case 'de': return 'de-DE';
+    case 'en': return 'en-GB';
+    case 'la': return 'la';       // no CLDR data; Intl falls back to the default locale
+    default: return currentLang;
+  }
 }
 
 function setLanguage(lang) {
@@ -53,6 +69,8 @@ function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('plants_calendar_lang', lang);
   localeData = LOCALE_MAP[lang] || LOCALE_MAP['de'];
+  // Keep the document language in sync for screen readers and hyphenation.
+  document.documentElement.setAttribute('lang', lang);
   applyTheme(currentTheme);
 }
 
@@ -115,6 +133,8 @@ function renderOnboardingOverlayText() {
 function getThemeColors() {
   const s = getComputedStyle(document.documentElement);
   return {
+    bg: s.getPropertyValue('--bg').trim(),
+    onPrimary: s.getPropertyValue('--on-primary').trim() || '#ffffff',
     accent: s.getPropertyValue('--accent').trim(),
     accentDim: s.getPropertyValue('--accent-dim').trim(),
     accentRgb: s.getPropertyValue('--accent-rgb').trim(),
@@ -144,6 +164,19 @@ function getThemeColors() {
   };
 }
 let TC = getThemeColors();
+
+/**
+ * Fields that update_plant_smart overwrites unconditionally on the Rust side.
+ * Every caller must resend them, otherwise they are silently reset to NULL.
+ */
+function plantExtraFields(plant) {
+  return {
+    location_id: plant.location_id ?? null,
+    lifecycle: plant.lifecycle ?? null,
+    pot_size_liters: plant.pot_size_liters ?? null,
+    soil_type: plant.soil_type ?? null,
+  };
+}
 
 function applyTheme(themeId) {
   currentTheme = themeId;
@@ -226,8 +259,8 @@ root.innerHTML = `
       <div id="analyticsPanel" style="margin-top:14px;"></div>
       <div id="careInsightsPanel" style="margin-top:14px;"></div>
       <div class="tasks-logs-grid" style="margin-top:14px;">
-        <div><div class="section-title">Tasks</div><div id="tasksList"></div></div>
-        <div><div class="section-title">Logs</div><div id="logsList"></div></div>
+        <div><div class="section-title">${t('nav.tasksSection')}</div><div id="tasksList"></div></div>
+        <div><div class="section-title">${t('nav.logsSection')}</div><div id="logsList"></div></div>
       </div>
       <div id="phaseTaskSetBar" style="margin-top:10px;"></div>
     </div>
@@ -685,36 +718,25 @@ function getMoonPhase(date) {
   const phaseIndex = Math.round(phase * 8) % 8;
   const illumination = 0.5 * (1 - Math.cos(2 * Math.PI * phase));
 
-  const names = ['Neumond', 'Zunehmende Sichel', 'Erstes Viertel', 'Zunehmender Mond', 'Vollmond', 'Abnehmender Mond', 'Letztes Viertel', 'Abnehmende Sichel'];
   const emojis = ['\u{1F311}', '\u{1F312}', '\u{1F313}', '\u{1F314}', '\u{1F315}', '\u{1F316}', '\u{1F317}', '\u{1F318}'];
 
-  // Gardening tips based on moon phase
-  const gardenTips = [
-    'Neumond: Ruhetag. Boden vorbereiten, nicht s\u00e4en.',
-    'Zunehmend: Oberirdische Pflanzen s\u00e4en (Salat, Kr\u00e4uter, Blumen).',
-    'Erstes Viertel: Fruchtpflanzen s\u00e4en (Tomate, Bohne, Paprika).',
-    'Zunehmend: Guter Zeitpunkt zum D\u00fcngen und Umpflanzen.',
-    'Vollmond: Erntezeit! H\u00f6chste Pflanzenkraft.',
-    'Abnehmend: Wurzelgem\u00fcse s\u00e4en (M\u00f6hre, Kartoffel, Rote Bete).',
-    'Letztes Viertel: R\u00fcckschnitt, Unkraut j\u00e4ten, Sch\u00e4dlinge bek\u00e4mpfen.',
-    'Abnehmend: Kompostieren, Boden bearbeiten, Ruhe.',
-  ];
 
   // Zodiac sign (simplified — 2.5 days per sign through the cycle)
   const zodiacIndex = Math.floor((phase * 12)) % 12;
-  const zodiacSigns = ['\u2648 Widder', '\u2649 Stier', '\u264A Zwillinge', '\u264B Krebs', '\u264C L\u00f6we', '\u264F Jungfrau', '\u264E Waage', '\u264F Skorpion', '\u2650 Sch\u00fctze', '\u2651 Steinbock', '\u2652 Wassermann', '\u2653 Fische'];
+  const zodiacSymbols = ['\u2648', '\u2649', '\u264A', '\u264B', '\u264C', '\u264F', '\u264E', '\u264F', '\u2650', '\u2651', '\u2652', '\u2653'];
   // Element groups for gardening
-  const elements = ['Feuer/Frucht', 'Erde/Wurzel', 'Luft/Bl\u00fcte', 'Wasser/Blatt', 'Feuer/Frucht', 'Erde/Wurzel', 'Luft/Bl\u00fcte', 'Wasser/Blatt', 'Feuer/Frucht', 'Erde/Wurzel', 'Luft/Bl\u00fcte', 'Wasser/Blatt'];
+  // Element group per sign, cycling fire -> earth -> air -> water.
+  const elementKeys = ['fire', 'earth', 'air', 'water'];
 
   return {
     phase: phaseIndex,
     phaseFloat: phase,
     illumination,
-    name: names[phaseIndex],
+    name: t(`moon.phase.${phaseIndex}`),
     emoji: emojis[phaseIndex],
-    gardenTip: gardenTips[phaseIndex],
-    zodiac: zodiacSigns[zodiacIndex],
-    element: elements[zodiacIndex],
+    gardenTip: t(`moon.tip.${phaseIndex}`),
+    zodiac: `${zodiacSymbols[zodiacIndex]} ${t(`zodiac.${zodiacIndex}`)}`,
+    element: t(`moon.element.${elementKeys[zodiacIndex % 4]}`),
   };
 }
 
@@ -725,11 +747,11 @@ function getMoonPhase(date) {
 function getChineseDate(date) {
   // Lunar New Year dates (approximate)
   const lunarNewYears = [
-    { year: 2024, start: new Date('2024-02-10'), animal: 'Drache', element: 'Holz' },
-    { year: 2025, start: new Date('2025-01-29'), animal: 'Schlange', element: 'Holz' },
-    { year: 2026, start: new Date('2026-02-17'), animal: 'Pferd', element: 'Feuer' },
-    { year: 2027, start: new Date('2027-02-06'), animal: 'Ziege', element: 'Feuer' },
-    { year: 2028, start: new Date('2028-01-26'), animal: 'Affe', element: 'Erde' },
+    { year: 2024, start: new Date('2024-02-10'), animal: 'dragon', element: 'wood' },
+    { year: 2025, start: new Date('2025-01-29'), animal: 'snake', element: 'wood' },
+    { year: 2026, start: new Date('2026-02-17'), animal: 'horse', element: 'fire' },
+    { year: 2027, start: new Date('2027-02-06'), animal: 'goat', element: 'fire' },
+    { year: 2028, start: new Date('2028-01-26'), animal: 'monkey', element: 'earth' },
   ];
 
   // Find current Chinese year
@@ -749,6 +771,8 @@ function getChineseDate(date) {
     day: Math.max(1, Math.min(30, lunarDay)),
     animal: cYear.animal,
     element: cYear.element,
+    animalLabel: t(`cal.chinese.animal.${cYear.animal}`),
+    elementLabel: t(`cal.chinese.element.${cYear.element}`),
   };
 }
 
@@ -841,73 +865,20 @@ function getJewishDate(date) {
 function getBauernkalenderInfo(date) {
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  const rules = {
-    '1-1': { name: 'Neujahr', spruch: 'Ist Neujahr hell und klar, deutet dies auf ein gutes Jahr.' },
-    '1-6': { name: 'Heilige Drei K\u00f6nige', spruch: 'Dreik\u00f6nigsabend hell und klar, verspricht ein gutes Weinjahr.' },
-    '1-20': { name: 'Fabian und Sebastian', spruch: 'Fabian im Nebelhut, macht dem Getreide gut.' },
-    '2-2': { name: 'Mari\u00e4 Lichtmess', spruch: 'Wenn es an Lichtmess st\u00fcrmt und schneit, ist der Fr\u00fchling nicht mehr weit.' },
-    '2-14': { name: 'Valentinstag', spruch: 'Valentinstag mit Sonnenschein, wird der Herbst gar lieblich sein.' },
-    '2-24': { name: 'Matthias', spruch: 'Matthias brichts Eis, hat er keins, so macht er eins.' },
-    '3-17': { name: 'Gertrud', spruch: 'Gertrud n\u00fctzt dem G\u00e4rtner viel, denn sie ist der Gartenarbeit Ziel.' },
-    '3-19': { name: 'Josef', spruch: 'Ist Josefstag sch\u00f6n, wird ein gutes Jahr man sehn.' },
-    '3-21': { name: 'Fr\u00fchlingsanfang', spruch: 'Wenn im M\u00e4rz die Veilchen bl\u00fchn, an den Rosen Knospen gl\u00fchn.' },
-    '4-23': { name: 'Georg', spruch: 'Auf St. Georgs G\u00fcte stehen alle B\u00e4ume in Bl\u00fcte.' },
-    '4-25': { name: 'Markus', spruch: 'Ist Markus warm und sch\u00f6n, wird man viel Getreide sehn.' },
-    '5-1': { name: 'Maifeiertag', spruch: 'Regen auf Walpurgisnacht hat stets ein gutes Jahr gebracht.' },
-    '5-11': { name: 'Eisheilige Mamertus', spruch: 'Pankraz, Servaz, Bonifaz machen erst dem Sommer Platz.' },
-    '5-12': { name: 'Eisheiliger Pankratius', spruch: 'Vor Bonifaz kein Sommer, nach der Sophie kein Frost.' },
-    '5-13': { name: 'Eisheiliger Servatius', spruch: 'Servaz muss vor\u00fcber sein, will man vor Nachtfrost sicher sein.' },
-    '5-14': { name: 'Eisheiliger Bonifatius', spruch: 'Pankrazi, Servazi und Bonifazi sind drei frostige Bazi.' },
-    '5-15': { name: 'Kalte Sophie', spruch: 'Die kalte Sophie macht alles hie.' },
-    '6-11': { name: 'Barnabas', spruch: 'St. Barnabas, der Sonnenschein, gibt den Trauben Honigsein.' },
-    '6-21': { name: 'Sommeranfang', spruch: 'Regnet es am Johannistag, so regnet es noch 30 Tag.' },
-    '6-24': { name: 'Johannistag', spruch: 'Bis Johanni wird gepflanzt, ein Datum das der G\u00e4rtner kennt.' },
-    '6-27': { name: 'Siebenschl\u00e4fer', spruch: 'Das Wetter am Siebenschl\u00e4fertag sieben Wochen bleiben mag.' },
-    '7-2': { name: 'Mari\u00e4 Heimsuchung', spruch: 'Wie das Wetter an Mari\u00e4 Heimsuchung f\u00e4llt, so ist es noch 40 Tage bestellt.' },
-    '7-15': { name: 'Hundstage Beginn', spruch: 'Hundstage hell und klar zeigen ein gutes Jahr.' },
-    '7-20': { name: 'Margarethe', spruch: 'Margaretentag der Regen mag, bringt den N\u00fcssen Plag.' },
-    '8-10': { name: 'Laurentius', spruch: 'Laurenzi mit hei\u00dfem Hauch, f\u00fcllt dem Bauern Fass und Schlauch.' },
-    '8-15': { name: 'Mari\u00e4 Himmelfahrt', spruch: 'An Mari\u00e4 Himmelfahrt, das Obst sich gerne rot verf\u00e4rbt.' },
-    '8-24': { name: 'Bartholom\u00e4us', spruch: 'Wie Bartholom\u00e4us sich h\u00e4lt, so ist der ganze Herbst bestellt.' },
-    '9-1': { name: '\u00c4gidius', spruch: 'Wie der September anf\u00e4ngt, so h\u00e4lt er bis zum Ende.' },
-    '9-8': { name: 'Mari\u00e4 Geburt', spruch: 'An Mari\u00e4 Geburt fliegen die Schwalben furt.' },
-    '9-22': { name: 'Herbstanfang', spruch: 'Sind die Zugv\u00f6gel nach Bartholom\u00e4 noch hier, deuten auf milden Winter wir.' },
-    '9-29': { name: 'Michaeli', spruch: 'Kommt St. Michael in die N\u00e4h, fallen die letzten Bl\u00e4tter j\u00e4h.' },
-    '10-4': { name: 'Franz von Assisi', spruch: 'Ist Franziskus ein sch\u00f6ner Tag, Unbest\u00e4ndigkeit folgen mag.' },
-    '10-16': { name: 'Gallus', spruch: 'St. Gallus l\u00e4sst die Kuh am Zaune steh\u0027n und treibt sie in den Stall hinein.' },
-    '10-28': { name: 'Simon und Juda', spruch: 'Simon und Judas, die zwei, laden zur Winterarbeit herbei.' },
-    '11-1': { name: 'Allerheiligen', spruch: 'Allerheiligen klar und helle, sitzt der Winter auf der Schwelle.' },
-    '11-2': { name: 'Allerseelen', spruch: 'November tritt oft mit Frost herein, doch muss es nicht so kalt gleich sein.' },
-    '11-11': { name: 'St. Martin', spruch: 'St. Martin kommt nach altem Brauch mit G\u00e4nsen und mit Feuern auch.' },
-    '11-25': { name: 'Katharina', spruch: 'Kathrinenschnee tut B\u00e4um und Saaten weh.' },
-    '12-4': { name: 'Barbara', spruch: 'Geht Barbara im Gr\u00fcnen, kommt das Christkind im Wei\u00dfen.' },
-    '12-21': { name: 'Winteranfang', spruch: 'Ist die Thomasnacht recht lang, braucht man um den Fr\u00fchling nicht bang.' },
-    '12-25': { name: 'Weihnachten', spruch: 'Weihnachten im Schnee, Ostern im Klee.' },
-    '12-31': { name: 'Silvester', spruch: 'Silvester Wind und warm, macht den Bauern arm.' },
-  };
-  const monthlyWisdom = [
-    '',
-    'Januar: Zeit der Planung und Saatgutbestellung. Obstb\u00e4ume schneiden.',
-    'Februar: Vorkultur beginnen. Beete vorbereiten wenn der Boden es erlaubt.',
-    'M\u00e4rz: Fr\u00fchgem\u00fcse direkt auss\u00e4en. Rosen und Str\u00e4ucher schneiden.',
-    'April: Hauptsaatzeit! Aber Vorsicht vor sp\u00e4ten Fr\u00f6sten.',
-    'Mai: Nach den Eisheiligen alles ins Freie. Mulchen nicht vergessen.',
-    'Juni: Gie\u00dfen, D\u00fcngen, Ernten. Johannistag = letzter Pflanztermin f\u00fcr viele Gem\u00fcse.',
-    'Juli: Erntezeit in vollem Gang. Zweitsaaten f\u00fcr Herbst beginnen.',
-    'August: Letzte Ernte der Sommerfr\u00fcchte. Herbstsaat vorbereiten.',
-    'September: \u00c4pfel und Birnen ernten. Gr\u00fcnd\u00fcngung auss\u00e4en.',
-    'Oktober: Ernte abschlie\u00dfen. Beete winterfest machen.',
-    'November: Laub kompostieren. Winterschutz anbringen.',
-    'Dezember: Gartenruhe. Werkzeug pflegen. N\u00e4chstes Jahr planen.',
-  ];
+  // Dates that have a lostag entry; the name/saying live in the locale files
+  // so the farmer's calendar is translated like the rest of the UI.
+  const lostagDates = new Set(['1-1', '1-6', '1-20', '2-2', '2-14', '2-24', '3-17', '3-19', '3-21', '4-23', '4-25', '5-1', '5-11', '5-12', '5-13', '5-14', '5-15', '6-11', '6-21', '6-24', '6-27', '7-2', '7-15', '7-20', '8-10', '8-15', '8-24', '9-1', '9-8', '9-22', '9-29', '10-4', '10-16', '10-28', '11-1', '11-2', '11-11', '11-25', '12-4', '12-21', '12-25', '12-31']);
+  const monthWisdom = month >= 1 && month <= 12 ? t(`bauern.monthWisdom.${month}`) : '';
   const key = `${month}-${day}`;
-  const lostag = rules[key] || null;
-  const monthWisdom = monthlyWisdom[month];
-  const phenoSeasons = ['','Vorfr\u00fchling','Vorfr\u00fchling','Erstfr\u00fchling','Vollfr\u00fchling','Fr\u00fchsommer','Hochsommer','Hochsommer','Sp\u00e4tsommer','Fr\u00fchherbst','Vollherbst','Sp\u00e4therbst','Winter'];
+  const lostag = lostagDates.has(key)
+    ? { name: t(`bauern.${key}.name`), spruch: t(`bauern.${key}.spruch`) }
+    : null;
+  // Phenological season per month, resolved through the locale.
+  const phenoSeason = month >= 1 && month <= 12 ? t(`pheno.season.${month}`) : '';
   return {
     lostag,
     monthWisdom,
-    phenoSeason: phenoSeasons[month],
+    phenoSeason,
     spruch: lostag ? lostag.spruch : monthWisdom,
     name: lostag ? lostag.name : null,
   };
@@ -933,7 +904,6 @@ const logsList = $("logsList");
 const selectedPlantLabel = $("selectedPlantLabel");
 const plantsFilterStatus = $("plantsFilterStatus");
 const phaseTaskSetBar = $("phaseTaskSetBar");
-const homePanel = null;
 const detailPanel = $("detailPanel");
 const reminderPanel = $("reminderPanel");
 const timelinePanel = $("timelinePanel");
@@ -1240,11 +1210,11 @@ function setVisible(el, visible) {
 
 function currentDueTaskCount() {
   const today = new Date().toISOString().slice(0, 10);
-  return allTasks.filter((task) => !task.done && task.due_at && task.due_at.slice(0, 10) <= today).length;
+  return allTasks.filter((task) => task.status === "open" && task.due_at && task.due_at.slice(0, 10) <= today).length;
 }
 
 function currentOpenReminderCount() {
-  return allTasks.filter((task) => !task.done && task.reminder).length;
+  return allTasks.filter((task) => task.status === "open" && task.notification_enabled).length;
 }
 
 function getMvpReadinessItems() {
@@ -1462,7 +1432,7 @@ function renderSettingsPanel() {
   const profileSection = `
     <div class="settings-section">
       <h3>${t('settings.profile')}</h3>
-      <div class="settings-info">${isLoggedIn ? t('settings.loggedInAs', `<strong style="color:${TC.text};">${userEmail || t('settings.loggedInUnknown')}</strong>`) : t('settings.guestMode')}</div>
+      <div class="settings-info">${isLoggedIn ? t('settings.loggedInAs', `<strong style="color:${TC.text};">${escapeHtml(userEmail || t('settings.loggedInUnknown'))}</strong>`) : t('settings.guestMode')}</div>
       <div class="settings-row">
         <div class="settings-field">
           <label for="settingsLocale">${t('settings.language')}</label>
@@ -1769,7 +1739,6 @@ function renderSettingsPanel() {
     try { renderPlantContextBar && renderPlantContextBar(); } catch (_) {}
     try { renderPlants && renderPlants(); } catch (_) {}
     try { renderTimelinePanel && renderTimelinePanel(); } catch (_) {}
-    try { if (typeof homePanel !== 'undefined' && homePanel && typeof renderHomePanel === 'function') renderHomePanel(); } catch (_) {}
     try { renderLocationsView && renderLocationsView(); } catch (_) {}
     try { renderTipsView && renderTipsView(); } catch (_) {}
     try { renderDeviceManagementPanel && renderDeviceManagementPanel(); } catch (_) {}
@@ -2162,7 +2131,7 @@ function renderProfileIndicator() {
   if (activeProfile) {
     el.innerHTML = `<span style="font-size:14px;">${activeProfile.avatar_emoji}</span> <span style="font-size:11px;color:${TC.textMuted};">${escapeHtml(activeProfile.name)}</span>`;
     el.style.cursor = 'pointer';
-    el.title = 'Profil wechseln';
+    el.title = t('profile.switchTitle');
     el.onclick = () => openProfileSwitchDropdown(el);
   } else {
     el.innerHTML = '';
@@ -2212,16 +2181,20 @@ async function loadLocations() {
   try { locations = await invoke("list_locations"); } catch (_) { locations = []; }
 }
 
-const locationTypeLabels = {
-  growzelt: 'Growzelt', gewaechshaus: 'Gew\u00e4chshaus', outdoor: 'Outdoor',
-  indoor: 'Indoor', balkon: 'Balkon', custom: 'Eigener'
-};
+// Must be a function, not a const object: a const would resolve t() once at
+// module load and keep the startup language forever after a language switch.
+function getLocationTypeLabels() {
+  return {
+    growzelt: t('location.type.tent'), gewaechshaus: t('location.type.greenhouse'), outdoor: t('location.type.outdoor'),
+    indoor: t('location.type.indoor'), balkon: t('location.type.balcony'), custom: t('location.type.custom'),
+  };
+}
 
 function renderLocationsView() {
   const container = document.getElementById('locationsList');
   if (!container) return;
 
-  const typeOptions = Object.entries(locationTypeLabels).map(([val, label]) =>
+  const typeOptions = Object.entries(getLocationTypeLabels()).map(([val, label]) =>
     `<option value="${val}">${escapeHtml(label)}</option>`
   ).join('');
 
@@ -2241,7 +2214,7 @@ function renderLocationsView() {
   } else {
     html += locations.map(loc => {
       const assignedPlants = plants.filter(p => p.location_id === loc.location_id);
-      const typeBadge = locationTypeLabels[loc.location_type] || escapeHtml(loc.location_type);
+      const typeBadge = getLocationTypeLabels()[loc.location_type] || escapeHtml(loc.location_type);
       return `<div class="view-card" style="margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
@@ -2270,10 +2243,13 @@ function renderLocationsView() {
     const location_type = document.getElementById('locTypeInput')?.value || 'custom';
     const description = document.getElementById('locDescInput')?.value?.trim() || null;
     try {
-      await invoke("create_location", { name, location_type, description });
+      await invoke("create_location", { name, locationType: location_type, description });
       await loadLocations();
       renderLocationsView();
-    } catch (e) { console.error("create location failed:", e); }
+    } catch (e) {
+      console.error("create location failed:", e);
+      logOut(t('location.createFailed', String(e)));
+    }
   });
 
   container.querySelectorAll('[data-loc-action]').forEach(btn => {
@@ -2339,7 +2315,7 @@ function renderDeviceManagementPanel() {
             <option value="">${t('devices.noneOption')}</option>
             ${plantOptions}
           </select>
-          <span style="color:${TC.textDim}; font-size:11px;">${t('devices.lastSeen')} ${new Date(d.last_seen).toLocaleString(currentLang === 'de' ? 'de-DE' : currentLang)}</span>
+          <span style="color:${TC.textDim}; font-size:11px;">${t('devices.lastSeen')} ${new Date(d.last_seen).toLocaleString(localeTag())}</span>
         </div>
       </div>`;
   }).join('');
@@ -2533,17 +2509,17 @@ function renderLcStatusCard(result) {
   const rawBytes = result?.raw_bytes ?? 0;
 
   const modeLabel = {
-    0: "Auto",
-    1: "Manuell",
-    2: "Slave",
-    3: "Timer",
-  }[s.mode] || (s.mode != null ? `Modus ${s.mode}` : "--");
+    0: t('lc.mode.auto'),
+    1: t('lc.mode.manual'),
+    2: t('lc.mode.slave'),
+    3: t('lc.mode.timer'),
+  }[s.mode] || (s.mode != null ? t('lc.mode.unknown', s.mode) : "--");
 
   const brightness = s.brightness != null ? `${s.brightness}%` : "--";
   const brightnessBarWidth = s.brightness != null ? Math.max(0, Math.min(100, s.brightness)) : 0;
   const pwm = s.pwm != null ? s.pwm : "--";
   const pwmPct = s.pwm != null ? Math.round((s.pwm / 1023) * 100) : null;
-  const screenOn = s.is_screen_on === true ? "An" : s.is_screen_on === false ? "Aus" : "--";
+  const screenOn = s.is_screen_on === true ? t('devices.on') : s.is_screen_on === false ? t('devices.off') : "--";
 
   const upTimeStr = s.up_time != null
     ? formatUpTime(s.up_time)
@@ -2566,7 +2542,7 @@ function renderLcStatusCard(result) {
   return `
     <div class="view-card" style="padding:14px; border:1px solid rgba(${TC.accentRgb},0.18); background:${TC.surface};">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h4 style="margin:0; color:${TC.accent}; font-size:14px;">LC Controller Status</h4>
+        <h4 style="margin:0; color:${TC.accent}; font-size:14px;">${t('lc.statusTitle')}</h4>
         <span style="font-size:10px; color:${TC.textDim};">${frameCount} Frames, ${rawBytes} Bytes</span>
       </div>
 
@@ -2662,7 +2638,7 @@ function renderSensorWidget() {
   const fanOn = reading ? (reading.fan_level > 0 ? t('devices.on') : t('devices.off')) : '--';
   const fanLevel = reading?.fan_level ?? '--';
   const lightLevel = reading?.light_level ?? '--';
-  const lastUpdate = reading?.created_at ? new Date(reading.created_at).toLocaleString(currentLang === 'de' ? 'de-DE' : currentLang) : t('devices.noData');
+  const lastUpdate = reading?.created_at ? new Date(reading.created_at).toLocaleString(localeTag()) : t('devices.noData');
 
   widget.innerHTML = `
     <div class="view-card" style="margin-bottom:12px;">
@@ -2843,7 +2819,7 @@ async function renderSensorChart(deviceId, rangeMinutes) {
     sensorChartInstance = null;
   }
 
-  const labels = readings.map(r => new Date(r.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
+  const labels = readings.map(r => new Date(r.created_at).toLocaleTimeString(localeTag(), { hour: "2-digit", minute: "2-digit" }));
   const tempData = readings.map(r => r.temp);
   const humiData = readings.map(r => r.humidity);
   const vpdData = readings.map(r => r.vpd);
@@ -2853,9 +2829,9 @@ async function renderSensorChart(deviceId, rangeMinutes) {
     data: {
       labels,
       datasets: [
-        { label: "Temp (C)", data: tempData, borderColor: "#ff9966", backgroundColor: "rgba(255,153,102,0.1)", yAxisID: "y", tension: 0.3, pointRadius: 1 },
-        { label: "Humidity (%)", data: humiData, borderColor: "#6bbbff", backgroundColor: "rgba(107,187,255,0.1)", yAxisID: "y", tension: 0.3, pointRadius: 1 },
-        { label: "VPD (kPa)", data: vpdData, borderColor: "#6bffbc", backgroundColor: "rgba(107,255,188,0.1)", yAxisID: "y2", tension: 0.3, pointRadius: 1 },
+        { label: t('chart.temp'), data: tempData, borderColor: "#ff9966", backgroundColor: "rgba(255,153,102,0.1)", yAxisID: "y", tension: 0.3, pointRadius: 1 },
+        { label: t('chart.humidity'), data: humiData, borderColor: "#6bbbff", backgroundColor: "rgba(107,187,255,0.1)", yAxisID: "y", tension: 0.3, pointRadius: 1 },
+        { label: t('chart.vpd'), data: vpdData, borderColor: "#6bffbc", backgroundColor: "rgba(107,255,188,0.1)", yAxisID: "y2", tension: 0.3, pointRadius: 1 },
       ],
     },
     options: {
@@ -2864,9 +2840,9 @@ async function renderSensorChart(deviceId, rangeMinutes) {
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: "#acd1c3", font: { size: 11 } } } },
       scales: {
-        x: { ticks: { color: "${TC.textDim}", maxTicksLimit: 10, font: { size: 10 } }, grid: { color: "rgba(${TC.accentRgb},0.05)" } },
-        y: { position: "left", ticks: { color: "${TC.textDim}", font: { size: 10 } }, grid: { color: "rgba(${TC.accentRgb},0.05)" }, title: { display: true, text: "Temp / Humi", color: "${TC.textDim}", font: { size: 10 } } },
-        y2: { position: "right", ticks: { color: "${TC.textDim}", font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: "VPD", color: "${TC.textDim}", font: { size: 10 } } },
+        x: { ticks: { color: TC.textDim, maxTicksLimit: 10, font: { size: 10 } }, grid: { color: `rgba(${TC.accentRgb},0.05)` } },
+        y: { position: "left", ticks: { color: TC.textDim, font: { size: 10 } }, grid: { color: `rgba(${TC.accentRgb},0.05)` }, title: { display: true, text: t('chart.axis.tempHumi'), color: TC.textDim, font: { size: 10 } } },
+        y2: { position: "right", ticks: { color: TC.textDim, font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: t('chart.axis.vpd'), color: TC.textDim, font: { size: 10 } } },
       },
     },
   });
@@ -2909,7 +2885,7 @@ function resetCheckoutState(message) {
 }
 
 function renderCheckoutStateCard() {
-  const tone = checkoutState.status === "ready" ? "#9fd7ff" : checkoutState.status === "error" ? "#ffb3a7" : "${TC.textMuted}";
+  const tone = checkoutState.status === "ready" ? "#9fd7ff" : checkoutState.status === "error" ? "#ffb3a7" : TC.textMuted;
   const border = checkoutState.status === "ready" ? "rgba(159,215,255,0.25)" : checkoutState.status === "error" ? "rgba(255,120,120,0.24)" : "rgba(255,255,255,0.08)";
   const bg = checkoutState.status === "ready" ? "rgba(159,215,255,0.08)" : checkoutState.status === "error" ? "rgba(255,120,120,0.10)" : "rgba(255,255,255,0.03)";
   const updated = checkoutState.updatedAt ? ` · ${formatDate(checkoutState.updatedAt)}` : "";
@@ -2971,7 +2947,7 @@ function mapServerHistoryEntry(entry) {
     eventKind: entry?.event_kind || entry?.eventKind || "status",
     checkoutStatus: entry?.checkout_status || entry?.checkoutStatus || null,
     status: String(entry?.checkout_status || entry?.checkoutStatus || entry?.event_kind || entry?.eventKind || "info").toLowerCase(),
-    message: entry?.message || "Kein Detailtext vorhanden.",
+    message: entry?.message || t('billing.noDetailText'),
     mode: String(entry?.event_kind || entry?.eventKind || "status").includes("webhook") ? "webhook" : "checkout",
     source: "server",
   };
@@ -3116,8 +3092,8 @@ function renderCheckoutHistoryCard() {
 
 function getPlanConfig() {
   return [
-    { key: "free",  title: "Free",  price: t('plan.price.free'),  limitText: t('plan.limit.1'),         accent: "${TC.textMuted}", detail: t('plan.free.detail') },
-    { key: "basic", title: "Basic", price: t('plan.price.basic'), limitText: t('plan.limit.3'),         accent: "${TC.accent}",    detail: t('plan.basic.detail') },
+    { key: "free",  title: "Free",  price: t('plan.price.free'),  limitText: t('plan.limit.1'),         accent: TC.textMuted, detail: t('plan.free.detail') },
+    { key: "basic", title: "Basic", price: t('plan.price.basic'), limitText: t('plan.limit.3'),         accent: TC.accent,    detail: t('plan.basic.detail') },
     { key: "pro",   title: "Pro",   price: t('plan.price.pro'),   limitText: t('plan.limit.100'),       accent: "#9fd7ff",         detail: t('plan.pro.detail') },
     { key: "csc",   title: "CSC",   price: t('plan.price.csc'),   limitText: t('plan.limit.unlimited'), accent: "#ffd76e",         detail: t('plan.csc.detail') },
   ];
@@ -3555,7 +3531,7 @@ function phaseLabel(phase) {
 
 function formatDate(value) {
   if (!value) return "-";
-  try { return new Date(value).toLocaleString("de-DE"); } catch { return value; }
+  try { return new Date(value).toLocaleString(localeTag()); } catch { return value; }
 }
 
 function toDatetimeLocalValue(value) {
@@ -3669,7 +3645,6 @@ function homeMonthGridData() {
 
 function navigateHomeMonth(delta) {
   homeMonthFocusKey = addMonthsToKey(homeMonthFocusKey || new Date().toISOString().slice(0, 10), delta);
-  if (homePanel) renderHomePanel();
 }
 
 
@@ -3754,458 +3729,6 @@ function renderHomeSubscriptionCard() {
     </div>`;
 }
 
-function renderHomePanel() {
-  const now = Date.now();
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const openTasks = allTasks.filter((task) => task.status === "open");
-  const todayTasks = openTasks
-    .filter((task) => normalizeDateKey(task.due_at) === todayKey)
-    .sort((a, b) => new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime());
-  const overdueTasks = openTasks
-    .filter((task) => task.due_at && new Date(task.due_at).getTime() < now && normalizeDateKey(task.due_at) !== todayKey)
-    .sort((a, b) => new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime());
-  const nextReminders = openTasks
-    .filter((task) => task.notification_enabled)
-    .sort((a, b) => new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime())
-    .slice(0, 5);
-  const homeWeekKeys = weekKeysFromFocusKey(todayKey);
-  const homeWeekLabel = weekRangeLabelFromKey(todayKey);
-  const homeWeekDaily = homeWeekKeys.map((dayKey) => {
-    const dayOpen = openTasks.filter((task) => normalizeDateKey(task.due_at) === dayKey);
-    const dayDueOpen = dayOpen.filter((task) => task.status === 'open');
-    const dayDone = allTasks.filter((task) => task.status === 'done' && normalizeDateKey(task.updated_at || task.due_at) === dayKey);
-    const dayLogs = allLogs.filter((log) => normalizeDateKey(log.created_at) === dayKey);
-    const overdueIntoDay = openTasks.filter((task) => task.due_at && normalizeDateKey(task.due_at) < dayKey && dayKey === todayKey);
-    return {
-      dayKey,
-      label: dateFromKey(dayKey).toLocaleDateString('de-DE', { weekday: 'short' }),
-      shortDate: dateFromKey(dayKey).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
-      openCount: dayDueOpen.length,
-      doneCount: dayDone.length,
-      logCount: dayLogs.length,
-      overdueCount: overdueIntoDay.length,
-      items: [...dayDueOpen].sort((a, b) => new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime()).slice(0, 3),
-      logsPreview: [...dayLogs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 2),
-    };
-  });
-  const homeWeekOpenTotal = homeWeekDaily.reduce((sum, day) => sum + day.openCount, 0);
-  const homeWeekDoneTotal = homeWeekDaily.reduce((sum, day) => sum + day.doneCount, 0);
-  const homeWeekLogTotal = homeWeekDaily.reduce((sum, day) => sum + day.logCount, 0);
-  const homeMonthLabel = monthRangeLabelFromKey(homeMonthFocusKey);
-  const homeMonthCells = homeMonthGridData();
-  const homeMonthOpenTotal = homeMonthCells.reduce((sum, day) => sum + day.openCount, 0);
-  const homeMonthDoneTotal = homeMonthCells.reduce((sum, day) => sum + day.doneCount, 0);
-  const homeMonthLogTotal = homeMonthCells.reduce((sum, day) => sum + day.logCount, 0);
-  const activityLogs = filteredHomeActivityLogs();
-  const latestActivity = activityLogs.slice(0, 8);
-  const homeLogTypes = ['all', ...new Set(allLogs.map((log) => log.log_type || 'note').filter(Boolean))];
-
-  const filterMap = {
-    all: openTasks,
-    today: todayTasks,
-    overdue: overdueTasks,
-    reminder: openTasks.filter((task) => task.notification_enabled),
-  };
-
-  const sorters = {
-    due: (a, b) => new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime(),
-    plant: (a, b) => plantNameById(a.plant_id).localeCompare(plantNameById(b.plant_id)) || new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime(),
-    title: (a, b) => (a.title || '').localeCompare(b.title || '') || new Date(a.due_at || 0).getTime() - new Date(b.due_at || 0).getTime(),
-  };
-
-  const filteredHomeTasks = [...(filterMap[homeTaskFilter] || openTasks)].sort(sorters[homeTaskSort] || sorters.due);
-
-  const groupedTaskSections = homeTaskGrouping === 'plant'
-    ? Object.entries(filteredHomeTasks.reduce((acc, task) => {
-        const key = plantNameById(task.plant_id);
-        acc[key] ||= [];
-        acc[key].push(task);
-        return acc;
-      }, {})).sort((a, b) => a[0].localeCompare(b[0]))
-    : [[t('home.allOpen'), filteredHomeTasks]];
-
-  const renderTaskRow = (task, tone = TC.accent) => `
-    <div style="padding:10px 12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); display:grid; gap:8px;">
-      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-        <div style="font-weight:700;">${escapeHtml(task.title)}</div>
-        <span style="padding:4px 8px; border-radius:999px; background:rgba(${TC.accentRgb},0.10); color:${tone}; font-size:11px;">${escapeHtml(task.category)}</span>
-      </div>
-      <div style="font-size:12px; color:${TC.textMuted};">${plantNameById(task.plant_id)} · ${formatDate(task.due_at)}</div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button data-home-task-action="done" data-home-task-id="${task.task_id}">Done</button>
-        <button data-home-task-action="skip" data-home-task-id="${task.task_id}">Skip</button>
-        <button data-home-task-action="open-plant" data-home-plant-id="${task.plant_id}">${t('plant.openAction')}</button>
-      </div>
-    </div>`;
-
-  const renderLogRow = (log) => `
-    <div style="padding:10px 12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); display:grid; gap:8px;">
-      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-        <div style="font-weight:700;">${escapeHtml(log.log_type)}</div>
-        <span style="padding:4px 8px; border-radius:999px; background:rgba(111,155,255,0.10); color:#9fc2ff; font-size:11px;">Log</span>
-      </div>
-      <div style="font-size:12px; color:${TC.textMuted};">${plantNameById(log.plant_id)} · ${formatDate(log.created_at)}</div>
-      <div style="font-size:13px; color:#dcefe8;">${escapeHtml((log.text || 'Ohne Text').slice(0, 120))}</div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button data-home-log-action="open-plant" data-home-plant-id="${log.plant_id}">${t('plant.openAction')}</button>
-        <button data-home-log-action="log-today" data-home-plant-id="${log.plant_id}">${t('home.logForToday')}</button>
-        <button data-home-log-action="log-same-day" data-home-plant-id="${log.plant_id}" data-home-log-created-at="${log.created_at || ''}">${t('home.logForDay')}</button>
-      </div>
-    </div>`;
-
-  const filterButton = (key, label) => `<button data-home-filter="${key}" style="${homeTaskFilter === key ? 'background:${TC.accent}; color:${TC.inputBg}; border-color:${TC.accent};' : ''}">${label}</button>`;
-  const groupingButton = (key, label) => `<button data-home-grouping="${key}" style="${homeTaskGrouping === key ? 'background:${TC.accent}; color:${TC.inputBg}; border-color:${TC.accent};' : ''}">${label}</button>`;
-  const sortButton = (key, label) => `<button data-home-sort="${key}" style="${homeTaskSort === key ? 'background:${TC.accent}; color:${TC.inputBg}; border-color:${TC.accent};' : ''}">${label}</button>`;
-  const logPlantButton = (key, label) => `<button data-home-log-plant="${key}" style="${homeLogPlantFilter === key ? 'background:#9fc2ff; color:${TC.inputBg}; border-color:#9fc2ff;' : ''}">${label}</button>`;
-  const logRangeButton = (key, label) => `<button data-home-log-range="${key}" style="${homeLogRangeFilter === key ? 'background:#9fc2ff; color:${TC.inputBg}; border-color:#9fc2ff;' : ''}">${label}</button>`;
-  const logTypeButton = (key, label) => `<button data-home-log-type="${key}" style="${homeLogTypeFilter === key ? 'background:#9fc2ff; color:${TC.inputBg}; border-color:#9fc2ff;' : ''}">${label}</button>`;
-
-  if (homePanel) homePanel.innerHTML = `
-    <div style="display:grid; gap:14px;">
-      <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap;">
-        <div>
-          <h2 style="margin:0; color:${TC.accent}; font-size:18px;">${t('home.todayTitle')}</h2>
-          <div style="margin-top:4px; color:${TC.textMuted}; font-size:13px;">${t('home.todayHint')}</div>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); font-size:12px; color:${TC.textMuted};">${t('home.pill.plants', plants.length)}</div>
-          <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); font-size:12px; color:${TC.textMuted};">${t('home.pill.today', todayTasks.length)}</div>
-          <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(255,122,122,0.16); font-size:12px; color:#ff9b9b;">${t('home.pill.overdue', overdueTasks.length)}</div>
-          <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.16); font-size:12px; color:#9fc2ff;">${t('home.pill.logs', allLogs.length)}</div>
-        </div>
-      </div>
-
-      ${renderHomeSubscriptionCard()}
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-        <div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10);">
-          <div style="font-size:12px; color:${TC.textMuted};">${t('settings.dueToday')}</div>
-          <div style="margin-top:6px; font-size:22px; font-weight:700; color:${TC.accent};">${todayTasks.length}</div>
-        </div>
-        <div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(255,122,122,0.12);">
-          <div style="font-size:12px; color:${TC.textMuted};">${t('home.section.overdue')}</div>
-          <div style="margin-top:6px; font-size:22px; font-weight:700; color:#ff9b9b;">${overdueTasks.length}</div>
-        </div>
-        <div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12);">
-          <div style="font-size:12px; color:${TC.textMuted};">${t('home.section.nextReminder')}</div>
-          <div style="margin-top:6px; font-size:22px; font-weight:700; color:${TC.textMuted};">${nextReminders.length}</div>
-        </div>
-        <div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.12);">
-          <div style="font-size:12px; color:${TC.textMuted};">${t('home.section.recentActivity')}</div>
-          <div style="margin-top:6px; font-size:22px; font-weight:700; color:#9fc2ff;">${latestActivity.length}</div>
-        </div>
-      </div>
-
-      <div style="display:grid; gap:10px; padding:12px; border-radius:12px; background:${TC.cardSolid}; border:1px solid rgba(${TC.accentRgb},0.10);">
-        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-          <div>
-            <div style="font-size:13px; color:${TC.textMuted};">${t('home.week.title')}</div>
-            <div style="margin-top:4px; font-size:12px; color:#6f8d80;">${t('home.week.hint', homeWeekLabel)}</div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); font-size:12px; color:${TC.accent};">Offen ${homeWeekOpenTotal}</div>
-            <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(183,216,203,0.12); font-size:12px; color:${TC.textMuted};">Done ${homeWeekDoneTotal}</div>
-            <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.16); font-size:12px; color:#9fc2ff;">Logs ${homeWeekLogTotal}</div>
-          </div>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px;">
-          ${homeWeekDaily.map((day) => `
-            <div style="padding:10px; border-radius:12px; background:${day.dayKey === todayKey ? '#10211c' : TC.surface}; border:1px solid ${day.overdueCount ? 'rgba(255,122,122,0.28)' : day.openCount ? `rgba(${TC.accentRgb},0.18)` : `rgba(${TC.accentRgb},0.10)`}; display:grid; gap:8px; min-height:220px; align-content:start;">
-              <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
-                <div>
-                  <div style="font-size:12px; color:${TC.textMuted}; text-transform:uppercase;">${day.label}</div>
-                  <div style="font-size:14px; font-weight:700; color:${TC.text};">${day.shortDate}</div>
-                </div>
-                ${day.dayKey === todayKey ? `<span style="padding:4px 8px; border-radius:999px; background:rgba(${TC.accentRgb},0.12); color:${TC.accent}; font-size:11px;">${t('home.week.today')}</span>` : ''}
-              </div>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <span style="padding:4px 8px; border-radius:999px; background:rgba(${TC.accentRgb},0.10); color:${TC.accent}; font-size:11px;">Open ${day.openCount}</span>
-                <span style="padding:4px 8px; border-radius:999px; background:rgba(183,216,203,0.10); color:${TC.textMuted}; font-size:11px;">Done ${day.doneCount}</span>
-                <span style="padding:4px 8px; border-radius:999px; background:rgba(111,155,255,0.10); color:#9fc2ff; font-size:11px;">Logs ${day.logCount}</span>
-                ${day.overdueCount ? `<span style="padding:4px 8px; border-radius:999px; background:rgba(255,122,122,0.12); color:#ff9b9b; font-size:11px;">${t('home.week.overdue', day.overdueCount)}</span>` : ''}
-              </div>
-              <div style="display:grid; gap:6px; align-content:start;">
-                ${day.items.length ? day.items.map((task) => `<div style="display:grid; gap:6px; padding:8px 10px; border-radius:10px; background:${TC.cardSolid}; border:1px solid rgba(${TC.accentRgb},0.10);"><button data-home-week-task="${task.task_id}" data-home-week-plant="${task.plant_id}" style="text-align:left; padding:0; background:transparent; border:none; color:#dcefe8; font-size:12px;">${escapeHtml(task.title)}<div style="margin-top:4px; color:${TC.textMuted}; font-size:11px;">${plantNameById(task.plant_id)}</div></button><div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-home-week-action="done" data-home-week-task-id="${task.task_id}" data-home-week-plant-id="${task.plant_id}" style="padding:4px 8px; font-size:11px;">Done</button><button data-home-week-action="skip" data-home-week-task-id="${task.task_id}" data-home-week-plant-id="${task.plant_id}" style="padding:4px 8px; font-size:11px;">Skip</button><button data-home-week-action="open-plant" data-home-week-plant-id="${task.plant_id}" style="padding:4px 8px; font-size:11px;">${t('plant.openAction')}</button></div></div>`).join('') : `<div style="font-size:12px; color:#6f8d80;">${t('home.week.noOpen')}</div>`}
-              </div>
-              <div style="display:grid; gap:6px; align-content:start;">
-                <div style="font-size:11px; color:${TC.textMuted}; text-transform:uppercase; letter-spacing:0.04em;">${t('home.week.activityLabel')}</div>
-                ${day.logsPreview.length ? day.logsPreview.map((log) => `<div style="display:grid; gap:6px; padding:8px 10px; border-radius:10px; background:${TC.inputBg}; border:1px solid rgba(111,155,255,0.10);"><div style="font-size:12px; color:#dcefe8;">${escapeHtml(((log.text || log.log_type || 'Log') + '').slice(0, 56))}</div><div style="font-size:11px; color:${TC.textMuted};">${plantNameById(log.plant_id)} · ${escapeHtml(log.log_type || 'note')}</div><div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-home-week-log-action="open-plant" data-home-week-log-plant-id="${log.plant_id}" style="padding:4px 8px; font-size:11px;">${t('plant.openAction')}</button><button data-home-week-log-action="log-day" data-home-week-log-plant-id="${log.plant_id}" data-home-week-log-day="${day.dayKey}" style="padding:4px 8px; font-size:11px;">${t('home.week.newLogForDay')}</button></div></div>`).join('') : `<div style="font-size:12px; color:#6f8d80;">${t('home.week.noLogs')}</div>`}
-                <div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-home-week-day-action="new-task" data-home-week-day="${day.dayKey}" style="padding:4px 8px; font-size:11px;">${t('home.week.newTaskForDay')}</button><button data-home-week-day-action="new-log" data-home-week-day="${day.dayKey}" style="padding:4px 8px; font-size:11px;">${t('home.week.newLogForDay')}</button></div>
-              </div>
-            </div>`).join('')}
-        </div>
-      <div style="display:grid; gap:10px; padding:12px; border-radius:12px; background:${TC.cardSolid}; border:1px solid rgba(111,155,255,0.10);">
-        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-          <div>
-            <div style="font-size:13px; color:${TC.textMuted};">${t('home.month.title')}</div>
-            <div style="margin-top:4px; font-size:12px; color:#6f8d80;">${t('home.month.hint')}</div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button data-home-month-nav="prev">←</button>
-            <button data-home-month-nav="today">${t('home.month.today')}</button>
-            <button data-home-month-nav="next">→</button>
-            <span style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.12); font-size:12px; color:#9fc2ff;">${homeMonthLabel}</span>
-          </div>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <span style="padding:6px 10px; border-radius:999px; background:rgba(${TC.accentRgb},0.10); color:${TC.accent}; font-size:11px;">Open ${homeMonthOpenTotal}</span>
-          <span style="padding:6px 10px; border-radius:999px; background:rgba(183,216,203,0.10); color:${TC.textMuted}; font-size:11px;">Done ${homeMonthDoneTotal}</span>
-          <span style="padding:6px 10px; border-radius:999px; background:rgba(111,155,255,0.10); color:#9fc2ff; font-size:11px;">Logs ${homeMonthLogTotal}</span>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; font-size:11px; color:${TC.textMuted};">
-          ${['Mo','Di','Mi','Do','Fr','Sa','So'].map((d)=>`<div style="padding:4px 6px;">${d}</div>`).join('')}
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px;">
-          ${homeMonthCells.map((day) => {
-            const focused = day.key === timelineFocusKey;
-            const border = day.openCount ? `rgba(${TC.accentRgb},0.18)` : day.logCount ? 'rgba(111,155,255,0.18)' : `rgba(${TC.accentRgb},0.08)`;
-            const bg = focused ? `linear-gradient(180deg, rgba(${TC.accentRgb},0.08), rgba(9,20,17,0.95))` : TC.surface;
-            return `<div style="min-height:118px; padding:8px; border-radius:12px; background:${bg}; border:1px solid ${border}; opacity:${day.inMonth ? '1' : '0.55'}; display:grid; gap:6px; align-content:start;">
-              <button data-home-month-day="${day.key}" style="text-align:left; padding:0; background:transparent; border:none; color:${focused ? TC.accent : TC.text}; font-weight:700; font-size:12px;">${day.dayNumber}</button>
-              <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                ${day.openCount ? `<span style="padding:3px 6px; border-radius:999px; background:rgba(${TC.accentRgb},0.12); color:${TC.accent}; font-size:10px;">O ${day.openCount}</span>` : ''}
-                ${day.doneCount ? `<span style="padding:3px 6px; border-radius:999px; background:rgba(183,216,203,0.10); color:${TC.textMuted}; font-size:10px;">D ${day.doneCount}</span>` : ''}
-                ${day.logCount ? `<span style="padding:3px 6px; border-radius:999px; background:rgba(111,155,255,0.10); color:#9fc2ff; font-size:10px;">L ${day.logCount}</span>` : ''}
-              </div>
-              <div style="display:grid; gap:4px;">
-                ${day.topTasks.length ? day.topTasks.map((task)=>`<button data-home-month-task="${task.task_id}" data-home-month-plant="${task.plant_id}" style="text-align:left; padding:4px 6px; border-radius:8px; border:1px solid rgba(${TC.accentRgb},0.08); background:${TC.inputBg}; color:#dcefe8; font-size:10px;">${escapeHtml(task.title)}</button>`).join('') : `<div style="font-size:10px; color:#6f8d80;">${t('home.month.noOpen')}</div>`}
-              </div>
-              <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:auto;">
-                <button data-home-month-action="task" data-home-month-day="${day.key}" style="padding:3px 6px; font-size:10px;">+ Task</button>
-                <button data-home-month-action="log" data-home-month-day="${day.key}" style="padding:3px 6px; font-size:10px;">+ Log</button>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>
-
-      <div style="display:grid; gap:10px; padding:12px; border-radius:12px; background:${TC.cardSolid}; border:1px solid rgba(${TC.accentRgb},0.10);">
-        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-          <div>
-            <div style="font-size:13px; color:${TC.textMuted};">${t('home.filter.title')}</div>
-            <div style="margin-top:4px; font-size:12px; color:#6f8d80;">${t('home.filter.hint')}</div>
-          </div>
-          <div style="padding:8px 10px; border-radius:999px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); font-size:12px; color:${TC.textMuted};">${t('home.filter.count', filteredHomeTasks.length)}</div>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          ${filterButton('all', t('home.filter.all'))}
-          ${filterButton('today', t('home.filter.today'))}
-          ${filterButton('overdue', t('home.filter.overdue'))}
-          ${filterButton('reminder', t('home.filter.remindersOnly'))}
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          ${groupingButton('flat', t('home.filter.flat'))}
-          ${groupingButton('plant', t('home.filter.byPlant'))}
-          ${sortButton('due', t('home.filter.byDate'))}
-          ${sortButton('plant', t('home.filter.byPlant'))}
-          ${sortButton('title', t('home.filter.byTitle'))}
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
-        <div style="display:grid; gap:10px;">
-          <div style="font-size:13px; color:${TC.textMuted};">${t('home.today.due')}</div>
-          ${todayTasks.length ? todayTasks.slice(0,6).map((task) => renderTaskRow(task)).join('') : `<div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); color:${TC.textMuted};">${t('home.today.empty')}</div>`}
-        </div>
-        <div style="display:grid; gap:10px;">
-          <div style="font-size:13px; color:${TC.textMuted};">${t('home.overdue.title')}</div>
-          ${overdueTasks.length ? overdueTasks.slice(0,6).map((task) => renderTaskRow(task, '#ff9b9b')).join('') : `<div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(255,122,122,0.10); color:${TC.textMuted};">${t('home.overdue.empty')}</div>`}
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns: minmax(280px, 1.25fr) minmax(260px, 1fr); gap:12px; align-items:start;">
-        <div style="display:grid; gap:10px;">
-          <div style="font-size:13px; color:${TC.textMuted};">${t('home.globalOpen.title')}</div>
-          ${groupedTaskSections.length && filteredHomeTasks.length ? groupedTaskSections.map(([groupName, groupTasks]) => `
-            <div style="display:grid; gap:8px; padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10);">
-              <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-                <div style="font-weight:700; color:${TC.text};">${groupName}</div>
-                <div style="font-size:12px; color:${TC.textMuted};">${groupTasks.length} offen</div>
-              </div>
-              ${groupTasks.slice(0, homeTaskGrouping === 'plant' ? 8 : 10).map((task) => renderTaskRow(task, homeTaskFilter === 'overdue' ? '#ff9b9b' : TC.accent)).join('')}
-            </div>`).join('') : `<div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); color:${TC.textMuted};">${t('home.globalOpen.empty')}</div>`}
-        </div>
-        <div style="display:grid; gap:12px;">
-          <div style="display:grid; gap:10px;">
-            <div style="font-size:13px; color:${TC.textMuted};">${t('home.nextReminder.title')}</div>
-            ${nextReminders.length ? nextReminders.map((task) => renderTaskRow(task)).join('') : `<div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); color:${TC.textMuted};">${t('home.nextReminder.empty')}</div>`}
-          </div>
-          <div style="display:grid; gap:10px;">
-            <div style="display:grid; gap:10px; padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.10);">
-              <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-                <div>
-                  <div style="font-size:13px; color:${TC.textMuted};">${t('home.activity.title')}</div>
-                  <div style="margin-top:4px; font-size:12px; color:#6f8d80;">${t('home.activity.hint')}</div>
-                </div>
-                <div style="padding:8px 10px; border-radius:999px; background:${TC.cardSolid}; border:1px solid rgba(111,155,255,0.12); font-size:12px; color:#9fc2ff;">${t('home.activity.count', activityLogs.length)}</div>
-              </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                ${logPlantButton('all', t('home.activity.allPlants'))}
-                ${plants.slice(0, 8).map((plant) => logPlantButton(plant.plant_id, plant.name || t('plant.fallbackName'))).join('')}
-              </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                ${logRangeButton('today', t('home.range.today'))}
-                ${logRangeButton('7d', t('home.range.7d'))}
-                ${logRangeButton('30d', t('home.range.30d'))}
-                ${logRangeButton('all', 'Alles')}
-              </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                ${homeLogTypes.map((type) => logTypeButton(type, type === 'all' ? t('home.logType.all') : type)).join('')}
-              </div>
-            </div>
-            ${latestActivity.length ? latestActivity.map((log) => renderLogRow(log)).join('') : `<div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(111,155,255,0.10); color:${TC.textMuted};">${t('home.activity.empty')}</div>`}
-          </div>
-        </div>
-      </div>
-    </div>`;
-
-  homePanel?.querySelectorAll('[data-home-filter]').forEach((btn) => {
-    btn.onclick = () => {
-      homeTaskFilter = btn.dataset.homeFilter;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-grouping]').forEach((btn) => {
-    btn.onclick = () => {
-      homeTaskGrouping = btn.dataset.homeGrouping;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-sort]').forEach((btn) => {
-    btn.onclick = () => {
-      homeTaskSort = btn.dataset.homeSort;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-log-plant]').forEach((btn) => {
-    btn.onclick = () => {
-      homeLogPlantFilter = btn.dataset.homeLogPlant;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-log-range]').forEach((btn) => {
-    btn.onclick = () => {
-      homeLogRangeFilter = btn.dataset.homeLogRange;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-log-type]').forEach((btn) => {
-    btn.onclick = () => {
-      homeLogTypeFilter = btn.dataset.homeLogType;
-      renderHomePanel();
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-week-task]').forEach((btn) => {
-    btn.onclick = async () => {
-      const plantId = btn.dataset.homeWeekPlant;
-      if (!plantId) return;
-      await focusPlantFromHome(plantId);
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-week-action]').forEach((btn) => {
-    btn.onclick = async () => {
-      const action = btn.dataset.homeWeekAction;
-      const taskId = btn.dataset.homeWeekTaskId;
-      const plantId = btn.dataset.homeWeekPlantId;
-      try {
-        if (action === 'open-plant') {
-          await focusPlantFromHome(plantId);
-          return;
-        }
-        if (!taskId) return;
-        await invoke('update_task_status_smart', { payload: { task_id: taskId, status: action === 'done' ? 'done' : 'skipped' } });
-        await refreshAll({ autoReminderReason: 'home_week_action' });
-      } catch (err) {
-        logOut(`Home week action error: ${err}`);
-      }
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-week-log-action]').forEach((btn) => {
-    btn.onclick = async () => {
-      const action = btn.dataset.homeWeekLogAction;
-      const plantId = btn.dataset.homeWeekLogPlantId;
-      const dayKey = btn.dataset.homeWeekLogDay;
-      try {
-        if (action === 'open-plant') {
-          await focusPlantFromHome(plantId);
-          return;
-        }
-        if (action === 'log-day') {
-          await prepareLogFromHome(plantId, { dayKey });
-        }
-      } catch (err) {
-        logOut(`Home week log action error: ${err}`);
-      }
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-week-day-action]').forEach((btn) => {
-    btn.onclick = async () => {
-      const action = btn.dataset.homeWeekDayAction;
-      const dayKey = btn.dataset.homeWeekDay;
-      try {
-        if (action === 'new-task') {
-          const plantId = selectedPlantId || plants[0]?.plant_id;
-          if (!plantId) {
-            logOut(t('home.week.noPlantForTask'));
-            return;
-          }
-          await prepareTaskFromHome(plantId, { dayKey });
-          return;
-        }
-        if (action === 'new-log') {
-          const plantId = selectedPlantId || plants[0]?.plant_id;
-          if (!plantId) {
-            logOut(t('home.week.noPlantForLog'));
-            return;
-          }
-          await prepareLogFromHome(plantId, { dayKey });
-        }
-      } catch (err) {
-        logOut(`Home week day action error: ${err}`);
-      }
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-task-action]').forEach((btn) => {
-    btn.onclick = async () => {
-      const action = btn.dataset.homeTaskAction;
-      const taskId = btn.dataset.homeTaskId;
-      const plantId = btn.dataset.homePlantId;
-      try {
-        if (action === 'open-plant') {
-          await focusPlantFromHome(plantId);
-          return;
-        }
-        if (!taskId) return;
-        await invoke('update_task_status_smart', { payload: { task_id: taskId, status: action === 'done' ? 'done' : 'skipped' } });
-        await refreshAll({ autoReminderReason: 'home_task_action' });
-      } catch (err) {
-        logOut(`Home action error: ${err}`);
-      }
-    };
-  });
-  homePanel?.querySelectorAll('[data-home-log-action]').forEach((btn) => {
-    btn.onclick = async () => {
-      const action = btn.dataset.homeLogAction;
-      const plantId = btn.dataset.homePlantId;
-      const createdAt = btn.dataset.homeLogCreatedAt;
-      try {
-        if (action === 'open-plant') {
-          await focusPlantFromHome(plantId);
-          return;
-        }
-        if (action === 'log-today') {
-          await prepareLogFromHome(plantId, { dayKey: new Date().toISOString().slice(0, 10) });
-          return;
-        }
-        if (action === 'log-same-day') {
-          await prepareLogFromHome(plantId, { createdAt });
-        }
-      } catch (err) {
-        logOut(`Home log action error: ${err}`);
-      }
-    };
-  });
-}
 
 function computePlantDashboardSummary(plant) {
   const plantTasks = tasks.filter((t) => t.plant_id === plant.plant_id);
@@ -4259,7 +3782,7 @@ function normalizeDateKey(value) {
 function dateLabelFromKey(key) {
   if (!key) return t('timeline.noDate');
   const d = new Date(`${key}T00:00:00`);
-  return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString(localeTag(), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function dateFromKey(key) {
@@ -4303,13 +3826,13 @@ function weekRangeLabelFromKey(key) {
   const start = startOfWeekFromKey(key);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
-  const startLabel = start.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
-  const endLabel = end.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const startLabel = start.toLocaleDateString(localeTag(), { day: "2-digit", month: "2-digit" });
+  const endLabel = end.toLocaleDateString(localeTag(), { day: "2-digit", month: "2-digit", year: "numeric" });
   return `${startLabel} – ${endLabel}`;
 }
 
 function monthRangeLabelFromKey(key) {
-  return startOfMonthFromKey(key).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+  return startOfMonthFromKey(key).toLocaleDateString(localeTag(), { month: "long", year: "numeric" });
 }
 
 function weekKeysFromFocusKey(key) {
@@ -4858,7 +4381,7 @@ function showDayDetail(dayKey) {
             <span class="cal-dot" style="background:${sanitizeColorTag(plant?.color_tag || TC.accent)};"></span>
             <span style="flex:1;">${escapeHtml(tsk.title)}${repeatLabel}${isVirtual ? ` <span style="font-size:10px;color:${TC.textDim};">(geplant)</span>` : ''}</span>
             <span class="status-badge status-badge--${tsk.status === 'done' ? 'active' : tsk.status === 'open' ? 'ended' : 'archived'}">${escapeHtml(tsk.status)}</span>
-            ${showDoneBtn ? `<button class="btn btn--sm" data-day-task-done="${tsk.task_id}">Done</button>` : ''}
+            ${showDoneBtn ? `<button class="btn btn--sm" data-day-task-done="${tsk.task_id}">${t('task.doneBtn')}</button>` : ''}
             ${tsk.repeat_interval_hours && tsk.repeat_interval_hours > 0 ? `<button class="btn btn--sm" data-day-task-stop-repeat="${tsk.task_id}" title="${t('task.stopRepeatTitle')}">${t('task.stopRepeat')}</button>` : ''}
             <button class="btn btn--sm" data-day-task-delete="${tsk.task_id}" title="${t('task.deleteTitle')}" style="color:#d66;">🗑</button>
           </div>`;
@@ -4886,10 +4409,15 @@ function showDayDetail(dayKey) {
 
   // Close on X button
   panel.querySelector('#closeDayDetail')?.addEventListener('click', closeDayDetail);
-  // Close on click outside the content
-  panel.addEventListener('click', (e) => {
-    if (e.target === panel) closeDayDetail();
-  });
+  // Close on click outside the content.
+  // The panel element is persistent, so bind this exactly once — otherwise
+  // every day-click and every refreshAll() stacks another listener on it.
+  if (!panel.dataset.outsideClickBound) {
+    panel.dataset.outsideClickBound = '1';
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) closeDayDetail();
+    });
+  }
   panel.querySelectorAll('[data-day-add-task]').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); openModal('task', { dueDate: dayKey }); });
   });
@@ -5066,7 +4594,7 @@ function openPlantStatPopup(plant, kind) {
           <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(it.category || '')} · ${t('task.dueOn', formatDate(it.due_at))}${repeatLbl}</div>
         </div>
         <span style="padding:3px 8px; border-radius:10px; font-size:11px; background:rgba(${TC.accentRgb},0.1); color:${statusColor};">${escapeHtml(it.status)}</span>
-        ${it.status === 'open' ? `<button class="btn btn--sm" data-popup-done="${it.task_id}">Done</button>` : ''}
+        ${it.status === 'open' ? `<button class="btn btn--sm" data-popup-done="${it.task_id}">${t('task.doneBtn')}</button>` : ''}
         <button class="btn btn--sm" data-popup-del-task="${it.task_id}" title="${t('action.deleteTitle')}" style="color:#d66;">🗑</button>
       </div>`;
     } else {
@@ -5359,14 +4887,14 @@ function renderPlantFormHTML(prefill = {}) {
       <div class="form-group">
         <label class="form-label">${t('plant.phase')}</label>
         <select id="plantPhase" class="form-select">
-          <option value="seed">Seed</option>
-          <option value="veg" selected>Veg</option>
-          <option value="flower">Flower</option>
-          <option value="harvest">Harvest</option>
-          <option value="dry">Dry</option>
-          <option value="cure">Cure</option>
+          <option value="seed">${t('phase.seed')}</option>
+          <option value="veg" selected>${t('phase.veg')}</option>
+          <option value="flower">${t('phase.flower')}</option>
+          <option value="harvest">${t('phase.harvest')}</option>
+          <option value="dry">${t('phase.dry')}</option>
+          <option value="cure">${t('phase.cure')}</option>
           <option value="dormant">${t('phase.dormant')}</option>
-          <option value="custom">Custom</option>
+          <option value="custom">${t('phase.custom')}</option>
         </select>
       </div>
     </div>
@@ -5392,7 +4920,7 @@ function renderPlantFormHTML(prefill = {}) {
       <div class="form-group">
         <label class="form-label">${t('plant.soil')}</label>
         <select id="plantSoilType" class="form-select">
-          <option value="">-- Standard --</option>
+          <option value="">${t('soil.default')}</option>
           <option value="erde">${t('soil.erde')}</option>
           <option value="kokos">${t('soil.kokos')}</option>
           <option value="hydro">${t('soil.hydro')}</option>
@@ -5425,7 +4953,7 @@ function renderTaskFormHTML(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">${t('task.title')}</label>
-      <input id="taskTitle" class="form-input" placeholder="z.B. Gie\u00dfen" value="${prefill.title || ''}" />
+      <input id="taskTitle" class="form-input" placeholder="${t('task.titlePlaceholder')}" value="${prefill.title || ''}" />
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -5491,7 +5019,7 @@ function renderLogFormHTML(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">${t('log.text')}</label>
-      <textarea id="logText" class="form-textarea" placeholder="Notizen...">${prefill.text || ''}</textarea>
+      <textarea id="logText" class="form-textarea" placeholder="${t('log.textPlaceholder')}">${prefill.text || ''}</textarea>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -5849,10 +5377,10 @@ function renderTimelinePanel() {
   // Chinese calendar header
   const chineseHeaderHtml = calendarMode === 'chinese' ? (() => {
     const cInfo = getChineseDate(dateFromKey(timelineFocusKey));
-    const animalEmojis = { Drache: '\u{1F409}', Schlange: '\u{1F40D}', Pferd: '\u{1F40E}', Ziege: '\u{1F410}', Affe: '\u{1F412}' };
+    const animalEmojis = { dragon: '\u{1F409}', snake: '\u{1F40D}', horse: '\u{1F40E}', goat: '\u{1F410}', monkey: '\u{1F412}' };
     const animalEmoji = animalEmojis[cInfo.animal] || '\u{1F43E}';
     return `<div style="padding:8px 0; font-size:13px; color:${TC.textMuted}; border-bottom:1px solid rgba(${TC.accentRgb},0.08); margin-bottom:8px;">
-      <span style="font-size:16px;">${animalEmoji}</span> ${t('cal.chinese.headline', escapeHtml(cInfo.animal), escapeHtml(cInfo.element), cInfo.year)}
+      <span style="font-size:16px;">${animalEmoji}</span> ${t('cal.chinese.headline', escapeHtml(cInfo.animalLabel), escapeHtml(cInfo.elementLabel), cInfo.year)}
     </div>`;
   })() : '';
 
@@ -6047,10 +5575,10 @@ function renderTimelinePanel() {
           return `
             <div class="cal-day-cell ${isToday ? 'cal-day-cell--today' : ''} ${isFocused ? 'cal-day-cell--focused' : ''}" data-timeline-day="${dayKey}" style="min-height:140px;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11px;color:${TC.textDim};">${dateFromKey(dayKey).toLocaleDateString('de-DE', { weekday: 'short' })}</span>
+                <span style="font-size:11px;color:${TC.textDim};">${dateFromKey(dayKey).toLocaleDateString(localeTag(), { weekday: 'short' })}</span>
                 ${moonInfo ? `<span style="font-size:14px;" title="${escapeHtml(moonInfo.gardenTip)}">${moonInfo.emoji}</span>` : ''}
                 ${chineseInfo ? `<span style="font-size:9px;color:${TC.textDim};">${chineseInfo.month}/${chineseInfo.day}</span>` : ''}
-                <span class="cal-day-num">${dateFromKey(dayKey).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+                <span class="cal-day-num">${dateFromKey(dayKey).toLocaleDateString(localeTag(), { day: '2-digit', month: '2-digit' })}</span>
               </div>
               ${persianInfo ? `<div style="font-size:9px;color:${TC.textDim};">${persianInfo.day} ${escapeHtml(persianInfo.monthName)}</div>` : ''}
               ${julianInfo ? `<div style="font-size:9px;color:${TC.textDim};">Jul: ${julianInfo.day}.${julianInfo.month}.</div>` : ''}
@@ -6353,6 +5881,7 @@ function renderDetailPanel() {
         phase: plant.phase,
         phase_week: (plant.phase_week ?? 0) + 1,
         status: plantStatusValue(plant),
+        ...plantExtraFields(plant),
       },
     });
     logOut(updated);
@@ -6415,7 +5944,7 @@ function renderDetailPanel() {
               ${s.harvest_count != null ? '<span>' + t('season.harvestCount', escapeHtml(String(s.harvest_count))) + '</span>' : ''}
               <span>${t('season.pruning', s.pruning_done ? t('season.done') : t('season.pending'))}</span>
             </div>
-            ${s.notes ? '<div style="font-size:12px; color:${TC.textMuted};">' + escapeHtml(s.notes) + '</div>' : ''}
+            ${s.notes ? `<div style="font-size:12px; color:${TC.textMuted};">` + escapeHtml(s.notes) + '</div>' : ''}
             <div style="display:flex; gap:6px; justify-content:flex-end;">
               <button data-season-edit="${s.season_id}" style="font-size:11px; padding:4px 10px; border-radius:6px; border:1px solid rgba(180,120,255,0.2); background:rgba(180,120,255,0.08); color:#c4a0ff;">${t('action.edit')}</button>
             </div>
@@ -6427,10 +5956,10 @@ function renderDetailPanel() {
             const seasonId = btn.getAttribute('data-season-edit');
             const season = seasons.find(s => s.season_id === seasonId);
             if (!season) return;
-            const notesInput = prompt('Notizen zur Saison:', season.notes || '');
+            const notesInput = prompt(t('season.prompt.notes'), season.notes || '');
             const harvestKgInput = prompt(t('season.prompt.harvestKg'), season.harvest_kg != null ? String(season.harvest_kg) : '');
             const harvestCountInput = prompt(t('season.prompt.harvestCount'), season.harvest_count != null ? String(season.harvest_count) : '');
-            const pruningInput = confirm('Schnitt erledigt?');
+            const pruningInput = confirm(t('season.prompt.pruningDone'));
             try {
               await invoke("update_plant_season", {
                 payload: {
@@ -6633,7 +6162,7 @@ function renderPlants() {
         <div style="margin-top:12px; padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); display:grid; gap:10px;">
           <input data-edit-field="name" data-plant-id="${plant.plant_id}" value="${escapeHtml(plant.name)}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
           <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-            <input data-edit-field="color" data-plant-id="${plant.plant_id}" type="color" value="${plant.color_tag}" style="width:100%; height:44px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg};" />
+            <input data-edit-field="color" data-plant-id="${plant.plant_id}" type="color" value="${sanitizeColorTag(plant.color_tag)}" style="width:100%; height:44px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg};" />
             <select data-edit-field="phase" data-plant-id="${plant.plant_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
               <option value="seed" ${plant.phase === 'seed' ? 'selected' : ''}>${t('phase.seed')}</option>
               <option value="veg" ${plant.phase === 'veg' ? 'selected' : ''}>${t('phase.veg')}</option>
@@ -6655,9 +6184,9 @@ function renderPlants() {
             <option value="perennial" ${plant.lifecycle === 'perennial' ? 'selected' : ''}>${t('plant.perennial')}</option>
           </select>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <input data-edit-field="pot_size" data-plant-id="${plant.plant_id}" type="number" step="0.5" placeholder="Topfgroesse (L)" value="${plant.pot_size_liters ?? ''}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+            <input data-edit-field="pot_size" data-plant-id="${plant.plant_id}" type="number" step="0.5" placeholder="${t('plant.potSize')}" value="${plant.pot_size_liters ?? ''}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
             <select data-edit-field="soil_type" data-plant-id="${plant.plant_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
-              <option value="">-- Standard --</option>
+              <option value="">${t('soil.default')}</option>
               <option value="erde" ${plant.soil_type === 'erde' ? 'selected' : ''}>${t('soil.erde')}</option>
               <option value="kokos" ${plant.soil_type === 'kokos' ? 'selected' : ''}>${t('soil.kokos')}</option>
               <option value="hydro" ${plant.soil_type === 'hydro' ? 'selected' : ''}>${t('soil.hydro')}</option>
@@ -6729,6 +6258,7 @@ function renderPlants() {
               phase: plant.phase,
               phase_week: (plant.phase_week ?? 0) + 1,
               status: plantStatusValue(plant),
+              ...plantExtraFields(plant),
             },
           });
           logOut(updated);
@@ -6746,6 +6276,7 @@ function renderPlants() {
               phase: plant.phase,
               phase_week: plant.phase_week,
               status: "ended",
+              ...plantExtraFields(plant),
             },
           });
           logOut(updated);
@@ -6769,6 +6300,7 @@ function renderPlants() {
               phase: plant.phase,
               phase_week: plant.phase_week ?? 0,
               status: nextStatus,
+              ...plantExtraFields(plant),
             },
           });
           if (selectedPlantId === plantId && archived) {
@@ -6856,14 +6388,14 @@ function renderTasks() {
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(task.title)}</div>
-          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · alle ${task.repeat_interval_hours}h` : ''}${task.repeat_until ? ` bis ${new Date(task.repeat_until).toLocaleDateString('de-DE')}` : ''}</div>
+          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · alle ${task.repeat_interval_hours}h` : ''}${task.repeat_until ? ` bis ${new Date(task.repeat_until).toLocaleDateString(localeTag())}` : ''}</div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-          <button data-action="done" data-task-id="${task.task_id}">Done</button>
-          <button data-action="skip" data-task-id="${task.task_id}">Skip</button>
-          <button data-action="edit" data-task-id="${task.task_id}">${isEditing ? t('action.close') : 'Edit'}</button>
+          <button data-action="done" data-task-id="${task.task_id}">${t('task.doneBtn')}</button>
+          <button data-action="skip" data-task-id="${task.task_id}">${t('task.skipBtn')}</button>
+          <button data-action="edit" data-task-id="${task.task_id}">${isEditing ? t('action.close') : t('action.edit')}</button>
           ${task.repeat_interval_hours && task.repeat_interval_hours > 0 ? `<button data-action="stop-repeat" data-task-id="${task.task_id}" title="${t('task.stopRepeatTitle')}">${t('task.stopRepeat')}</button>` : ''}
-          <button data-action="delete" data-task-id="${task.task_id}">Delete</button>
+          <button data-action="delete" data-task-id="${task.task_id}">${t('action.delete')}</button>
         </div>
       </div>
       ${isEditing ? `
@@ -6871,17 +6403,17 @@ function renderTasks() {
         <input data-task-edit="title" data-task-id="${task.task_id}" value="${escapeHtml(task.title)}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
           <select data-task-edit="category" data-task-id="${task.task_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
-            <option value="water" ${task.category === 'water' ? 'selected' : ''}>Water</option>
-            <option value="feed" ${task.category === 'feed' ? 'selected' : ''}>Feed</option>
-            <option value="check" ${task.category === 'check' ? 'selected' : ''}>Check</option>
-            <option value="train" ${task.category === 'train' ? 'selected' : ''}>Train</option>
-            <option value="note" ${task.category === 'note' ? 'selected' : ''}>Note</option>
+            <option value="water" ${task.category === 'water' ? 'selected' : ''}>${t('cat.water')}</option>
+            <option value="feed" ${task.category === 'feed' ? 'selected' : ''}>${t('cat.feed')}</option>
+            <option value="check" ${task.category === 'check' ? 'selected' : ''}>${t('cat.check')}</option>
+            <option value="train" ${task.category === 'train' ? 'selected' : ''}>${t('cat.train')}</option>
+            <option value="note" ${task.category === 'note' ? 'selected' : ''}>${t('cat.note')}</option>
           </select>
-          <input data-task-edit="repeat" data-task-id="${task.task_id}" type="number" min="0" value="${task.repeat_interval_hours ?? ''}" placeholder="Repeat h" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+          <input data-task-edit="repeat" data-task-id="${task.task_id}" type="number" min="0" value="${task.repeat_interval_hours ?? ''}" placeholder="${t('task.repeatPlaceholder')}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
           <select data-task-edit="status" data-task-id="${task.task_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
-            <option value="open" ${task.status === 'open' ? 'selected' : ''}>Open</option>
-            <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
-            <option value="skipped" ${task.status === 'skipped' ? 'selected' : ''}>Skipped</option>
+            <option value="open" ${task.status === 'open' ? 'selected' : ''}>${t('task.open')}</option>
+            <option value="done" ${task.status === 'done' ? 'selected' : ''}>${t('task.done')}</option>
+            <option value="skipped" ${task.status === 'skipped' ? 'selected' : ''}>${t('task.skipped')}</option>
           </select>
         </div>
         <input data-task-edit="due_at" data-task-id="${task.task_id}" type="datetime-local" value="${toDatetimeLocalValue(task.due_at)}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
@@ -7010,15 +6542,15 @@ function renderLogs() {
           ${log.metrics ? `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">pH ${log.metrics.ph ?? '-'} · EC ${log.metrics.ec ?? '-'} · Temp ${log.metrics.temp_c ?? '-'} · RH ${log.metrics.rh ?? '-'}</div>` : ""}
           ${(harvestInfo || qualityInfo || waterInfo) ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${harvestInfo}${qualityInfo}${waterInfo}</div>` : ''}
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-action="edit" data-log-id="${log.log_id}">${isEditing ? t('action.close') : 'Edit'}</button><button data-action="delete" data-log-id="${log.log_id}">Delete</button></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-action="edit" data-log-id="${log.log_id}">${isEditing ? t('action.close') : t('action.edit')}</button><button data-action="delete" data-log-id="${log.log_id}">${t('action.delete')}</button></div>
       </div>
       ${isEditing ? `
       <div style="margin-top:12px; padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); display:grid; gap:10px;">
         <select data-log-edit="log_type" data-log-id="${log.log_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
-          <option value="note" ${log.log_type === 'note' ? 'selected' : ''}>Note</option>
-          <option value="measurement" ${log.log_type === 'measurement' ? 'selected' : ''}>Measurement</option>
-          <option value="action" ${log.log_type === 'action' ? 'selected' : ''}>Action</option>
-          <option value="photo" ${log.log_type === 'photo' ? 'selected' : ''}>Photo</option>
+          <option value="note" ${log.log_type === 'note' ? 'selected' : ''}>${t('log.note')}</option>
+          <option value="measurement" ${log.log_type === 'measurement' ? 'selected' : ''}>${t('log.measurement')}</option>
+          <option value="action" ${log.log_type === 'action' ? 'selected' : ''}>${t('log.action')}</option>
+          <option value="photo" ${log.log_type === 'photo' ? 'selected' : ''}>${t('log.photo')}</option>
           <option value="harvest" ${log.log_type === 'harvest' ? 'selected' : ''}>${t('log.harvest')}</option>
           <option value="watering" ${log.log_type === 'watering' ? 'selected' : ''}>${t('log.watering')}</option>
         </select>
@@ -7043,10 +6575,10 @@ function renderLogs() {
             <option value="average" ${log.metrics?.harvest_quality === 'average' ? 'selected' : ''}>${t('harvest.average')}</option>
             <option value="poor" ${log.metrics?.harvest_quality === 'poor' ? 'selected' : ''}>${t('harvest.poor')}</option>
           </select>
-          <input data-log-edit="water_liters" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.water_liters ?? ''}" placeholder="Wasser L" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+          <input data-log-edit="water_liters" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.water_liters ?? ''}" placeholder="${t('water.liters')}" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
         </div>
         <select data-log-edit="water_method" data-log-id="${log.log_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
-          <option value="">Methode --</option>
+          <option value="">${t('water.methodPlaceholder')}</option>
           <option value="giessen" ${log.metrics?.water_method === 'giessen' ? 'selected' : ''}>${t('water.pour')}</option>
           <option value="tropf" ${log.metrics?.water_method === 'tropf' ? 'selected' : ''}>${t('water.drip')}</option>
           <option value="spruehen" ${log.metrics?.water_method === 'spruehen' ? 'selected' : ''}>${t('water.spray')}</option>
@@ -7185,7 +6717,7 @@ function renderSafetyBadgesFromEntry(entry) {
 // ── Feature: Propagation Guide ──
 function renderPropagationBadges(entry) {
   if (!entry || !entry.propagation_methods || !entry.propagation_methods.length) return '';
-  const methodLabels = { steckling: 'Steckling', ableger: 'Ableger', samen: 'Samen', teilung: 'Teilung', veredelung: 'Veredelung' };
+  const methodLabels = { steckling: t('propagation.cutting'), ableger: t('propagation.offshoot'), samen: t('propagation.seed'), teilung: t('propagation.division'), veredelung: t('propagation.grafting') };
   const badges = entry.propagation_methods.map(m => {
     const label = methodLabels[m] || m;
     return `<span style="padding:2px 6px;border-radius:6px;background:rgba(${TC.accentRgb},0.12);color:${TC.accent};font-size:10px;">${escapeHtml(label)}</span>`;
@@ -7204,7 +6736,7 @@ function getHarvestPrediction(plant) {
 
   // Already in harvest/dry/cure phase
   if (plant.phase === 'harvest' || plant.phase === 'dry' || plant.phase === 'cure') {
-    return { daysUntil: 0, status: 'ready', text: 'Erntebereit!' };
+    return { daysUntil: 0, status: 'ready', text: t('harvest.ready') };
   }
 
   // Find next harvest month
@@ -7637,16 +7169,19 @@ async function renderWeatherDashboard() {
             if (!loc) return;
             try {
               await invoke("update_location", {
-                location_id: locId,
+                locationId: locId,
                 name: loc.name,
-                location_type: loc.location_type,
+                locationType: loc.location_type,
                 description: loc.description,
                 latitude: lat,
                 longitude: lon
               });
               await loadLocations();
               await renderWeatherDashboard();
-            } catch (err) { console.error("Failed to set coordinates:", err); }
+            } catch (err) {
+              console.error("Failed to set coordinates:", err);
+              logOut(t('location.coordSaveFailed', String(err)));
+            }
           });
         });
       } catch (err) {
@@ -7690,8 +7225,8 @@ async function renderWeatherCharts(locationId, hours) {
   const labels = records.map(r => {
     const d = new Date(r.recorded_at);
     return hours <= 48
-      ? d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-      : d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + ' ' + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      ? d.toLocaleTimeString(localeTag(), { hour: "2-digit", minute: "2-digit" })
+      : d.toLocaleDateString(localeTag(), { day: "2-digit", month: "2-digit" }) + ' ' + d.toLocaleTimeString(localeTag(), { hour: "2-digit", minute: "2-digit" });
   });
 
   const chartOpts = {
@@ -7712,7 +7247,7 @@ async function renderWeatherCharts(locationId, hours) {
       type: 'line',
       data: {
         labels,
-        datasets: [{ label: 'Temp (\u00b0C)', data: records.map(r => r.temp_c), borderColor: '#ff9966', backgroundColor: 'rgba(255,153,102,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
+        datasets: [{ label: t('chart.temp'), data: records.map(r => r.temp_c), borderColor: '#ff9966', backgroundColor: 'rgba(255,153,102,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
       },
       options: chartOpts,
     }));
@@ -7725,7 +7260,7 @@ async function renderWeatherCharts(locationId, hours) {
       type: 'line',
       data: {
         labels,
-        datasets: [{ label: 'Feuchte (%)', data: records.map(r => r.humidity), borderColor: '#6bbbff', backgroundColor: 'rgba(107,187,255,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
+        datasets: [{ label: t('chart.humidity'), data: records.map(r => r.humidity), borderColor: '#6bbbff', backgroundColor: 'rgba(107,187,255,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
       },
       options: chartOpts,
     }));
@@ -7738,7 +7273,7 @@ async function renderWeatherCharts(locationId, hours) {
       type: 'line',
       data: {
         labels,
-        datasets: [{ label: 'Wind (km/h)', data: records.map(r => r.wind_kmh), borderColor: '#6bffbc', backgroundColor: 'rgba(107,255,188,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
+        datasets: [{ label: t('chart.wind'), data: records.map(r => r.wind_kmh), borderColor: '#6bffbc', backgroundColor: 'rgba(107,255,188,0.1)', tension: 0.3, pointRadius: 1, fill: true }],
       },
       options: chartOpts,
     }));
@@ -8091,7 +7626,7 @@ async function handleCitySearch() {
       <div style="border-radius:10px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); overflow:hidden;">
         ${results.map((r, i) => {
           const label = [r.name, r.admin1, r.country].filter(Boolean).join(', ');
-          return `<div class="climate-city-option" data-city-idx="${i}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:${TC.textMuted}; border-bottom:1px solid rgba(${TC.accentRgb},0.06);"
+          return `<div class="climate-city-option" data-city-idx="${i}" style="padding:8px 12px; cursor:pointer; font-size:13px; color:${TC.textMuted}; border-bottom:1px solid rgba(${TC.accentRgb},0.06);">
             ${escapeHtml(label)} <span style="color:${TC.textDim}; font-size:11px;">(${r.latitude.toFixed(2)}, ${r.longitude.toFixed(2)})</span>
           </div>`;
         }).join('')}
@@ -8353,21 +7888,22 @@ function renderCareInsights() {
           type: 'warning',
           plant: plant.name,
           emoji: (entry && entry.emoji) || '🌱',
-          text: 'hatte seit ' + Math.round(daysSinceActivity) + ' Tagen keine Aktivitaet.',
-          tip: 'Regelmaessige Pflege und Dokumentation verbessern die Ergebnisse.',
+          text: t('insight.inactive.text', Math.round(daysSinceActivity)),
+          tip: t('insight.inactive.tip'),
         });
       }
     }
 
-    // No photos
+    // No photos — plantPhotos only ever holds the selected plant's photos,
+    // so this insight is only meaningful for that one plant.
     const plantPhotoCount = plantPhotos.filter(p => p.plant_id === plant.plant_id).length;
-    if (plantPhotoCount === 0) {
+    if (plant.plant_id === selectedPlantId && plantPhotoCount === 0) {
       insights.push({
         type: 'tip',
         plant: plant.name,
         emoji: (entry && entry.emoji) || '🌱',
-        text: 'hat noch keine Fotos.',
-        tip: 'Dokumentiere das Wachstum mit regelmaessigen Fotos!',
+        text: t('insight.noPhotos.text'),
+        tip: t('insight.noPhotos.tip'),
       });
     }
   }
@@ -8415,8 +7951,8 @@ function renderPhotoGallery() {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px;border-radius:12px;background:rgba(${TC.accentRgb},0.06);border:1px solid rgba(${TC.accentRgb},0.1);">
         <span style="font-size:14px;">📈</span>
         <span style="font-size:12px;color:${TC.textMuted};">
-          ${t('photo.first', new Date(photos[0].taken_at).toLocaleDateString('de-DE'))} \u00b7
-          ${t('photo.last', new Date(photos[photos.length-1].taken_at).toLocaleDateString('de-DE'))} \u00b7
+          ${t('photo.first', new Date(photos[0].taken_at).toLocaleDateString(localeTag()))} \u00b7
+          ${t('photo.last', new Date(photos[photos.length-1].taken_at).toLocaleDateString(localeTag()))} \u00b7
           ${t('photo.range', Math.ceil((new Date(photos[photos.length-1].taken_at) - new Date(photos[0].taken_at)) / 86400000))}
         </span>
       </div>
@@ -8432,7 +7968,7 @@ function renderPhotoGallery() {
             <div style="position:relative;margin-bottom:16px;">
               <div style="position:absolute;left:-29px;top:8px;width:10px;height:10px;border-radius:50%;background:${TC.accent};border:2px solid ${TC.cardSolid};"></div>
               <div style="display:flex;gap:4px;margin-bottom:4px;font-size:11px;color:${TC.textDim};">
-                <span>${date.toLocaleDateString('de-DE')}</span>
+                <span>${date.toLocaleDateString(localeTag())}</span>
                 ${dayNum != null ? '<span>\u00b7 ' + t('photo.dayLabel', dayNum) + '</span>' : ''}
                 ${daysBetween != null && daysBetween > 0 ? '<span>\u00b7 +' + daysBetween + ' ' + t('analytics.days') + '</span>' : ''}
               </div>
@@ -8462,7 +7998,7 @@ function renderPhotoGallery() {
       const fullPath = await invoke("get_photo_path", { photoPath: img.dataset.photoSrc });
       img.src = convertFileSrc(fullPath);
     } catch (_) {
-      img.alt = 'Foto nicht gefunden';
+      img.alt = t('photo.notFoundAlt');
     }
   });
 
@@ -8477,7 +8013,7 @@ function renderPhotoGallery() {
       if (!selected) return; // User cancelled
       const filePath = typeof selected === 'string' ? selected : selected.path;
       if (!filePath) return;
-      const caption = prompt('Bildbeschreibung (optional):') || '';
+      const caption = prompt(t('photo.captionPrompt')) || '';
       await invoke("add_photo", {
         plantId: selectedPlantId,
         sourcePath: filePath,
@@ -8495,7 +8031,7 @@ function renderPhotoGallery() {
   container.querySelectorAll('[data-delete-photo]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Foto wirklich loeschen?')) return;
+      if (!confirm(t('photo.confirmDelete'))) return;
       try {
         await invoke("delete_photo", { photoId: btn.dataset.deletePhoto });
         await loadPlantPhotos();
@@ -8510,13 +8046,11 @@ function renderPhotoGallery() {
 async function loadAllTasks() {
   const grouped = await Promise.all(plants.map((plant) => invoke("list_current_tasks", { plantId: plant.plant_id }).catch(() => [])));
   allTasks = grouped.flat();
-  if (homePanel) renderHomePanel();
 }
 
 async function loadAllLogs() {
   const grouped = await Promise.all(plants.map((plant) => invoke("list_current_logs", { plantId: plant.plant_id }).catch(() => [])));
   allLogs = grouped.flat();
-  if (homePanel) renderHomePanel();
 }
 
 async function refreshAll(options = {}) {
@@ -8536,7 +8070,6 @@ async function refreshAll(options = {}) {
     refreshExpandedTasks();
     renderTimelinePanel();
     renderPhaseTaskSets();
-    if (homePanel) renderHomePanel();
     updateOnboardingVisibility();
     renderCalendarToolbar();
     renderPlantContextBar();
