@@ -339,12 +339,17 @@ function setVisible(el, visible) {
   el.style.display = visible ? (el.dataset.originalDisplay || "") : "none";
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function currentDueTaskCount() {
-  return allTasks.filter((task) => !task.done && task.due_at && task.due_at.slice(0, 10) <= todayKey()).length;
+  const today = todayKey();
+  return allTasks.filter((task) => task.status === "open" && task.due_at && normalizeDateKey(task.due_at) <= today).length;
 }
 
 function currentOpenReminderCount() {
-  return allTasks.filter((task) => !task.done && task.reminder).length;
+  return allTasks.filter((task) => task.status === "open" && task.notification_enabled).length;
 }
 
 function getMvpReadinessItems() {
