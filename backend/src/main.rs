@@ -17,6 +17,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let state = AppState::from_env().await?;
+    // Cloned up front: the router takes ownership of `state` below.
+    let prune_state = state.clone();
 
     // Rate limiter: 10 requests per 60 seconds per IP for auth endpoints
     let auth_rate_limiter = RateLimiter::new(10, 60);
@@ -108,6 +110,35 @@ async fn main() -> anyhow::Result<()> {
             axum::http::HeaderName::from_static("permissions-policy"),
             axum::http::HeaderValue::from_static("geolocation=(), microphone=(), camera=()"),
         ));
+
+    // Retention sweep (GDPR Art. 5(1)(e)). refresh_tokens, deleted_records and
+    // subscription_history previously grew for the life of the deployment.
+    // Intervals are generous: this is housekeeping, not a hot path.
+    {
+        tokio::spawn(async move {
+            let token_grace_days: i64 = std::env::var("RETENTION_TOKEN_GRACE_DAYS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(7);
+            let tombstone_days: i64 = std::env::var("RETENTION_TOMBSTONE_DAYS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(180);
+            let history_keep: i64 = std::env::var("RETENTION_HISTORY_PER_USER")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(200);
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+            loop {
+                ticker.tick().await;
+                match db::repos::prune_operational_data(
+                    &prune_state, token_grace_days, tombstone_days, history_keep,
+                ).await {
+                    Ok(report) => tracing::info!(
+                        refresh_tokens = report.refresh_tokens,
+                        deleted_records = report.deleted_records,
+                        subscription_history = report.subscription_history,
+                        "retention sweep complete"
+                    ),
+                    Err(err) => tracing::warn!("retention sweep failed: {err}"),
+                }
+            }
+        });
+    }
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     tracing::info!("backend listening on 0.0.0.0:8080");

@@ -1286,5 +1286,6 @@
   "nav.logsSection": "Journaux",
   "csv.section.plants": "### PLANTES ###",
   "csv.section.tasks": "### TÂCHES ###",
-  "csv.section.logs": "### JOURNAUX ###"
+  "csv.section.logs": "### JOURNAUX ###",
+  "task.repeatHoursPlaceholder": "p. ex. 48"
 }

@@ -1286,5 +1286,6 @@
   "nav.logsSection": "Log",
   "csv.section.plants": "### PIANTE ###",
   "csv.section.tasks": "### ATTIVITÀ ###",
-  "csv.section.logs": "### LOG ###"
+  "csv.section.logs": "### LOG ###",
+  "task.repeatHoursPlaceholder": "es. 48"
 }

@@ -64,13 +64,37 @@ impl RateLimiter {
     }
 }
 
+/// Identify the client for rate-limiting purposes.
+///
+/// Behind a reverse proxy every request arrives from the proxy's address, so
+/// keying on the socket address alone puts all users in one shared bucket:
+/// a single noisy client locks everyone out of /auth, while credential
+/// stuffing from many IPs stays unthrottled.
+///
+/// `TRUST_PROXY_HEADERS=1` opts into using the left-most X-Forwarded-For entry.
+/// It is off by default because a client can forge that header when the service
+/// is exposed directly.
+fn client_key(addr: &SocketAddr, headers: &axum::http::HeaderMap) -> String {
+    if std::env::var("TRUST_PROXY_HEADERS").map(|v| v == "1").unwrap_or(false) {
+        if let Some(fwd) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            if let Some(first) = fwd.split(',').next() {
+                let candidate = first.trim();
+                if !candidate.is_empty() {
+                    return candidate.to_string();
+                }
+            }
+        }
+    }
+    addr.ip().to_string()
+}
+
 pub async fn rate_limit_middleware(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Extension(limiter): Extension<RateLimiter>,
     request: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
-    let key = addr.ip().to_string();
+    let key = client_key(&addr, request.headers());
     if limiter.check(&key) {
         next.run(request).await
     } else {

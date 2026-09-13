@@ -118,6 +118,18 @@ struct CreatePlantPayload {
     name: String,
     color_tag: String,
     phase: PlantPhase,
+    // Must be sent, otherwise the server creates the plant without them and the
+    // response overwrites the local row — silently dropping the user's input.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lifecycle: Option<PlantLifecycle>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    catalog_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pot_size_liters: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    soil_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -126,6 +138,10 @@ struct CreateTaskPayload {
     category: TaskCategory,
     due_at: chrono::DateTime<Utc>,
     repeat_interval_hours: Option<i32>,
+    // Without this the online path dropped the series end date entirely, so the
+    // backend applied its own default and the calendar expanded a wrong series.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repeat_until: Option<chrono::DateTime<Utc>>,
     notification_enabled: bool,
 }
 
@@ -423,11 +439,20 @@ async fn authorized_update_plant(session: &StoredSession, plant_id: Uuid, payloa
     let response = client
         .patch(format!("{}/plants/{}", session.backend_url, plant_id))
         .bearer_auth(&session.access_token)
+        // Every field the user can edit must be sent. Anything omitted keeps the
+        // server's old value, which then overwrites the local row on the
+        // follow-up GET — silently reverting the edit.
         .json(&serde_json::json!({
             "name": payload.name.trim(),
             "color_tag": payload.color_tag,
             "phase": parse_phase(Some(&payload.phase)),
             "status": outbound_requested_plant_status(payload).map(|status| status.as_str().to_string()),
+            "phase_week": payload.phase_week,
+            "location_id": payload.location_id.as_deref().and_then(|s| Uuid::parse_str(s).ok()),
+            "lifecycle": payload.lifecycle.as_deref().map(|s| parse_lifecycle(Some(s))),
+            "plant_year": payload.plant_year,
+            "pot_size_liters": payload.pot_size_liters,
+            "soil_type": payload.soil_type,
         }))
         .send()
         .await
@@ -729,22 +754,40 @@ fn list_local_tasks(state: State<AppLocalState>, plant_id: Option<String>) -> Re
     Ok(tasks)
 }
 
+/// Resolve a task's series end date.
+///
+/// Accepts RFC3339 or plain `YYYY-MM-DD` (interpreted as end of that day).
+/// When the caller supplies nothing but the task repeats, defaults to four
+/// weeks out so a series always terminates.
+fn resolve_repeat_until(
+    raw: Option<&str>,
+    due_at: chrono::DateTime<Utc>,
+    repeat_interval_hours: Option<i32>,
+) -> Option<chrono::DateTime<Utc>> {
+    if let Some(until_str) = raw {
+        return chrono::DateTime::parse_from_rfc3339(until_str)
+            .ok()
+            .map(|d| d.with_timezone(&Utc))
+            .or_else(|| {
+                chrono::NaiveDate::parse_from_str(until_str, "%Y-%m-%d")
+                    .ok()
+                    .and_then(|d| d.and_hms_opt(23, 59, 59))
+                    .map(|d| d.and_utc())
+            });
+    }
+    if repeat_interval_hours.filter(|&h| h > 0).is_some() {
+        return Some(due_at + Duration::weeks(4));
+    }
+    None
+}
+
 #[tauri::command]
 fn create_local_task(state: State<AppLocalState>, payload: TaskCreateInput) -> Result<Task, String> {
     let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
     let plant_id = Uuid::parse_str(&payload.plant_id).map_err(|e| e.to_string())?;
     let now = Utc::now();
     let due_at = parse_due_at(payload.due_at.as_deref(), now + Duration::hours(24));
-    // Parse repeat_until or default to 4 weeks from due_at when repeating
-    let repeat_until = if let Some(ref until_str) = payload.repeat_until {
-        chrono::DateTime::parse_from_rfc3339(until_str).ok().map(|d| d.with_timezone(&Utc))
-            .or_else(|| chrono::NaiveDate::parse_from_str(until_str, "%Y-%m-%d").ok()
-                .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc()))
-    } else if payload.repeat_interval_hours.filter(|&h| h > 0).is_some() {
-        Some(due_at + Duration::weeks(4))
-    } else {
-        None
-    };
+    let repeat_until = resolve_repeat_until(payload.repeat_until.as_deref(), due_at, payload.repeat_interval_hours);
     let task = Task {
         task_id: Uuid::new_v4(),
         plant_id,
@@ -880,6 +923,7 @@ fn create_local_log(state: State<AppLocalState>, payload: LogCreateInput) -> Res
         action: None,
         photo_refs: None,
         created_at: parse_due_at(payload.created_at.as_deref(), Utc::now()),
+        updated_at: Some(Utc::now()),
     };
     store.upsert_log(&log).map_err(|e| e.to_string())?;
     Ok(log)
@@ -945,6 +989,11 @@ async fn create_plant_smart(state: State<'_, AppLocalState>, payload: PlantCreat
             name: payload.name.trim().to_string(),
             color_tag: payload.color_tag.unwrap_or_else(|| "#0B3D2E".into()),
             phase: parse_phase(payload.phase.as_deref()),
+            location_id: payload.location_id.as_deref().and_then(|s| Uuid::parse_str(s).ok()),
+            lifecycle: payload.lifecycle.as_deref().map(|s| parse_lifecycle(Some(s))),
+            catalog_id: payload.catalog_id.clone(),
+            pot_size_liters: payload.pot_size_liters,
+            soil_type: payload.soil_type.clone(),
         };
         let plant = authorized_create_plant(&session, &request).await?;
         let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
@@ -1017,11 +1066,17 @@ async fn create_task_smart(state: State<'_, AppLocalState>, payload: TaskCreateI
         store.load_session().map_err(|e| e.to_string())?
     };
     if let Some(session) = session {
+        let due_at = parse_due_at(payload.due_at.as_deref(), Utc::now() + Duration::hours(24));
         let request = CreateTaskPayload {
             title: payload.title.trim().to_string(),
             category: parse_task_category(payload.category.as_deref()),
-            due_at: parse_due_at(payload.due_at.as_deref(), Utc::now() + Duration::hours(24)),
+            due_at,
             repeat_interval_hours: payload.repeat_interval_hours,
+            repeat_until: resolve_repeat_until(
+                payload.repeat_until.as_deref(),
+                due_at,
+                payload.repeat_interval_hours,
+            ),
             notification_enabled: payload.notification_enabled.unwrap_or(true),
         };
         let task = authorized_create_task(&session, plant_id, &request).await?;
@@ -1946,7 +2001,11 @@ async fn ble_read_telemetry(state: State<'_, AppLocalState>, device_id: String) 
         if let Ok(Some(mut device)) = store.get_device(did) {
             device.last_seen = now;
             device.updated_at = now;
-            store.upsert_device(&device).ok();
+            // Heartbeat only — a failure must not break the telemetry read,
+            // but it should not vanish silently either.
+            if let Err(e) = store.upsert_device(&device) {
+                eprintln!("[devices] could not persist last_seen for {did}: {e}");
+            }
         }
     }
 
@@ -1967,7 +2026,7 @@ async fn tuya_read_status(state: State<'_, AppLocalState>, device_id: String) ->
     // GDPR Art. 32: legacy rows stored the Tuya local_key in plaintext.
     // First time we see one, migrate it into the OS keychain and rewrite the
     // row to a `keyring:<device_id>` pointer.
-    if let Some(stripped) = device.ble_address.strip_prefix("tuya:") {
+    if let Some(stripped) = split_tuya_suffix(&device.ble_address).0.strip_prefix("tuya:") {
         if let Some((_ip, key)) = stripped.split_once(':') {
             if !key.starts_with("keyring:") {
                 let mut migrated = device.clone();
@@ -1992,7 +2051,7 @@ async fn tuya_read_status(state: State<'_, AppLocalState>, device_id: String) ->
         .ok_or_else(|| "Device not configured for Tuya local. Expected ble_address format: tuya:<IP>:<LOCAL_KEY>".to_string())?;
 
     let config = tuya_local::TuyaDeviceConfig {
-        device_id: device.name.clone(), // Tuya device_id stored in name field
+        device_id: tuya_device_id(&device),
         local_key: tuya_config.1.clone(),
         ip_address: tuya_config.0.clone(),
         port: 6668,
@@ -2016,7 +2075,9 @@ async fn tuya_read_status(state: State<'_, AppLocalState>, device_id: String) ->
     };
     {
         let store = state.store.lock().map_err(|_| "lock".to_string())?;
-        store.insert_reading(&reading).ok();
+        if let Err(e) = store.insert_reading(&reading) {
+            eprintln!("[devices] could not store sensor reading: {e}");
+        }
     }
 
     // Return full status + parsed telemetry
@@ -2031,7 +2092,29 @@ async fn tuya_read_status(state: State<'_, AppLocalState>, device_id: String) ->
 /// GDPR Art. 32: when the second component is `keyring:<device_id>` we look
 /// up the actual local_key from the OS keychain rather than holding it in the
 /// SQLite row.
+/// Split a Tuya `ble_address` into its config part and the optional
+/// `#<tuya-device-id>` suffix.
+///
+/// Older rows have no suffix — they kept the Tuya device id in `Device.name`,
+/// which meant the name the user typed was never stored.
+fn split_tuya_suffix(address: &str) -> (&str, Option<&str>) {
+    match address.split_once('#') {
+        Some((cfg, id)) if !id.is_empty() => (cfg, Some(id)),
+        _ => (address, None),
+    }
+}
+
+/// The Tuya device id for a device, preferring the address suffix and falling
+/// back to the legacy `name` field.
+fn tuya_device_id(device: &shared::Device) -> String {
+    split_tuya_suffix(&device.ble_address)
+        .1
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| device.name.clone())
+}
+
 fn parse_tuya_config(address: &str) -> Option<(String, String)> {
+    let (address, _) = split_tuya_suffix(address);
     let stripped = address.strip_prefix("tuya:")?;
     let parts: Vec<&str> = stripped.splitn(2, ':').collect();
     if parts.len() != 2 {
@@ -2057,17 +2140,22 @@ fn parse_tuya_config(address: &str) -> Option<(String, String)> {
 /// Returns Err if the keychain write fails — the caller must NOT persist the
 /// device in that case, otherwise the secret silently stays in plaintext.
 fn redact_tuya_secret_for_storage(device: &mut shared::Device) -> Result<(), String> {
-    let Some(stripped) = device.ble_address.strip_prefix("tuya:") else { return Ok(()); };
+    let (config_part, suffix) = split_tuya_suffix(&device.ble_address);
+    let suffix = suffix.map(|s| s.to_string());
+    let Some(stripped) = config_part.strip_prefix("tuya:") else { return Ok(()); };
     let parts: Vec<&str> = stripped.splitn(2, ':').collect();
     if parts.len() != 2 { return Ok(()); }
-    let ip = parts[0];
+    let ip = parts[0].to_string();
     let key = parts[1];
     if key.starts_with("keyring:") { return Ok(()); } // already redacted
     let secret_name = format!("tuya_{}", device.device_id);
     secrets::set(&secret_name, key).map_err(|e| {
         format!("could not store Tuya key in the OS keychain: {e}")
     })?;
-    device.ble_address = format!("tuya:{}:keyring:{}", ip, device.device_id);
+    device.ble_address = match suffix {
+        Some(id) => format!("tuya:{}:keyring:{}#{}", ip, device.device_id, id),
+        None => format!("tuya:{}:keyring:{}", ip, device.device_id),
+    };
     Ok(())
 }
 
@@ -2159,6 +2247,7 @@ fn create_auto_log_from_reading(state: State<AppLocalState>, device_id: String) 
         action: None,
         photo_refs: None,
         created_at: now,
+        updated_at: Some(now),
     };
 
     store.upsert_log(&log).map_err(|e| e.to_string())?;
@@ -2496,7 +2585,11 @@ shortwave_radiation_sum,et0_fao_evapotranspiration\
         soil_moisture,
         is_day: current["is_day"].as_i64().map(|v| v != 0),
     };
-    store.insert_weather_record(&record).ok();
+    // The dashboard's history comes from this table, so a write failure would
+    // leave silent gaps. Keep serving the live data, but make the loss visible.
+    if let Err(e) = store.insert_weather_record(&record) {
+        eprintln!("[weather] could not store weather history record: {e}");
+    }
 
     Ok(data)
 }
@@ -2961,10 +3054,9 @@ fn read_import_file(path: String) -> Result<String, String> {
 }
 
 fn main() {
-    // NOTE: No automatic pruning — weather history and all other records persist
-    // indefinitely (multi-year storage) so users can analyze long-term trends.
-    // Users can manually trigger `prune_weather_history_cmd` from Settings if they
-    // want to reclaim space.
+    // Retention is driven by the frontend: it runs a sweep shortly after startup
+    // using the user's configured retention window (Settings -> data retention),
+    // covering both weather_history and device_readings.
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())

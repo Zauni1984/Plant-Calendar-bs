@@ -297,6 +297,8 @@ impl LocalStore {
         }
         // 021: GDPR consent persistence. Idempotent (CREATE TABLE/INDEX IF NOT EXISTS).
         conn.execute_batch(include_str!("../../../migrations/021_sqlite_consents.sql"))?;
+        // 022: logs.updated_at — the last-write-wins key for log sync.
+        apply_migration_tolerant(&conn, include_str!("../../../migrations/022_sqlite_log_updated_at.sql"))?;
         Ok(Self { conn })
     }
 
@@ -928,8 +930,10 @@ impl LocalStore {
         )?;
         for task in tasks {
             tx.execute(
-                "INSERT OR REPLACE INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                // INSERT OR REPLACE rewrites the whole row, so repeat_until must
+                // be listed or every cache refresh would clear the series end.
+                "INSERT OR REPLACE INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
                 params![
                     task.task_id.to_string(),
                     task.plant_id.to_string(),
@@ -937,6 +941,7 @@ impl LocalStore {
                     format!("{:?}", task.category).to_lowercase(),
                     task.due_at,
                     task.repeat_interval_hours,
+                    task.repeat_until,
                     i64::from(task.notification_enabled),
                     format!("{:?}", task.status).to_lowercase(),
                     task.created_at,
@@ -963,8 +968,8 @@ impl LocalStore {
 
     pub fn cache_upsert_log(&self, log: &LogEntry) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
             params![
                 log.log_id.to_string(),
                 log.plant_id.to_string(),
@@ -974,6 +979,7 @@ impl LocalStore {
                 log.action.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
                 log.photo_refs.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
                 log.created_at,
+                log.last_modified(),
             ],
         )?;
         Ok(())
@@ -989,8 +995,8 @@ impl LocalStore {
         )?;
         for log in logs {
             tx.execute(
-                "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
                 params![
                     log.log_id.to_string(),
                     log.plant_id.to_string(),
@@ -1107,7 +1113,7 @@ impl LocalStore {
     }
 
     pub fn list_logs(&self) -> anyhow::Result<Vec<LogEntry>> {
-        let mut stmt = self.conn.prepare("SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at FROM logs ORDER BY created_at DESC")?;
+        let mut stmt = self.conn.prepare("SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at FROM logs ORDER BY created_at DESC")?;
         let rows = stmt.query_map([], |row| {
             Ok(LogEntry {
                 log_id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap_or(Uuid::nil()),
@@ -1125,6 +1131,7 @@ impl LocalStore {
                 action: row.get::<_, Option<String>>(5)?.and_then(|v| serde_json::from_str(&v).ok()),
                 photo_refs: row.get::<_, Option<String>>(6)?.and_then(|v| serde_json::from_str(&v).ok()),
                 created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })?;
         Ok(rows.flatten().collect())
@@ -1132,8 +1139,8 @@ impl LocalStore {
 
     pub fn upsert_log(&self, log: &LogEntry) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
             params![
                 log.log_id.to_string(),
                 log.plant_id.to_string(),
@@ -1143,6 +1150,7 @@ impl LocalStore {
                 log.action.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
                 log.photo_refs.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
                 log.created_at,
+                log.last_modified(),
             ],
         )?;
         self.mark_dirty(DirtyRecord {
@@ -1329,7 +1337,7 @@ impl LocalStore {
 
     fn get_task_by_id(&self, task_id: Uuid) -> anyhow::Result<Option<Task>> {
         let mut stmt = self.conn.prepare(
-            "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = ?1 LIMIT 1",
+            "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at, repeat_until FROM tasks WHERE task_id = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query(params![task_id.to_string()])?;
         if let Some(row) = rows.next()? {
@@ -1346,7 +1354,7 @@ impl LocalStore {
                 },
                 due_at: row.get(4)?,
                 repeat_interval_hours: row.get(5)?,
-                repeat_until: None,
+                repeat_until: row.get(10)?,
                 notification_enabled: row.get::<_, i64>(6)? == 1,
                 status: match row.get::<_, String>(7)?.as_str() {
                     "done" => TaskStatus::Done,
@@ -1362,7 +1370,7 @@ impl LocalStore {
 
     fn get_log_by_id(&self, log_id: Uuid) -> anyhow::Result<Option<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at FROM logs WHERE log_id = ?1 LIMIT 1",
+            "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at FROM logs WHERE log_id = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query(params![log_id.to_string()])?;
         if let Some(row) = rows.next()? {
@@ -1382,6 +1390,7 @@ impl LocalStore {
                 action: row.get::<_, Option<String>>(5)?.and_then(|v| serde_json::from_str(&v).ok()),
                 photo_refs: row.get::<_, Option<String>>(6)?.and_then(|v| serde_json::from_str(&v).ok()),
                 created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             }));
         }
         Ok(None)
@@ -1468,8 +1477,8 @@ impl LocalStore {
                 continue;
             }
             tx.execute(
-                "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
-                params![log.log_id.to_string(), log.plant_id.to_string(), format!("{:?}", log.log_type).to_lowercase(), log.text.as_deref(), log.metrics.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.action.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.photo_refs.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.created_at],
+                "INSERT OR REPLACE INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                params![log.log_id.to_string(), log.plant_id.to_string(), format!("{:?}", log.log_type).to_lowercase(), log.text.as_deref(), log.metrics.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.action.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.photo_refs.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()), log.created_at, log.last_modified()],
             )?;
         }
         for item in deleted {
@@ -2083,5 +2092,6 @@ pub fn demo_log(plant_id: Uuid) -> LogEntry {
         action: None,
         photo_refs: None,
         created_at: Utc::now(),
+        updated_at: None,
     }
 }

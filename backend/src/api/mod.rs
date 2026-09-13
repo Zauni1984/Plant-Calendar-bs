@@ -3,10 +3,11 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use shared::{
-    AuthMode, LogEntry, LogType, PlantPhase, PlantStatus, SubscriptionPlan, SubscriptionStatusSummary, SyncCursor, SyncEnvelope,
+    AuthMode, LogEntry, LogType, PlantLifecycle, PlantPhase, PlantStatus, SubscriptionPlan, SubscriptionStatusSummary, SyncCursor, SyncEnvelope,
     SyncPullResponse, SyncPushRequest, Task, TaskCategory, TaskStatus,
 };
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::{
     db::{repos, AppState},
@@ -79,6 +80,9 @@ fn pseudonymize_email(email: &str) -> String {
 /// Anything larger is rejected rather than clamped, so a bogus client value
 /// surfaces as a validation error instead of silently becoming a huge series.
 pub const MAX_REPEAT_INTERVAL_HOURS: i32 = 8760;
+
+/// Upper bound for a log entry's free text, mirroring the REST handler limit.
+pub const MAX_LOG_TEXT_LEN: usize = 5000;
 
 fn next_recurring_due_after(current_due: chrono::DateTime<Utc>, repeat_interval_hours: Option<i32>, now: chrono::DateTime<Utc>) -> Option<chrono::DateTime<Utc>> {
     let hours = repeat_interval_hours?;
@@ -324,6 +328,23 @@ pub struct CreatePlantPayload {
     pub name: String,
     pub color_tag: String,
     pub phase: PlantPhase,
+    // Optional so older clients keep working. Without these the desktop app
+    // silently lost location/lifecycle/pot/soil/catalog whenever the user was
+    // logged in, because the server response overwrote the local row.
+    #[serde(default)]
+    pub phase_week: Option<i32>,
+    #[serde(default)]
+    pub location_id: Option<Uuid>,
+    #[serde(default)]
+    pub lifecycle: Option<PlantLifecycle>,
+    #[serde(default)]
+    pub plant_year: Option<i32>,
+    #[serde(default)]
+    pub catalog_id: Option<String>,
+    #[serde(default)]
+    pub pot_size_liters: Option<f32>,
+    #[serde(default)]
+    pub soil_type: Option<String>,
 }
 
 pub async fn create_plant(
@@ -352,7 +373,21 @@ pub async fn create_plant(
         return api_error(StatusCode::FORBIDDEN, err);
     }
 
-    let plant = plants::build_plant(user.user_id, payload.name, payload.color_tag, payload.phase);
+    let plant = plants::build_plant(
+        user.user_id,
+        payload.name,
+        payload.color_tag,
+        payload.phase,
+        plants::PlantExtras {
+            phase_week: payload.phase_week,
+            location_id: payload.location_id,
+            lifecycle: payload.lifecycle,
+            plant_year: payload.plant_year,
+            catalog_id: payload.catalog_id,
+            pot_size_liters: payload.pot_size_liters,
+            soil_type: payload.soil_type,
+        },
+    );
     match repos::insert_plant(&state, &plant).await {
         Ok(_) => (StatusCode::CREATED, Json(plant)).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -375,6 +410,20 @@ pub struct UpdatePlantPayload {
     #[serde(default)]
     pub archived: Option<bool>,
     pub status: Option<PlantStatus>,
+    // Previously absent, so a logged-in user's edits to these were never sent
+    // and the server response overwrote them locally. `None` means "leave as is".
+    #[serde(default)]
+    pub phase_week: Option<i32>,
+    #[serde(default)]
+    pub location_id: Option<Uuid>,
+    #[serde(default)]
+    pub lifecycle: Option<PlantLifecycle>,
+    #[serde(default)]
+    pub plant_year: Option<i32>,
+    #[serde(default)]
+    pub pot_size_liters: Option<f32>,
+    #[serde(default)]
+    pub soil_type: Option<String>,
 }
 
 pub async fn update_plant(
@@ -403,7 +452,15 @@ pub async fn update_plant(
         }
     }
 
-    match repos::update_plant(&state, session.user_id, id, payload.name, payload.color_tag, payload.phase, Some(target_status)).await {
+    let extras = repos::PlantUpdateExtras {
+        phase_week: payload.phase_week,
+        location_id: payload.location_id,
+        lifecycle: payload.lifecycle,
+        plant_year: payload.plant_year,
+        pot_size_liters: payload.pot_size_liters,
+        soil_type: payload.soil_type,
+    };
+    match repos::update_plant(&state, session.user_id, id, payload.name, payload.color_tag, payload.phase, Some(target_status), extras).await {
         Ok(plant) => Json(plant).into_response(),
         Err(err) if err.to_string().contains("not found") => api_error(StatusCode::NOT_FOUND, err),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -433,6 +490,8 @@ pub struct CreateTaskPayload {
     pub category: TaskCategory,
     pub due_at: chrono::DateTime<Utc>,
     pub repeat_interval_hours: Option<i32>,
+    #[serde(default)]
+    pub repeat_until: Option<chrono::DateTime<Utc>>,
     pub notification_enabled: bool,
 }
 
@@ -445,6 +504,19 @@ pub async fn create_task_for_plant(
     if payload.title.trim().is_empty() || payload.title.len() > 120 {
         return api_error(StatusCode::BAD_REQUEST, "task title must be 1-120 characters");
     }
+    if let Some(hours) = payload.repeat_interval_hours {
+        if hours <= 0 || hours > MAX_REPEAT_INTERVAL_HOURS {
+            return api_error(
+                StatusCode::BAD_REQUEST,
+                format!("repeat_interval_hours must be 1-{MAX_REPEAT_INTERVAL_HOURS}"),
+            );
+        }
+    }
+    if let Some(until) = payload.repeat_until {
+        if until < payload.due_at {
+            return api_error(StatusCode::BAD_REQUEST, "repeat_until must not be before due_at");
+        }
+    }
     if let Err(err) = repos::verify_plant_ownership(&state, session.user_id, id).await {
         return api_error(StatusCode::FORBIDDEN, err);
     }
@@ -456,7 +528,7 @@ pub async fn create_task_for_plant(
         category: payload.category,
         due_at: payload.due_at,
         repeat_interval_hours: payload.repeat_interval_hours,
-        repeat_until: None,
+        repeat_until: payload.repeat_until,
         notification_enabled: payload.notification_enabled,
         status: TaskStatus::Open,
         created_at: now,
@@ -474,6 +546,8 @@ pub struct UpdateTaskPayload {
     pub status: Option<TaskStatus>,
     pub due_at: Option<chrono::DateTime<Utc>>,
     pub repeat_interval_hours: Option<i32>,
+    #[serde(default)]
+    pub repeat_until: Option<chrono::DateTime<Utc>>,
     pub notification_enabled: Option<bool>,
 }
 
@@ -489,17 +563,22 @@ pub async fn update_task(Path(id): Path<Uuid>, State(state): State<AppState>, se
 
     let requested_status = payload.status;
     let repeat_interval_hours = payload.repeat_interval_hours.or(existing.repeat_interval_hours);
+    let repeat_until = payload.repeat_until.or(existing.repeat_until);
     let mut due_at = payload.due_at;
     let mut final_status = requested_status.unwrap_or(existing.status);
 
     if requested_status == Some(TaskStatus::Done) && due_at.is_none() {
         if let Some(next_due) = next_recurring_due_after(existing.due_at, repeat_interval_hours, Utc::now()) {
-            due_at = Some(next_due);
-            final_status = TaskStatus::Open;
+            // Honour the series end date: past it the task stays Done instead of
+            // rolling forward forever.
+            if repeat_until.is_none_or(|until| next_due <= until) {
+                due_at = Some(next_due);
+                final_status = TaskStatus::Open;
+            }
         }
     }
 
-    match repos::update_task(&state, id, payload.title, Some(final_status), due_at, payload.repeat_interval_hours, payload.notification_enabled).await {
+    match repos::update_task(&state, id, payload.title, Some(final_status), due_at, payload.repeat_interval_hours, payload.repeat_until, payload.notification_enabled).await {
         Ok(task) => Json(task).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -555,6 +634,7 @@ pub async fn create_log_for_plant(
         action: payload.action.and_then(|v| serde_json::from_value(v).ok()),
         photo_refs: payload.photo_refs,
         created_at: payload.created_at.unwrap_or_else(Utc::now),
+        updated_at: Some(Utc::now()),
     };
     match repos::insert_log(&state, &log).await {
         Ok(_) => (StatusCode::CREATED, Json(log)).into_response(),
@@ -644,10 +724,14 @@ pub async fn delete_location(Path(id): Path<Uuid>, State(state): State<AppState>
 pub async fn get_subscription(State(state): State<AppState>, session: SessionUser) -> impl IntoResponse {
     match repos::get_or_create_user(&state, session.user_id, session.auth_mode).await {
         Ok(user) => {
+            // An empty history is harmless, but the summary drives can_create.
+            // Falling back to a permissive default on a DB error would hand out
+            // a 200 that lets the client exceed its plant limit, so propagate it.
             let history = repos::list_subscription_history(&state, session.user_id, 10).await.unwrap_or_default();
-            let summary = repos::subscription_status_summary(&state, session.user_id, user.plan)
-                .await
-                .unwrap_or_else(|_| SubscriptionStatusSummary::empty_for_plan(user.plan));
+            let summary = match repos::subscription_status_summary(&state, session.user_id, user.plan).await {
+                Ok(summary) => summary,
+                Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+            };
             Json(serde_json::json!({
                 "plan": format!("{:?}", user.plan).to_lowercase(),
                 "plant_limit": user.plan.plant_limit(),
@@ -1190,18 +1274,14 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
-    // plant_seasons aggregated over all user plants
-    let mut plant_seasons: Vec<serde_json::Value> = Vec::new();
-    for p in &plants {
-        match repos::list_seasons_for_plant(&state, p.plant_id).await {
-            Ok(v) => {
-                for s in v {
-                    plant_seasons.push(serde_json::to_value(s).unwrap_or(serde_json::Value::Null));
-                }
-            }
-            Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
-        }
-    }
+    // plant_seasons aggregated over all user plants, in a single query
+    let plant_seasons: Vec<serde_json::Value> = match repos::list_seasons_for_user(&state, user_id).await {
+        Ok(v) => v
+            .into_iter()
+            .map(|s| serde_json::to_value(s).unwrap_or(serde_json::Value::Null))
+            .collect(),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let subscription_history = match repos::list_subscription_history(&state, user_id, 10_000).await {
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -1355,20 +1435,62 @@ pub async fn sync_push(
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
 
+    // Field validation. The REST handlers enforce these limits inline, but the
+    // sync envelope bypassed them entirely, so /sync/push was a way to store a
+    // 10 MB plant name or an over-long log entry.
+    for plant in &payload.envelope.plants {
+        if let Err(err) = plant.validate() {
+            return api_error(StatusCode::BAD_REQUEST, format!("invalid plant in sync payload: {err}"));
+        }
+    }
+    for task in &payload.envelope.tasks {
+        if let Err(err) = task.validate() {
+            return api_error(StatusCode::BAD_REQUEST, format!("invalid task in sync payload: {err}"));
+        }
+        if let Some(hours) = task.repeat_interval_hours {
+            if hours <= 0 || hours > MAX_REPEAT_INTERVAL_HOURS {
+                return api_error(
+                    StatusCode::BAD_REQUEST,
+                    format!("repeat_interval_hours must be 1-{MAX_REPEAT_INTERVAL_HOURS}"),
+                );
+            }
+        }
+    }
+    for log in &payload.envelope.logs {
+        if let Some(text) = &log.text {
+            if text.len() > MAX_LOG_TEXT_LEN {
+                return api_error(
+                    StatusCode::BAD_REQUEST,
+                    format!("log text must be at most {MAX_LOG_TEXT_LEN} characters"),
+                );
+            }
+        }
+    }
+
     // Verify all plants in the envelope belong to the user
     for plant in &payload.envelope.plants {
         if plant.user_id != session.user_id {
             return api_error(StatusCode::FORBIDDEN, "cannot sync plants owned by another user");
         }
     }
-    // Verify all tasks belong to user's plants
+
+    // Ownership for tasks/logs, resolved with one query instead of one per
+    // record. Plants pushed in this same envelope count as owned, since they
+    // may not exist server-side yet.
+    let mut owned_plant_ids: std::collections::HashSet<Uuid> =
+        match repos::list_plant_ids(&state, session.user_id).await {
+            Ok(ids) => ids.into_iter().collect(),
+            Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+        };
+    owned_plant_ids.extend(payload.envelope.plants.iter().map(|p| p.plant_id));
+
     for task in &payload.envelope.tasks {
-        if let Err(_) = repos::verify_plant_ownership(&state, session.user_id, task.plant_id).await {
+        if !owned_plant_ids.contains(&task.plant_id) {
             return api_error(StatusCode::FORBIDDEN, "cannot sync tasks for unowned plants");
         }
     }
     for log in &payload.envelope.logs {
-        if let Err(_) = repos::verify_plant_ownership(&state, session.user_id, log.plant_id).await {
+        if !owned_plant_ids.contains(&log.plant_id) {
             return api_error(StatusCode::FORBIDDEN, "cannot sync logs for unowned plants");
         }
     }
@@ -1470,5 +1592,56 @@ pub async fn upsert_consent(
     match repos::upsert_user_consent(&state, session.user_id, &payload.consent_type, payload.granted, &payload.policy_version).await {
         Ok(record) => Json(record).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+#[cfg(test)]
+mod recurrence_tests {
+    use super::*;
+
+    fn ts(s: &str) -> chrono::DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc)
+    }
+
+    #[test]
+    fn no_repeat_interval_yields_no_next_due() {
+        assert!(next_recurring_due_after(ts("2026-01-01T00:00:00Z"), None, ts("2026-01-02T00:00:00Z")).is_none());
+    }
+
+    #[test]
+    fn rejects_non_positive_and_oversized_intervals() {
+        let due = ts("2026-01-01T00:00:00Z");
+        let now = ts("2026-01-02T00:00:00Z");
+        assert!(next_recurring_due_after(due, Some(0), now).is_none());
+        assert!(next_recurring_due_after(due, Some(-5), now).is_none());
+        assert!(next_recurring_due_after(due, Some(MAX_REPEAT_INTERVAL_HOURS + 1), now).is_none());
+    }
+
+    #[test]
+    fn next_due_is_strictly_after_now() {
+        // Due date exactly one interval before now: the next slot must move past now.
+        let due = ts("2026-01-01T00:00:00Z");
+        let now = ts("2026-01-03T00:00:00Z");
+        let next = next_recurring_due_after(due, Some(48), now).unwrap();
+        assert!(next > now, "next={next} must be after now={now}");
+        assert_eq!(next, ts("2026-01-05T00:00:00Z"));
+    }
+
+    #[test]
+    fn far_past_due_date_skips_ahead_without_looping() {
+        // Used to step one interval at a time — millions of iterations for a
+        // due date years in the past.
+        let due = ts("2000-01-01T00:00:00Z");
+        let now = ts("2026-01-01T00:00:00Z");
+        let next = next_recurring_due_after(due, Some(1), now).unwrap();
+        assert!(next > now);
+        assert!(next <= now + chrono::Duration::hours(1));
+    }
+
+    #[test]
+    fn interval_boundary_is_accepted() {
+        let due = ts("2026-01-01T00:00:00Z");
+        let now = ts("2026-01-01T12:00:00Z");
+        assert!(next_recurring_due_after(due, Some(MAX_REPEAT_INTERVAL_HOURS), now).is_some());
     }
 }

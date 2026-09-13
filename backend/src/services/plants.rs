@@ -6,7 +6,26 @@ use shared::{
 };
 use uuid::Uuid;
 
-pub fn build_plant(user_id: Uuid, name: String, color_tag: String, phase: PlantPhase) -> Plant {
+/// Optional attributes a client may supply when creating a plant.
+/// Everything left as `None` falls back to the previous defaults.
+#[derive(Debug, Default, Clone)]
+pub struct PlantExtras {
+    pub phase_week: Option<i32>,
+    pub location_id: Option<Uuid>,
+    pub lifecycle: Option<PlantLifecycle>,
+    pub plant_year: Option<i32>,
+    pub catalog_id: Option<String>,
+    pub pot_size_liters: Option<f32>,
+    pub soil_type: Option<String>,
+}
+
+pub fn build_plant(
+    user_id: Uuid,
+    name: String,
+    color_tag: String,
+    phase: PlantPhase,
+    extras: PlantExtras,
+) -> Plant {
     let now = Utc::now();
     Plant {
         plant_id: Uuid::new_v4(),
@@ -15,16 +34,16 @@ pub fn build_plant(user_id: Uuid, name: String, color_tag: String, phase: PlantP
         color_tag,
         start_date: now,
         phase,
-        phase_week: Some(1),
+        phase_week: extras.phase_week.or(Some(1)),
         status: PlantStatus::Active,
         is_active: true,
         archived: false,
-        location_id: None,
-        lifecycle: PlantLifecycle::default(),
-        plant_year: None,
-        catalog_id: None,
-        pot_size_liters: None,
-        soil_type: None,
+        location_id: extras.location_id,
+        lifecycle: extras.lifecycle.unwrap_or_default(),
+        plant_year: extras.plant_year,
+        catalog_id: extras.catalog_id,
+        pot_size_liters: extras.pot_size_liters,
+        soil_type: extras.soil_type,
         created_at: now,
         updated_at: now,
     }
@@ -57,7 +76,7 @@ mod tests {
     use super::*;
 
     fn make_plant(status: PlantStatus) -> Plant {
-        let mut plant = build_plant(Uuid::new_v4(), "Alpha".into(), "#0B3D2E".into(), PlantPhase::Veg);
+        let mut plant = build_plant(Uuid::new_v4(), "Alpha".into(), "#0B3D2E".into(), PlantPhase::Veg, PlantExtras::default());
         plant.status = status;
         plant.normalize_in_place();
         plant
@@ -65,7 +84,7 @@ mod tests {
 
     #[test]
     fn build_plant_creates_active_normalized_plant() {
-        let plant = build_plant(Uuid::new_v4(), "Alpha".into(), "#0B3D2E".into(), PlantPhase::Veg);
+        let plant = build_plant(Uuid::new_v4(), "Alpha".into(), "#0B3D2E".into(), PlantPhase::Veg, PlantExtras::default());
         assert_eq!(plant.status, PlantStatus::Active);
         assert!(plant.is_active_state());
         assert!(!plant.is_archived_state());

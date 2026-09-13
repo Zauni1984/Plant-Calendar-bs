@@ -1286,5 +1286,6 @@
   "nav.logsSection": "Kayıtlar",
   "csv.section.plants": "### BİTKİLER ###",
   "csv.section.tasks": "### GÖREVLER ###",
-  "csv.section.logs": "### KAYITLAR ###"
+  "csv.section.logs": "### KAYITLAR ###",
+  "task.repeatHoursPlaceholder": "örn. 48"
 }

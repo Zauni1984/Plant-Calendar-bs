@@ -1286,5 +1286,6 @@
   "nav.logsSection": "Diaria",
   "csv.section.plants": "### PLANTAE ###",
   "csv.section.tasks": "### MUNERA ###",
-  "csv.section.logs": "### DIARIA ###"
+  "csv.section.logs": "### DIARIA ###",
+  "task.repeatHoursPlaceholder": "exempli gratia 48"
 }

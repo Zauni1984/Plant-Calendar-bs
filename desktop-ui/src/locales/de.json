@@ -1286,5 +1286,6 @@
   "nav.logsSection": "Logs",
   "csv.section.plants": "### PFLANZEN ###",
   "csv.section.tasks": "### AUFGABEN ###",
-  "csv.section.logs": "### LOGS ###"
+  "csv.section.logs": "### LOGS ###",
+  "task.repeatHoursPlaceholder": "z. B. 48"
 }

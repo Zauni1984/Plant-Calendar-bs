@@ -59,6 +59,7 @@ pub struct TaskRow {
     pub category: String,
     pub due_at: DateTime<Utc>,
     pub repeat_interval_hours: Option<i32>,
+    pub repeat_until: Option<DateTime<Utc>>,
     pub notification_enabled: bool,
     pub status: String,
     pub created_at: DateTime<Utc>,
@@ -75,6 +76,7 @@ pub struct LogRow {
     pub action_json: Option<serde_json::Value>,
     pub photo_refs_json: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 

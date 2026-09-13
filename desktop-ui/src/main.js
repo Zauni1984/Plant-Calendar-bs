@@ -2394,9 +2394,11 @@ function renderDeviceManagementPanel() {
     const now = new Date().toISOString();
     const device = {
       device_id: crypto.randomUUID(),
-      name: deviceId, // Store Tuya device_id in name field (used by tuya_read_status)
+      // The label the user typed. The Tuya device id travels in ble_address as a
+      // "#<id>" suffix — it used to occupy this field, so the name was ignored.
+      name: name,
       device_type: "tuya",
-      ble_address: `tuya:${ip}:${localKey}`, // Encoded config
+      ble_address: `tuya:${ip}:${localKey}#${deviceId}`,
       linked_plant_id: null,
       last_seen: now,
       created_at: now,
@@ -4877,12 +4879,12 @@ function renderPlantFormHTML(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">${t('plant.name')}</label>
-      <input id="plantName" class="form-input" placeholder="${t('plant.form.namePlaceholder')}" value="${prefill.name || ''}" />
+      <input id="plantName" class="form-input" placeholder="${t('plant.form.namePlaceholder')}" value="${escapeHtml(prefill.name || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">${t('plant.color')}</label>
-        <input id="plantColor" type="color" value="${prefill.color || '#0B3D2E'}" class="form-input" />
+        <input id="plantColor" type="color" value="${sanitizeColorTag(prefill.color || '#0B3D2E')}" class="form-input" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('plant.phase')}</label>
@@ -4953,7 +4955,7 @@ function renderTaskFormHTML(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">${t('task.title')}</label>
-      <input id="taskTitle" class="form-input" placeholder="${t('task.titlePlaceholder')}" value="${prefill.title || ''}" />
+      <input id="taskTitle" class="form-input" placeholder="${t('task.titlePlaceholder')}" value="${escapeHtml(prefill.title || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -4968,7 +4970,7 @@ function renderTaskFormHTML(prefill = {}) {
       </div>
       <div class="form-group">
         <label class="form-label">${t('task.repeat')}</label>
-        <input id="taskRepeat" type="number" class="form-input" min="0" placeholder="z.B. 48" value="${prefill.repeat || ''}" />
+        <input id="taskRepeat" type="number" class="form-input" min="0" placeholder="${t('task.repeatHoursPlaceholder')}" value="${escapeHtml(String(prefill.repeat ?? ''))}" />
       </div>
     </div>
     <div class="form-group">
@@ -5019,7 +5021,7 @@ function renderLogFormHTML(prefill = {}) {
     </div>
     <div class="form-group">
       <label class="form-label">${t('log.text')}</label>
-      <textarea id="logText" class="form-textarea" placeholder="${t('log.textPlaceholder')}">${prefill.text || ''}</textarea>
+      <textarea id="logText" class="form-textarea" placeholder="${t('log.textPlaceholder')}">${escapeHtml(prefill.text || '')}</textarea>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -8419,3 +8421,25 @@ if (!window.__weatherLogIntervalSet) {
   }, 60 * 60 * 1000);
 }
 
+
+// Retention sweep on startup.
+//
+// Pruning previously ran only when the user *changed* the retention setting, so
+// a user who never touched it kept every row forever. `device_readings` had no
+// caller at all and grew unbounded with every sensor poll.
+if (!window.__retentionSweepDone) {
+  window.__retentionSweepDone = true;
+  setTimeout(async () => {
+    const days = getStoredRetentionDays();
+    try {
+      await invoke("prune_weather_history_cmd", { days });
+    } catch (err) {
+      console.warn("weather history prune failed", err);
+    }
+    try {
+      await invoke("prune_old_readings", { days });
+    } catch (err) {
+      console.warn("device reading prune failed", err);
+    }
+  }, 5_000);
+}

@@ -226,7 +226,7 @@ pub fn task_from_row(row: TaskRow) -> Task {
         category: parse_category(&row.category),
         due_at: row.due_at,
         repeat_interval_hours: row.repeat_interval_hours,
-        repeat_until: None,
+        repeat_until: row.repeat_until,
         notification_enabled: row.notification_enabled,
         status: parse_status(&row.status),
         created_at: row.created_at,
@@ -244,6 +244,7 @@ pub fn log_from_row(row: LogRow) -> LogEntry {
         action: row.action_json.and_then(|v| serde_json::from_value::<ActionInfo>(v).ok()),
         photo_refs: row.photo_refs_json.and_then(|v| serde_json::from_value::<Vec<String>>(v).ok()),
         created_at: row.created_at,
+        updated_at: row.updated_at,
     }
 }
 
@@ -419,7 +420,19 @@ pub async fn upsert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()>
     Ok(())
 }
 
-pub async fn update_plant(state: &AppState, user_id: Uuid, plant_id: Uuid, name: Option<String>, color_tag: Option<String>, phase: Option<PlantPhase>, status: Option<PlantStatus>) -> anyhow::Result<Plant> {
+/// Optional plant attributes an update may carry. `None` leaves the stored
+/// value untouched, so a client that omits a field never clears it.
+#[derive(Debug, Default, Clone)]
+pub struct PlantUpdateExtras {
+    pub phase_week: Option<i32>,
+    pub location_id: Option<Uuid>,
+    pub lifecycle: Option<shared::PlantLifecycle>,
+    pub plant_year: Option<i32>,
+    pub pot_size_liters: Option<f32>,
+    pub soil_type: Option<String>,
+}
+
+pub async fn update_plant(state: &AppState, user_id: Uuid, plant_id: Uuid, name: Option<String>, color_tag: Option<String>, phase: Option<PlantPhase>, status: Option<PlantStatus>, extras: PlantUpdateExtras) -> anyhow::Result<Plant> {
     let current = get_plant(state, user_id, plant_id).await?.ok_or_else(|| anyhow::anyhow!("plant not found"))?;
     let updated_status = normalize_plant_status(&current, status);
     let updated_name = name.unwrap_or(current.name);
@@ -427,9 +440,15 @@ pub async fn update_plant(state: &AppState, user_id: Uuid, plant_id: Uuid, name:
     let updated_phase = phase.unwrap_or(current.phase);
     let updated_archived = updated_status == PlantStatus::Archived;
     let updated_is_active = updated_status == PlantStatus::Active;
+    let updated_phase_week = extras.phase_week.or(current.phase_week);
+    let updated_location = extras.location_id.or(current.location_id);
+    let updated_lifecycle = extras.lifecycle.unwrap_or(current.lifecycle);
+    let updated_plant_year = extras.plant_year.or(current.plant_year);
+    let updated_pot_size = extras.pot_size_liters.or(current.pot_size_liters);
+    let updated_soil = extras.soil_type.or(current.soil_type);
     let now = Utc::now();
     sqlx::query(
-        "UPDATE plants SET name = $3, color_tag = $4, phase = $5, plant_status = $6, is_active = $7, archived = $8, updated_at = $9 WHERE user_id = $1 AND plant_id = $2",
+        "UPDATE plants SET name = $3, color_tag = $4, phase = $5, plant_status = $6, is_active = $7, archived = $8,          phase_week = $9, location_id = $10, lifecycle = $11, plant_year = $12, pot_size_liters = $13, soil_type = $14,          updated_at = $15 WHERE user_id = $1 AND plant_id = $2",
     )
     .bind(user_id)
     .bind(plant_id)
@@ -439,6 +458,12 @@ pub async fn update_plant(state: &AppState, user_id: Uuid, plant_id: Uuid, name:
     .bind(plant_status_str(updated_status))
     .bind(updated_is_active)
     .bind(updated_archived)
+    .bind(updated_phase_week)
+    .bind(updated_location)
+    .bind(lifecycle_str(updated_lifecycle))
+    .bind(updated_plant_year)
+    .bind(updated_pot_size)
+    .bind(updated_soil)
     .bind(now)
     .execute(&state.pg)
     .await?;
@@ -458,7 +483,7 @@ pub async fn delete_plant(state: &AppState, user_id: Uuid, plant_id: Uuid) -> an
 
 pub async fn list_tasks_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::Result<Vec<Task>> {
     let rows = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at
          FROM tasks WHERE plant_id = $1 ORDER BY due_at ASC",
     )
     .bind(plant_id)
@@ -470,13 +495,13 @@ pub async fn list_tasks_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::R
 pub async fn list_tasks_for_user_since(state: &AppState, user_id: Uuid, since: Option<DateTime<Utc>>) -> anyhow::Result<Vec<Task>> {
     let rows = if let Some(since) = since {
         sqlx::query_as::<_, TaskRow>(
-            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.notification_enabled, t.status, t.created_at, t.updated_at
+            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at
              FROM tasks t INNER JOIN plants p ON p.plant_id = t.plant_id
              WHERE p.user_id = $1 AND t.updated_at > $2 ORDER BY t.updated_at DESC"
         ).bind(user_id).bind(since).fetch_all(&state.pg).await?
     } else {
         sqlx::query_as::<_, TaskRow>(
-            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.notification_enabled, t.status, t.created_at, t.updated_at
+            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at
              FROM tasks t INNER JOIN plants p ON p.plant_id = t.plant_id
              WHERE p.user_id = $1 ORDER BY t.updated_at DESC"
         ).bind(user_id).fetch_all(&state.pg).await?
@@ -486,7 +511,7 @@ pub async fn list_tasks_for_user_since(state: &AppState, user_id: Uuid, since: O
 
 pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<Task>> {
     let row = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
     )
     .bind(task_id)
     .fetch_optional(&state.pg)
@@ -499,7 +524,7 @@ pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<
         category: parse_category(&row.category),
         due_at: row.due_at,
         repeat_interval_hours: row.repeat_interval_hours,
-        repeat_until: None,
+        repeat_until: row.repeat_until,
         notification_enabled: row.notification_enabled,
         status: parse_status(&row.status),
         created_at: row.created_at,
@@ -509,8 +534,8 @@ pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<
 
 pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
     )
     .bind(task.task_id)
     .bind(task.plant_id)
@@ -518,6 +543,7 @@ pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     .bind(category_str(task.category))
     .bind(task.due_at)
     .bind(task.repeat_interval_hours)
+    .bind(task.repeat_until)
     .bind(task.notification_enabled)
     .bind(status_str(task.status))
     .bind(task.created_at)
@@ -529,14 +555,15 @@ pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
 
 pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT (task_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             title = EXCLUDED.title,
             category = EXCLUDED.category,
             due_at = EXCLUDED.due_at,
             repeat_interval_hours = EXCLUDED.repeat_interval_hours,
+            repeat_until = EXCLUDED.repeat_until,
             notification_enabled = EXCLUDED.notification_enabled,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at"
@@ -547,6 +574,7 @@ pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     .bind(category_str(task.category))
     .bind(task.due_at)
     .bind(task.repeat_interval_hours)
+    .bind(task.repeat_until)
     .bind(task.notification_enabled)
     .bind(status_str(task.status))
     .bind(task.created_at)
@@ -556,9 +584,9 @@ pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>, status: Option<TaskStatus>, due_at: Option<DateTime<Utc>>, repeat_interval_hours: Option<i32>, notification_enabled: Option<bool>) -> anyhow::Result<Task> {
+pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>, status: Option<TaskStatus>, due_at: Option<DateTime<Utc>>, repeat_interval_hours: Option<i32>, repeat_until: Option<DateTime<Utc>>, notification_enabled: Option<bool>) -> anyhow::Result<Task> {
     let row = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
     )
     .bind(task_id)
     .fetch_one(&state.pg)
@@ -567,14 +595,16 @@ pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>,
     let next_status = status.unwrap_or(parse_status(&row.status));
     let next_due_at = due_at.unwrap_or(row.due_at);
     let next_repeat = repeat_interval_hours.or(row.repeat_interval_hours);
+    let next_repeat_until = repeat_until.or(row.repeat_until);
     let next_notification = notification_enabled.unwrap_or(row.notification_enabled);
     let updated_at = Utc::now();
-    sqlx::query("UPDATE tasks SET title = $2, status = $3, due_at = $4, repeat_interval_hours = $5, notification_enabled = $6, updated_at = $7 WHERE task_id = $1")
+    sqlx::query("UPDATE tasks SET title = $2, status = $3, due_at = $4, repeat_interval_hours = $5, repeat_until = $6, notification_enabled = $7, updated_at = $8 WHERE task_id = $1")
         .bind(task_id)
         .bind(&next_title)
         .bind(status_str(next_status))
         .bind(next_due_at)
         .bind(next_repeat)
+        .bind(next_repeat_until)
         .bind(next_notification)
         .bind(updated_at)
         .execute(&state.pg)
@@ -586,7 +616,7 @@ pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>,
         category: parse_category(&row.category),
         due_at: next_due_at,
         repeat_interval_hours: next_repeat,
-        repeat_until: None,
+        repeat_until: next_repeat_until,
         notification_enabled: next_notification,
         status: next_status,
         created_at: row.created_at,
@@ -606,7 +636,7 @@ pub async fn delete_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> anyh
 
 pub async fn list_logs_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::Result<Vec<LogEntry>> {
     let rows = sqlx::query_as::<_, LogRow>(
-        "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at
+        "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at
          FROM logs WHERE plant_id = $1 ORDER BY created_at DESC",
     )
     .bind(plant_id)
@@ -618,13 +648,13 @@ pub async fn list_logs_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::Re
 pub async fn list_logs_for_user_since(state: &AppState, user_id: Uuid, since: Option<DateTime<Utc>>) -> anyhow::Result<Vec<LogEntry>> {
     let rows = if let Some(since) = since {
         sqlx::query_as::<_, LogRow>(
-            "SELECT l.log_id, l.plant_id, l.log_type, l.text, l.metrics_json, l.action_json, l.photo_refs_json, l.created_at
+            "SELECT l.log_id, l.plant_id, l.log_type, l.text, l.metrics_json, l.action_json, l.photo_refs_json, l.created_at, l.updated_at
              FROM logs l INNER JOIN plants p ON p.plant_id = l.plant_id
              WHERE p.user_id = $1 AND l.created_at > $2 ORDER BY l.created_at DESC"
         ).bind(user_id).bind(since).fetch_all(&state.pg).await?
     } else {
         sqlx::query_as::<_, LogRow>(
-            "SELECT l.log_id, l.plant_id, l.log_type, l.text, l.metrics_json, l.action_json, l.photo_refs_json, l.created_at
+            "SELECT l.log_id, l.plant_id, l.log_type, l.text, l.metrics_json, l.action_json, l.photo_refs_json, l.created_at, l.updated_at
              FROM logs l INNER JOIN plants p ON p.plant_id = l.plant_id
              WHERE p.user_id = $1 ORDER BY l.created_at DESC"
         ).bind(user_id).fetch_all(&state.pg).await?
@@ -634,8 +664,8 @@ pub async fn list_logs_for_user_since(state: &AppState, user_id: Uuid, since: Op
 
 pub async fn insert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     )
     .bind(log.log_id)
     .bind(log.plant_id)
@@ -645,6 +675,7 @@ pub async fn insert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> 
     .bind(log.action.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.photo_refs.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.created_at)
+    .bind(log.last_modified())
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -652,8 +683,8 @@ pub async fn insert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> 
 
 pub async fn upsert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT (log_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             log_type = EXCLUDED.log_type,
@@ -661,7 +692,8 @@ pub async fn upsert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> 
             metrics_json = EXCLUDED.metrics_json,
             action_json = EXCLUDED.action_json,
             photo_refs_json = EXCLUDED.photo_refs_json,
-            created_at = EXCLUDED.created_at"
+            created_at = EXCLUDED.created_at,
+            updated_at = EXCLUDED.updated_at"
     )
     .bind(log.log_id)
     .bind(log.plant_id)
@@ -671,6 +703,7 @@ pub async fn upsert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> 
     .bind(log.action.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.photo_refs.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.created_at)
+    .bind(log.last_modified())
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -678,7 +711,7 @@ pub async fn upsert_log(state: &AppState, log: &LogEntry) -> anyhow::Result<()> 
 
 pub async fn update_log(state: &AppState, log_id: Uuid, log_type: Option<LogType>, text: Option<String>, metrics: Option<Metrics>, action: Option<serde_json::Value>, photo_refs: Option<Vec<String>>) -> anyhow::Result<LogEntry> {
     let row = sqlx::query_as::<_, LogRow>(
-        "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at FROM logs WHERE log_id = $1",
+        "SELECT log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at FROM logs WHERE log_id = $1",
     )
     .bind(log_id)
     .fetch_one(&state.pg)
@@ -689,8 +722,9 @@ pub async fn update_log(state: &AppState, log_id: Uuid, log_type: Option<LogType
     let next_action_json = action.or_else(|| row.action_json.clone());
     let next_photo_refs = photo_refs.or_else(|| row.photo_refs_json.clone().and_then(|v| serde_json::from_value::<Vec<String>>(v).ok()));
 
+    let now = Utc::now();
     sqlx::query(
-        "UPDATE logs SET log_type = $2, text = $3, metrics_json = $4, action_json = $5, photo_refs_json = $6 WHERE log_id = $1",
+        "UPDATE logs SET log_type = $2, text = $3, metrics_json = $4, action_json = $5, photo_refs_json = $6, updated_at = $7 WHERE log_id = $1",
     )
     .bind(log_id)
     .bind(log_type_str(next_log_type))
@@ -698,6 +732,7 @@ pub async fn update_log(state: &AppState, log_id: Uuid, log_type: Option<LogType
     .bind(next_metrics.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(next_action_json.clone())
     .bind(next_photo_refs.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
+    .bind(now)
     .execute(&state.pg)
     .await?;
 
@@ -710,6 +745,7 @@ pub async fn update_log(state: &AppState, log_id: Uuid, log_type: Option<LogType
         action: next_action_json.and_then(|v| serde_json::from_value(v).ok()),
         photo_refs: next_photo_refs,
         created_at: row.created_at,
+        updated_at: Some(now),
     })
 }
 
@@ -776,8 +812,10 @@ pub async fn merge_guest_data(state: &AppState, guest_user_id: Uuid, account_use
 
 pub async fn record_delete(state: &AppState, user_id: Uuid, record_id: Uuid, entity_kind: &str) -> anyhow::Result<()> {
     sqlx::query(
+        // Conflict target includes user_id, and user_id is never rewritten:
+        // a tombstone belongs to exactly one user.
         "INSERT INTO deleted_records (record_id, user_id, entity_kind, operation, changed_at) VALUES ($1,$2,$3,'delete',$4)
-         ON CONFLICT (record_id, entity_kind) DO UPDATE SET changed_at = EXCLUDED.changed_at, user_id = EXCLUDED.user_id"
+         ON CONFLICT (user_id, record_id, entity_kind) DO UPDATE SET changed_at = EXCLUDED.changed_at"
     )
     .bind(record_id)
     .bind(user_id)
@@ -1132,6 +1170,19 @@ pub async fn list_seasons_for_plant(state: &AppState, plant_id: Uuid) -> anyhow:
     Ok(rows.into_iter().map(season_from_row).collect())
 }
 
+/// All seasons across a user's plants in one query.
+/// /me/export previously issued one query per plant, so a large account turned
+/// a single export into hundreds of round-trips.
+pub async fn list_seasons_for_user(state: &AppState, user_id: Uuid) -> anyhow::Result<Vec<PlantSeason>> {
+    let rows = sqlx::query_as::<_, PlantSeasonRow>(
+        "SELECT ps.season_id, ps.plant_id, ps.year, ps.started_at, ps.ended_at, ps.notes,                 ps.harvest_kg, ps.harvest_count, ps.pruning_done, ps.created_at, ps.updated_at          FROM plant_seasons ps INNER JOIN plants p ON p.plant_id = ps.plant_id          WHERE p.user_id = $1 ORDER BY ps.year DESC"
+    )
+    .bind(user_id)
+    .fetch_all(&state.pg)
+    .await?;
+    Ok(rows.into_iter().map(season_from_row).collect())
+}
+
 pub async fn get_season(state: &AppState, season_id: Uuid) -> anyhow::Result<Option<PlantSeason>> {
     let row = sqlx::query_as::<_, PlantSeasonRow>(
         "SELECT season_id, plant_id, year, started_at, ended_at, notes, harvest_kg, harvest_count, pruning_done, created_at, updated_at
@@ -1341,14 +1392,15 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
 
 pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT (task_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             title = EXCLUDED.title,
             category = EXCLUDED.category,
             due_at = EXCLUDED.due_at,
             repeat_interval_hours = EXCLUDED.repeat_interval_hours,
+            repeat_until = EXCLUDED.repeat_until,
             notification_enabled = EXCLUDED.notification_enabled,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at
@@ -1360,6 +1412,7 @@ pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task
     .bind(category_str(task.category))
     .bind(task.due_at)
     .bind(task.repeat_interval_hours)
+    .bind(task.repeat_until)
     .bind(task.notification_enabled)
     .bind(status_str(task.status))
     .bind(task.created_at)
@@ -1371,8 +1424,8 @@ pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task
 
 pub async fn upsert_log_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, log: &LogEntry) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        "INSERT INTO logs (log_id, plant_id, log_type, text, metrics_json, action_json, photo_refs_json, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT (log_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             log_type = EXCLUDED.log_type,
@@ -1380,7 +1433,9 @@ pub async fn upsert_log_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, log: 
             metrics_json = EXCLUDED.metrics_json,
             action_json = EXCLUDED.action_json,
             photo_refs_json = EXCLUDED.photo_refs_json,
-            created_at = EXCLUDED.created_at"
+            created_at = EXCLUDED.created_at,
+            updated_at = EXCLUDED.updated_at
+         WHERE COALESCE(logs.updated_at, logs.created_at) < COALESCE(EXCLUDED.updated_at, EXCLUDED.created_at)"
     )
     .bind(log.log_id)
     .bind(log.plant_id)
@@ -1390,6 +1445,7 @@ pub async fn upsert_log_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, log: 
     .bind(log.action.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.photo_refs.as_ref().map(|m| serde_json::to_value(m).unwrap_or_default()))
     .bind(log.created_at)
+    .bind(log.last_modified())
     .execute(&mut **tx)
     .await?;
     Ok(())
@@ -1397,8 +1453,10 @@ pub async fn upsert_log_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, log: 
 
 pub async fn record_delete_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, user_id: Uuid, record_id: Uuid, entity_kind: &str) -> anyhow::Result<()> {
     sqlx::query(
+        // Conflict target includes user_id, and user_id is never rewritten:
+        // a tombstone belongs to exactly one user.
         "INSERT INTO deleted_records (record_id, user_id, entity_kind, operation, changed_at) VALUES ($1,$2,$3,'delete',$4)
-         ON CONFLICT (record_id, entity_kind) DO UPDATE SET changed_at = EXCLUDED.changed_at, user_id = EXCLUDED.user_id"
+         ON CONFLICT (user_id, record_id, entity_kind) DO UPDATE SET changed_at = EXCLUDED.changed_at"
     )
     .bind(record_id)
     .bind(user_id)
@@ -1433,6 +1491,16 @@ pub async fn get_stripe_customer_id(state: &AppState, user_id: Uuid) -> anyhow::
         .fetch_optional(&state.pg)
         .await?;
     Ok(row.and_then(|r| r.0))
+}
+
+/// All plant ids owned by a user. Used by /sync/push so ownership for a whole
+/// envelope costs one query instead of one per task and log.
+pub async fn list_plant_ids(state: &AppState, user_id: Uuid) -> anyhow::Result<Vec<Uuid>> {
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT plant_id FROM plants WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_all(&state.pg)
+        .await?;
+    Ok(ids)
 }
 
 pub async fn verify_plant_ownership(state: &AppState, user_id: Uuid, plant_id: Uuid) -> Result<(), String> {
@@ -1570,4 +1638,68 @@ pub async fn delete_location(state: &AppState, user_id: Uuid, location_id: Uuid)
         .execute(&state.pg)
         .await?;
     Ok(())
+}
+
+// --- Retention (GDPR Art. 5(1)(e): storage limitation) ---
+
+/// Number of rows removed by one retention pass, per table.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PruneReport {
+    pub refresh_tokens: u64,
+    pub deleted_records: u64,
+    pub subscription_history: u64,
+}
+
+/// Delete operational rows that are no longer needed.
+///
+/// None of these tables had any retention, so they grew without bound for the
+/// life of the deployment:
+/// - `refresh_tokens`: expired or revoked tokens serve no purpose once past the
+///   grace period, and they are credentials.
+/// - `deleted_records`: tombstones only need to outlive the sync window; a
+///   client that has not synced in a year performs a full resync anyway.
+/// - `subscription_history`: keep the most recent entries per user for support,
+///   drop the rest.
+pub async fn prune_operational_data(
+    state: &AppState,
+    token_grace_days: i64,
+    tombstone_days: i64,
+    history_keep_per_user: i64,
+) -> anyhow::Result<PruneReport> {
+    let now = Utc::now();
+
+    let tokens = sqlx::query(
+        "DELETE FROM refresh_tokens \
+         WHERE (expires_at < $1) OR (revoked_at IS NOT NULL AND revoked_at < $1)",
+    )
+    .bind(now - chrono::Duration::days(token_grace_days))
+    .execute(&state.pg)
+    .await?
+    .rows_affected();
+
+    let tombstones = sqlx::query("DELETE FROM deleted_records WHERE changed_at < $1")
+        .bind(now - chrono::Duration::days(tombstone_days))
+        .execute(&state.pg)
+        .await?
+        .rows_affected();
+
+    let history = sqlx::query(
+        "DELETE FROM subscription_history \
+         WHERE event_id IN ( \
+             SELECT event_id FROM ( \
+                 SELECT event_id, row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn \
+                 FROM subscription_history \
+             ) ranked WHERE ranked.rn > $1 \
+         )",
+    )
+    .bind(history_keep_per_user)
+    .execute(&state.pg)
+    .await?
+    .rows_affected();
+
+    Ok(PruneReport {
+        refresh_tokens: tokens,
+        deleted_records: tombstones,
+        subscription_history: history,
+    })
 }

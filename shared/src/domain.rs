@@ -427,6 +427,18 @@ pub struct LogEntry {
     pub action: Option<ActionInfo>,
     pub photo_refs: Option<Vec<String>>,
     pub created_at: DateTime<Utc>,
+    /// Last modification time, used as the last-write-wins key during sync.
+    /// Optional so payloads from older clients still deserialize; callers treat
+    /// `None` as `created_at` via [`LogEntry::last_modified`].
+    #[serde(default)]
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+impl LogEntry {
+    /// Effective modification time for conflict resolution.
+    pub fn last_modified(&self) -> DateTime<Utc> {
+        self.updated_at.unwrap_or(self.created_at)
+    }
 }
 
 
