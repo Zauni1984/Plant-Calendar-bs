@@ -744,3 +744,309 @@
   outline: none;
   border-color: var(--danger);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Responsive / touch
+   ══════════════════════════════════════════════════════════════════════
+   The shell was built for a desktop window and had exactly one media
+   query. Everything below adapts it down to phone widths without
+   changing behaviour: no view is hidden, nothing becomes unreachable.
+
+   Breakpoints
+     1024px  tablet / small desktop window — tighten spacing
+      720px  phone landscape and below     — restructure
+      420px  narrow phones                 — final tightening
+     pointer: coarse — touch sizing, independent of width
+   ────────────────────────────────────────────────────────────────── */
+
+/* Use the dynamic viewport height so mobile browser chrome (URL bar)
+   does not cut off the bottom of the shell. 100vh stays as fallback. */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Horizontal overflow inside the content area would be clipped invisibly by
+   .app-shell's overflow:hidden, so keep children inside instead. */
+.app-content { overflow-x: hidden; }
+
+/* Flex/grid children need this to be allowed to shrink below their content
+   width; without it long names force the whole row wider than the screen. */
+.plant-context-bar,
+.plant-card,
+.day-detail-item,
+.settings-field { min-width: 0; }
+
+.plant-card-name,
+.plant-card-meta { overflow-wrap: anywhere; }
+
+/* Media can never push the layout wider than its column. */
+img, video, canvas { max-width: 100%; height: auto; }
+
+/* ── Tablet ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .app-content { padding: 16px; }
+  .app-toolbar { padding: 0 14px; }
+  .app-nav { margin-left: 10px; }
+  .plants-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .cal-year-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+}
+
+/* ── Narrow desktop / tablet toolbar ────────────────────────────────────
+   Eight tabs are ~575px wide. Together with the brand and the plant
+   selector that no longer fits below roughly 900px, and the selector was
+   getting squeezed until its label was unreadable. Let the tab strip
+   shrink and scroll instead of stealing the selector's space. */
+@media (max-width: 900px) {
+  .app-nav {
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .app-nav::-webkit-scrollbar { display: none; }
+  .app-nav-btn { flex: 0 0 auto; }
+  .plant-context-bar { flex: 0 0 auto; }
+}
+
+/* ── Phone ──────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  /* Toolbar becomes two rows: brand + plant selector, then a scrollable
+     tab strip. Eight tabs cannot fit side by side on a phone, and hiding
+     some behind a menu would make them harder to reach than a swipe. */
+  .app-toolbar {
+    height: auto;
+    min-height: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+  .app-brand { font-size: 14px; }
+  .app-nav {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .app-nav::-webkit-scrollbar { display: none; }
+  .app-nav-btn {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    padding: 8px 12px;
+  }
+  .plant-context-bar {
+    margin-left: auto;
+    max-width: 55%;
+  }
+  .plant-context-select {
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+
+  .app-content {
+    padding: 12px;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  /* Calendar: keep the seven-column week (a calendar that reflows into a
+     list stops reading as a calendar), but shrink the cells to fit. */
+  .cal-toolbar { gap: 6px; margin-bottom: 12px; }
+  .cal-period-label {
+    min-width: 0;
+    flex: 1 1 100%;
+    order: -1;
+    margin: 0 0 4px;
+    font-size: 14px;
+  }
+  .cal-toolbar-btn { padding: 8px 10px; }
+  .cal-grid { gap: 1px; }
+  .cal-day-header { font-size: 9px; padding: 4px 0; letter-spacing: 0; }
+  .cal-day-cell {
+    min-height: 58px;
+    padding: 3px;
+    border-radius: 7px;
+    gap: 2px;
+  }
+  .cal-day-num { font-size: 11px; }
+  .cal-badge { font-size: 9px; padding: 1px 4px; }
+  .cal-year-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+
+  /* Two-column layouts collapse. */
+  .form-row,
+  .settings-row,
+  .tasks-logs-grid { grid-template-columns: 1fr; }
+  .plants-grid { grid-template-columns: 1fr; }
+
+  .plants-toolbar { gap: 6px; }
+  .plants-toolbar .form-input,
+  .plants-toolbar .form-select {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 130px;
+  }
+
+  .view-card { padding: 13px; border-radius: 13px; }
+
+  /* Modals and the day detail become bottom sheets: a centred dialog with
+     24px of overlay padding wastes the little width a phone has, and a
+     sheet puts the content within thumb reach. */
+  .modal-overlay,
+  .day-detail {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal-content,
+  .day-detail-content {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .onboarding-overlay { padding: 16px; }
+  .onboarding-card { padding: 24px 18px; }
+
+  .fab-container {
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Narrow phones ──────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  .app-content { padding: 10px; }
+  .app-brand { font-size: 13px; }
+  .plant-context-bar { max-width: 48%; }
+  .cal-day-cell { min-height: 50px; padding: 2px; }
+  .cal-day-num { font-size: 10px; }
+  .cal-year-grid { grid-template-columns: 1fr 1fr; }
+  .view-card { padding: 11px; }
+  .btn { padding: 8px 12px; }
+}
+
+/* ── Touch input ────────────────────────────────────────────────────────
+   Sizing keyed to the input device rather than the width, so a touch
+   laptop gets it too and a narrow desktop window does not. */
+@media (pointer: coarse) {
+  .btn,
+  .cal-toolbar-btn,
+  .app-nav-btn,
+  .fab-option {
+    min-height: 44px;
+  }
+  .btn--sm { min-height: 36px; }
+  .form-input,
+  .form-select,
+  .form-textarea { min-height: 44px; }
+  .modal-close { min-width: 44px; min-height: 44px; }
+
+  /* iOS zooms the page when focusing an input whose text is under 16px.
+     The zoom does not reverse on blur, leaving the layout shifted. */
+  .form-input,
+  .form-select,
+  .form-textarea,
+  .plant-context-select,
+  .delete-confirm-input { font-size: 16px; }
+
+  /* Suppress the grey flash on tap; :active styling already gives feedback. */
+  button, .btn, .app-nav-btn, .cal-day-cell, .cal-year-day, .plant-card {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Inline grid templates generated in main.js cannot be reached by a plain
+   selector, and inline styles outrank the stylesheet. These attribute
+   selectors collapse the fixed multi-column ones on narrow screens.
+   They match the exact strings emitted by the template literals. */
+@media (max-width: 720px) {
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns:1.2fr 1fr"],
+  [style*="grid-template-columns:1.1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Week view sets min-height:140px inline on each day cell. */
+  .cal-day-cell[style*="min-height:140px"] {
+    min-height: 92px !important;
+  }
+}
+@media (max-width: 420px) {
+  [style*="minmax(140px"],
+  [style*="minmax(160px"],
+  [style*="minmax(180px"],
+  [style*="minmax(220px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Day-cell internals on small screens.
+   A cell is ~50px wide on a 375px phone and its header row can hold the day
+   number, a moon glyph, a secondary-calendar date and the task dots at once
+   (chinese mode shows all four). Clip and shrink rather than let any of it
+   push the seven-column grid wider than the screen. */
+@media (max-width: 720px) {
+  .cal-day-cell { overflow: hidden; }
+  /* Let the dots drop to a second line instead of being clipped when a
+     secondary calendar is active and four items compete for ~45px. */
+  .cal-day-cell > div:first-child {
+    gap: 2px;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 1px;
+  }
+  /* The moon glyph is emitted with an inline font-size. */
+  .cal-day-cell span[style*="font-size:14px"] { font-size: 11px !important; }
+  .cal-day-dots { gap: 2px; }
+  .cal-dot { width: 6px; height: 6px; }
+  .cal-day-badges { gap: 2px; overflow: hidden; }
+  .cal-badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* A ~50px cell cannot hold "3 überfällig"; truncating it to "3 üb…" says
+     less than the bare number does. The badge colour already encodes the
+     kind, and the full wording is one tap away in the day detail. */
+  .cal-badge-label { display: none; }
+}
+
+/* Plant cards (and the structurally identical task/log rows) put their action
+   buttons in a right-hand cluster next to the text. At 375px that cluster
+   claimed 223px and squeezed the plant name into 95px. Stack instead: text
+   first at full width, actions underneath.
+   These rows are generated with inline styles in main.js, so they are matched
+   through their stable data-* hook rather than a class. */
+@media (max-width: 720px) {
+  [data-plant-id] > div[style*="justify-content:space-between"],
+  [data-task-id] > div[style*="justify-content:space-between"],
+  [data-log-id] > div[style*="justify-content:space-between"] {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  [data-plant-id] > div > div[style*="justify-content:flex-end"],
+  [data-task-id] > div > div[style*="justify-content:flex-end"],
+  [data-log-id] > div > div[style*="justify-content:flex-end"] {
+    width: 100%;
+    /* !important: justify-content is set inline, which otherwise wins. */
+    justify-content: flex-start !important;
+  }
+  /* The text column must be allowed to take the full row once wrapped. */
+  [data-plant-id] > div > div[style*="flex:1"],
+  [data-task-id] > div > div[style*="flex:1"],
+  [data-log-id] > div > div[style*="flex:1"] {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}

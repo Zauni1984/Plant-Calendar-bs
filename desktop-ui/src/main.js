@@ -5547,10 +5547,10 @@ function renderTimelinePanel() {
               ${jewishInfo ? `<div style="font-size:9px;color:${TC.textDim};">${jewishInfo.day} ${escapeHtml(jewishInfo.monthName)}</div>` : ''}
               ${bauernInfo?.lostag ? `<div style="font-size:9px;color:${TC.warning};font-weight:600;" title="${escapeHtml(bauernInfo.spruch)}">${escapeHtml(bauernInfo.name)}</div>` : ''}
               <div class="cal-day-badges">
-                ${stats.open > 0 ? `<span class="cal-badge">${stats.open} ${t('misc.open')}</span>` : ''}
-                ${stats.overdue > 0 ? `<span class="cal-badge cal-badge--overdue">${stats.overdue} ${t('misc.overdue')}</span>` : ''}
-                ${stats.done > 0 ? `<span class="cal-badge">${stats.done} ${t('misc.done')}</span>` : ''}
-                ${stats.logs > 0 ? `<span class="cal-badge cal-badge--log">${stats.logs} ${t('misc.logs')}</span>` : ''}
+                ${stats.open > 0 ? `<span class="cal-badge">${stats.open}<span class="cal-badge-label"> ${t('misc.open')}</span></span>` : ''}
+                ${stats.overdue > 0 ? `<span class="cal-badge cal-badge--overdue">${stats.overdue}<span class="cal-badge-label"> ${t('misc.overdue')}</span></span>` : ''}
+                ${stats.done > 0 ? `<span class="cal-badge">${stats.done}<span class="cal-badge-label"> ${t('misc.done')}</span></span>` : ''}
+                ${stats.logs > 0 ? `<span class="cal-badge cal-badge--log">${stats.logs}<span class="cal-badge-label"> ${t('misc.logs')}</span></span>` : ''}
                 ${stats.harvests > 0 ? `<span class="cal-badge" style="background:rgba(255,200,100,0.15);color:${TC.warning};">&#127806; ${stats.harvests}</span>` : ''}
                 ${stats.waterings > 0 ? `<span class="cal-badge" style="background:rgba(100,180,255,0.15);color:${TC.info};">&#128167; ${stats.waterings}</span>` : ''}
                 ${calendarMode === 'moon' && moonInfo ? `<span class="cal-badge" style="background:rgba(200,180,255,0.12);color:#c8b4ff;" title="${escapeHtml(moonInfo.gardenTip)}">${escapeHtml(moonInfo.element)}</span>` : ''}
@@ -5589,9 +5589,9 @@ function renderTimelinePanel() {
               ${bauernInfo?.lostag ? `<div style="font-size:9px;color:${TC.warning};font-weight:600;" title="${escapeHtml(bauernInfo.spruch)}">${escapeHtml(bauernInfo.name)}</div>` : ''}
               <div class="cal-day-dots">${dots}</div>
               <div class="cal-day-badges">
-                ${stats.open > 0 ? `<span class="cal-badge">${stats.open} ${t('misc.open')}</span>` : ''}
+                ${stats.open > 0 ? `<span class="cal-badge">${stats.open}<span class="cal-badge-label"> ${t('misc.open')}</span></span>` : ''}
                 ${stats.overdue > 0 ? `<span class="cal-badge cal-badge--overdue">${stats.overdue}</span>` : ''}
-                ${stats.logs > 0 ? `<span class="cal-badge cal-badge--log">${stats.logs} ${t('misc.logs')}</span>` : ''}
+                ${stats.logs > 0 ? `<span class="cal-badge cal-badge--log">${stats.logs}<span class="cal-badge-label"> ${t('misc.logs')}</span></span>` : ''}
                 ${stats.harvests > 0 ? `<span class="cal-badge" style="background:rgba(255,200,100,0.15);color:${TC.warning};">&#127806; ${stats.harvests}</span>` : ''}
                 ${stats.waterings > 0 ? `<span class="cal-badge" style="background:rgba(100,180,255,0.15);color:${TC.info};">&#128167; ${stats.waterings}</span>` : ''}
                 ${calendarMode === 'moon' && moonInfo ? `<span class="cal-badge" style="background:rgba(200,180,255,0.12);color:#c8b4ff;" title="${escapeHtml(moonInfo.gardenTip)}">${escapeHtml(moonInfo.element)}</span>` : ''}
