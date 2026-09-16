@@ -6133,7 +6133,7 @@ function renderPlants() {
         : '',
     ].filter(Boolean).join(' ');
     return `
-    <div data-plant-id="${plant.plant_id}" style="padding:12px; border-radius:14px; border:1px solid ${isGrandfathered ? 'rgba(255,120,120,0.32)' : selectedPlantId === plant.plant_id ? TC.accent : `rgba(${TC.accentRgb},0.15)`}; background:${selectedPlantId === plant.plant_id ? '#10231d' : isGrandfathered ? '#1a1212' : TC.cardSolid}; box-shadow:${isGrandfathered ? '0 0 0 1px rgba(255,120,120,0.08), 0 0 24px rgba(255,120,120,0.06)' : 'none'};">
+    <div class="entity-row" data-plant-id="${plant.plant_id}" style="padding:12px; border-radius:14px; border:1px solid ${isGrandfathered ? 'rgba(255,120,120,0.32)' : selectedPlantId === plant.plant_id ? TC.accent : `rgba(${TC.accentRgb},0.15)`}; background:${selectedPlantId === plant.plant_id ? '#10231d' : isGrandfathered ? '#1a1212' : TC.cardSolid}; box-shadow:${isGrandfathered ? '0 0 0 1px rgba(255,120,120,0.08), 0 0 24px rgba(255,120,120,0.06)' : 'none'};">
       <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
         <div style="display:flex; gap:10px; align-items:flex-start; flex:1;">
           <div style="width:14px; height:14px; border-radius:999px; margin-top:4px; background:${sanitizeColorTag(plant.color_tag)}; border:1px solid rgba(255,255,255,0.15);"></div>
@@ -6386,7 +6386,7 @@ function renderTasks() {
   tasksList.innerHTML = visible.map((task) => {
     const isEditing = editingTaskId === task.task_id;
     return `
-    <div style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
+    <div class="entity-row" style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(task.title)}</div>
@@ -6535,7 +6535,7 @@ function renderLogs() {
       ? `<span class="cal-badge" style="background:rgba(100,180,255,0.15);color:${TC.info};">&#128167; ${log.metrics.water_liters} L${log.metrics.water_method ? ' (' + escapeHtml(log.metrics.water_method) + ')' : ''}</span>`
       : '';
     return `
-    <div style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
+    <div class="entity-row" style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(log.log_type)}</div>

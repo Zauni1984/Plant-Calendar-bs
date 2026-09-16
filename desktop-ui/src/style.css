@@ -1022,31 +1022,62 @@ img, video, canvas { max-width: 100%; height: auto; }
   .cal-badge-label { display: none; }
 }
 
-/* Plant cards (and the structurally identical task/log rows) put their action
-   buttons in a right-hand cluster next to the text. At 375px that cluster
-   claimed 223px and squeezed the plant name into 95px. Stack instead: text
-   first at full width, actions underneath.
-   These rows are generated with inline styles in main.js, so they are matched
-   through their stable data-* hook rather than a class. */
-@media (max-width: 720px) {
-  [data-plant-id] > div[style*="justify-content:space-between"],
-  [data-task-id] > div[style*="justify-content:space-between"],
-  [data-log-id] > div[style*="justify-content:space-between"] {
+/* Plant cards and the structurally identical task/log rows put their action
+   buttons in a right-hand cluster next to the text. Whether that fits depends
+   on the ROW's width, not the screen's: at 375px the cluster took 223px and
+   left the plant name 95px, and the same thing happens on a 1280px desktop,
+   where .plants-grid lays out four ~303px columns.
+
+   So this is keyed to the row itself with a container query. A viewport media
+   query cannot express "this card is narrow" when the card is narrow because
+   it is one of four columns on a wide screen. */
+.entity-row {
+  container: entity-row / inline-size;
+}
+
+/* Give the text column a real floor at every width. Without it the nine-button
+   cluster takes its max-content width (~500px) whenever it fits on one line,
+   starving the text down to its own min-content — 95px even in a 615px card.
+   With a floor the cluster is forced to wrap instead, which is the behaviour
+   the wrapping was there for. */
+.entity-row > div > div[style*="flex:1"] {
+  flex: 1 1 220px !important;
+  min-width: 200px;
+}
+
+@container entity-row (max-width: 460px) {
+  .entity-row > div[style*="justify-content:space-between"] {
     flex-wrap: wrap;
     gap: 8px;
   }
-  [data-plant-id] > div > div[style*="justify-content:flex-end"],
-  [data-task-id] > div > div[style*="justify-content:flex-end"],
-  [data-log-id] > div > div[style*="justify-content:flex-end"] {
+  /* !important throughout: these properties are set inline in main.js and
+     inline styles outrank the stylesheet. */
+  .entity-row > div > div[style*="justify-content:flex-end"] {
     width: 100%;
-    /* !important: justify-content is set inline, which otherwise wins. */
     justify-content: flex-start !important;
   }
-  /* The text column must be allowed to take the full row once wrapped. */
-  [data-plant-id] > div > div[style*="flex:1"],
-  [data-task-id] > div > div[style*="flex:1"],
-  [data-log-id] > div > div[style*="flex:1"] {
-    flex: 1 1 100%;
-    min-width: 0;
+  .entity-row > div > div[style*="flex:1"] {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Fallback for engines without container queries (older WebKitGTK on Linux).
+   Same stacking, keyed to the viewport — covers phones, not narrow columns
+   on a wide screen, which is the best a media query can do. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 720px) {
+    .entity-row > div[style*="justify-content:space-between"] {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .entity-row > div > div[style*="justify-content:flex-end"] {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+    .entity-row > div > div[style*="flex:1"] {
+      flex: 1 1 100% !important;
+      min-width: 0 !important;
+    }
   }
 }
