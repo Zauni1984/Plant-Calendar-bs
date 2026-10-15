@@ -123,7 +123,63 @@ pub struct RegisterPayload {
     pub password: String,
 }
 
-pub async fn auth_register(State(state): State<AppState>, Json(payload): Json<RegisterPayload>) -> impl IntoResponse {
+// --- Browser sessions -------------------------------------------------------
+//
+// The desktop app keeps its refresh token in the OS-protected local store and
+// receives it in the JSON body. A browser has no such store: anything in the
+// body ends up in JavaScript-reachable memory, where a single XSS bug would leak
+// a 90-day credential. Web clients identify themselves with `X-Client: web`;
+// for them the refresh token travels only as an httpOnly cookie scoped to /auth.
+
+const REFRESH_COOKIE: &str = "pc_refresh";
+const REFRESH_COOKIE_MAX_AGE_SECS: i64 = 90 * 24 * 60 * 60;
+
+fn is_web_client(headers: &axum::http::HeaderMap) -> bool {
+    headers
+        .get("x-client")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.eq_ignore_ascii_case("web"))
+        .unwrap_or(false)
+}
+
+fn refresh_cookie_value(raw: &str, max_age: i64) -> Option<axum::http::HeaderValue> {
+    // Secure is honoured by browsers on http://localhost too, so dev works.
+    // SameSite=Strict: the cookie is never sent on a cross-site request, which
+    // is what keeps /auth/refresh from being driven by a third-party page.
+    axum::http::HeaderValue::from_str(&format!(
+        "{REFRESH_COOKIE}={raw}; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age={max_age}"
+    ))
+    .ok()
+}
+
+fn read_refresh_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, _)| *name == REFRESH_COOKIE)
+        .map(|(_, value)| value.to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// Serialise an auth response, moving the refresh token into a cookie for web
+/// clients. Desktop clients get the unchanged JSON body.
+fn auth_response(headers: &axum::http::HeaderMap, mut body: AuthResponse) -> axum::response::Response {
+    if is_web_client(headers) {
+        if let Some(raw) = body.refresh_token.take() {
+            let mut resp = Json(body).into_response();
+            if let Some(cookie) = refresh_cookie_value(&raw, REFRESH_COOKIE_MAX_AGE_SECS) {
+                resp.headers_mut().append(axum::http::header::SET_COOKIE, cookie);
+            }
+            return resp;
+        }
+    }
+    Json(body).into_response()
+}
+
+pub async fn auth_register(State(state): State<AppState>, headers: axum::http::HeaderMap, Json(payload): Json<RegisterPayload>) -> impl IntoResponse {
     if payload.email.trim().is_empty() || !payload.email.contains('@') || payload.email.len() > 320 {
         return api_error(StatusCode::BAD_REQUEST, "invalid email");
     }
@@ -151,7 +207,7 @@ pub async fn auth_register(State(state): State<AppState>, Json(payload): Json<Re
                 if let Err(err) = repos::store_refresh_token(&state, &refresh_hash, user.user_id, expires_at).await {
                     return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
                 }
-                Json(AuthResponse { user_id: user.user_id, auth_mode: AuthMode::Email, access_token: token, refresh_token: Some(raw_refresh) }).into_response()
+                auth_response(&headers, AuthResponse { user_id: user.user_id, auth_mode: AuthMode::Email, access_token: token, refresh_token: Some(raw_refresh) })
             },
             Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
         },
@@ -165,7 +221,7 @@ pub struct LoginPayload {
     pub password: String,
 }
 
-pub async fn auth_login(State(state): State<AppState>, Json(payload): Json<LoginPayload>) -> impl IntoResponse {
+pub async fn auth_login(State(state): State<AppState>, headers: axum::http::HeaderMap, Json(payload): Json<LoginPayload>) -> impl IntoResponse {
     if payload.email.trim().is_empty() || !payload.email.contains('@') || payload.email.len() > 320 {
         return api_error(StatusCode::BAD_REQUEST, "invalid email");
     }
@@ -199,7 +255,7 @@ pub async fn auth_login(State(state): State<AppState>, Json(payload): Json<Login
             if let Err(err) = repos::store_refresh_token(&state, &refresh_hash, user.user_id, expires_at).await {
                 return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
             }
-            Json(AuthResponse { user_id: user.user_id, auth_mode: AuthMode::Email, access_token: token, refresh_token: Some(raw_refresh) }).into_response()
+            auth_response(&headers, AuthResponse { user_id: user.user_id, auth_mode: AuthMode::Email, access_token: token, refresh_token: Some(raw_refresh) })
         },
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -220,8 +276,9 @@ pub struct LogoutPayload {
     pub refresh_token: Option<String>,
 }
 
-pub async fn auth_logout(State(state): State<AppState>, session: SessionUser, Json(payload): Json<LogoutPayload>) -> impl IntoResponse {
-    if let Some(raw_token) = payload.refresh_token {
+pub async fn auth_logout(State(state): State<AppState>, session: SessionUser, headers: axum::http::HeaderMap, Json(payload): Json<LogoutPayload>) -> impl IntoResponse {
+    let web = is_web_client(&headers);
+    if let Some(raw_token) = payload.refresh_token.or_else(|| read_refresh_cookie(&headers)) {
         let hash = hex::encode(sha2::Sha256::digest(raw_token.as_bytes()));
         // Scope the revoke to the caller: revoking purely by hash would let a
         // logged-in user invalidate another account's session.
@@ -230,17 +287,27 @@ pub async fn auth_logout(State(state): State<AppState>, session: SessionUser, Js
             Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
         }
     }
-    StatusCode::NO_CONTENT.into_response()
+    let mut resp = StatusCode::NO_CONTENT.into_response();
+    if web {
+        if let Some(expired) = refresh_cookie_value("", 0) {
+            resp.headers_mut().append(axum::http::header::SET_COOKIE, expired);
+        }
+    }
+    resp
 }
 
 #[derive(Deserialize)]
 pub struct RefreshPayload {
-    pub refresh_token: String,
+    #[serde(default)]
+    pub refresh_token: Option<String>,
 }
 
-pub async fn auth_refresh(State(state): State<AppState>, Json(payload): Json<RefreshPayload>) -> impl IntoResponse {
+pub async fn auth_refresh(State(state): State<AppState>, headers: axum::http::HeaderMap, Json(payload): Json<RefreshPayload>) -> impl IntoResponse {
+    let Some(raw_refresh) = payload.refresh_token.or_else(|| read_refresh_cookie(&headers)) else {
+        return api_error(StatusCode::UNAUTHORIZED, "missing refresh token");
+    };
     // Hash the raw token to look it up
-    let token_hash = hex::encode(sha2::Sha256::digest(payload.refresh_token.as_bytes()));
+    let token_hash = hex::encode(sha2::Sha256::digest(raw_refresh.as_bytes()));
 
     let stored = match repos::find_refresh_token(&state, &token_hash).await {
         Ok(Some(row)) => row,
@@ -285,12 +352,12 @@ pub async fn auth_refresh(State(state): State<AppState>, Json(payload): Json<Ref
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
 
-    Json(AuthResponse {
+    auth_response(&headers, AuthResponse {
         user_id: user.user_id,
         auth_mode: user.auth_mode,
         access_token,
         refresh_token: Some(new_raw_refresh),
-    }).into_response()
+    })
 }
 
 pub async fn get_me(State(state): State<AppState>, session: SessionUser) -> impl IntoResponse {
@@ -1643,5 +1710,83 @@ mod recurrence_tests {
         let due = ts("2026-01-01T00:00:00Z");
         let now = ts("2026-01-01T12:00:00Z");
         assert!(next_recurring_due_after(due, Some(MAX_REPEAT_INTERVAL_HOURS), now).is_some());
+    }
+}
+
+
+/// Every task across the caller's plants. The desktop app answers "all tasks"
+/// from its local cache; a browser has no cache, so it needs this endpoint.
+pub async fn list_my_tasks(State(state): State<AppState>, session: SessionUser) -> impl IntoResponse {
+    match repos::list_tasks_for_user_since(&state, session.user_id, None).await {
+        Ok(tasks) => Json(tasks).into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+/// Every log across the caller's plants (see `list_my_tasks`).
+pub async fn list_my_logs(State(state): State<AppState>, session: SessionUser) -> impl IntoResponse {
+    match repos::list_logs_for_user_since(&state, session.user_id, None).await {
+        Ok(logs) => Json(logs).into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+#[cfg(test)]
+mod web_session_tests {
+    use super::*;
+    use axum::http::{header, HeaderMap, HeaderValue};
+
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        for (k, v) in pairs {
+            h.append(*k, HeaderValue::from_str(v).unwrap());
+        }
+        h
+    }
+
+    #[test]
+    fn web_client_detection_is_explicit() {
+        assert!(is_web_client(&headers(&[("x-client", "web")])));
+        assert!(is_web_client(&headers(&[("x-client", "WEB")])));
+        assert!(!is_web_client(&headers(&[("x-client", "desktop")])));
+        assert!(!is_web_client(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn reads_refresh_cookie_among_others() {
+        let h = headers(&[("cookie", "theme=dark; pc_refresh=abc123; lang=de")]);
+        assert_eq!(read_refresh_cookie(&h).as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn ignores_lookalike_and_empty_cookies() {
+        assert_eq!(read_refresh_cookie(&headers(&[("cookie", "xpc_refresh=evil")])), None);
+        assert_eq!(read_refresh_cookie(&headers(&[("cookie", "pc_refresh=")])), None);
+        assert_eq!(read_refresh_cookie(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn refresh_cookie_carries_hardening_attributes() {
+        let v = refresh_cookie_value("tok", 60).unwrap();
+        let v = v.to_str().unwrap();
+        for attr in ["HttpOnly", "Secure", "SameSite=Strict", "Path=/auth", "Max-Age=60"] {
+            assert!(v.contains(attr), "missing {attr} in {v}");
+        }
+    }
+
+    #[test]
+    fn web_auth_response_moves_token_out_of_body() {
+        let body = || AuthResponse {
+            user_id: Uuid::nil(),
+            auth_mode: AuthMode::Email,
+            access_token: "access".into(),
+            refresh_token: Some("secret-refresh".into()),
+        };
+        let web = auth_response(&headers(&[("x-client", "web")]), body());
+        let cookie = web.headers().get(header::SET_COOKIE).expect("cookie set");
+        assert!(cookie.to_str().unwrap().starts_with("pc_refresh=secret-refresh;"));
+
+        let desktop = auth_response(&HeaderMap::new(), body());
+        assert!(desktop.headers().get(header::SET_COOKIE).is_none());
     }
 }

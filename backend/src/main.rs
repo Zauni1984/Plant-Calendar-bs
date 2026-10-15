@@ -54,6 +54,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/plants/{id}", get(api::get_plant).patch(api::update_plant).delete(api::delete_plant))
         .route("/plants/{id}/seasons", get(api::list_seasons_for_plant).post(api::create_season_for_plant))
         .route("/seasons/{id}", patch(api::update_season).delete(api::delete_season))
+        .route("/tasks", get(api::list_my_tasks))
+        .route("/logs", get(api::list_my_logs))
         .route("/plants/{id}/tasks", get(api::list_tasks_for_plant).post(api::create_task_for_plant))
         .route("/tasks/{id}", patch(api::update_task).delete(api::delete_task))
         .route("/plants/{id}/logs", get(api::list_logs_for_plant).post(api::create_log_for_plant))
@@ -86,7 +88,12 @@ async fn main() -> anyhow::Result<()> {
                 .allow_headers([
                     axum::http::header::CONTENT_TYPE,
                     axum::http::header::AUTHORIZATION,
+                    axum::http::HeaderName::from_static("x-client"),
                 ])
+                // The web client's refresh token is an httpOnly cookie, which the
+                // browser only sends cross-origin when credentials are allowed.
+                // Safe here because allow_origin is an explicit list, never "*".
+                .allow_credentials(true)
         })
         .layer(TraceLayer::new_for_http())
         // GDPR Art. 32 / OWASP — defence-in-depth security response headers.
