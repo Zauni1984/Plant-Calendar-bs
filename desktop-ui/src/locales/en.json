@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### PLANTS ###",
   "csv.section.tasks": "### TASKS ###",
   "csv.section.logs": "### LOGS ###",
-  "task.repeatHoursPlaceholder": "e.g. 48"
+  "task.repeatHoursPlaceholder": "e.g. 48",
+  "account.signOut": "Sign out",
+  "devices.desktopOnlyHint": "Bluetooth sensors and Tuya devices can only be connected in the desktop app: browsers are not allowed to reach devices on the local network, and iPhone and iPad have no Web Bluetooth. Readings saved by the desktop app still show up here.",
+  "auth.webModalHint": "Sign in or create an account. Your plants, tasks and logs are stored in your account and available on all your devices."
 }

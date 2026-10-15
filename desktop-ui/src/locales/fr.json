@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### PLANTES ###",
   "csv.section.tasks": "### TÂCHES ###",
   "csv.section.logs": "### JOURNAUX ###",
-  "task.repeatHoursPlaceholder": "p. ex. 48"
+  "task.repeatHoursPlaceholder": "p. ex. 48",
+  "account.signOut": "Se déconnecter",
+  "devices.desktopOnlyHint": "Les capteurs Bluetooth et les appareils Tuya ne peuvent être connectés que dans l'application de bureau : les navigateurs n'ont pas le droit d'accéder aux appareils du réseau local, et l'iPhone et l'iPad ne prennent pas en charge le Web Bluetooth. Les mesures enregistrées par l'application de bureau s'affichent tout de même ici.",
+  "auth.webModalHint": "Connecte-toi ou crée un compte. Tes plantes, tâches et journaux sont enregistrés dans ton compte et disponibles sur tous tes appareils."
 }

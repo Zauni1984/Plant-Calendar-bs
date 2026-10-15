@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### PLANTAS ###",
   "csv.section.tasks": "### TAREAS ###",
   "csv.section.logs": "### REGISTROS ###",
-  "task.repeatHoursPlaceholder": "p. ej. 48"
+  "task.repeatHoursPlaceholder": "p. ej. 48",
+  "account.signOut": "Cerrar sesión",
+  "devices.desktopOnlyHint": "Los sensores Bluetooth y los dispositivos Tuya solo se pueden conectar en la aplicación de escritorio: los navegadores no pueden acceder a dispositivos de la red local, y el iPhone y el iPad no tienen Web Bluetooth. Las mediciones guardadas por la aplicación de escritorio se muestran aquí de todos modos.",
+  "auth.webModalHint": "Inicia sesión o crea una cuenta. Tus plantas, tareas y registros se guardan en tu cuenta y están disponibles en todos tus dispositivos."
 }

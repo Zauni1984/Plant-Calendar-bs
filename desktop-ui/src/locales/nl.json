@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### PLANTEN ###",
   "csv.section.tasks": "### TAKEN ###",
   "csv.section.logs": "### LOGS ###",
-  "task.repeatHoursPlaceholder": "bijv. 48"
+  "task.repeatHoursPlaceholder": "bijv. 48",
+  "account.signOut": "Afmelden",
+  "devices.desktopOnlyHint": "Bluetooth-sensoren en Tuya-apparaten kun je alleen in de desktop-app koppelen: browsers mogen geen apparaten in het lokale netwerk benaderen, en iPhone en iPad hebben geen Web Bluetooth. Metingen die de desktop-app opslaat, zie je hier wel.",
+  "auth.webModalHint": "Meld je aan of maak een account aan. Je planten, taken en logs worden in je account opgeslagen en zijn op al je apparaten beschikbaar."
 }

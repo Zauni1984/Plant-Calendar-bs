@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### PLANTAE ###",
   "csv.section.tasks": "### MUNERA ###",
   "csv.section.logs": "### DIARIA ###",
-  "task.repeatHoursPlaceholder": "exempli gratia 48"
+  "task.repeatHoursPlaceholder": "exempli gratia 48",
+  "account.signOut": "Exire",
+  "devices.desktopOnlyHint": "Sensoria Bluetooth et instrumenta Tuya in applicatione mensali tantum coniungi possunt: navigatris instrumenta retis localis attingere non licet, et iPhone atque iPad Web Bluetooth carent. Mensurae ab applicatione mensali servatae tamen hic apparent.",
+  "auth.webModalHint": "Inscribe te aut rationem crea. Plantae, munera et diaria tua in ratione tua servantur et in omnibus instrumentis tuis praesto sunt."
 }

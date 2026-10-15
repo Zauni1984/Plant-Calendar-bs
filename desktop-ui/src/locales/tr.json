@@ -1287,5 +1287,8 @@
   "csv.section.plants": "### BİTKİLER ###",
   "csv.section.tasks": "### GÖREVLER ###",
   "csv.section.logs": "### KAYITLAR ###",
-  "task.repeatHoursPlaceholder": "örn. 48"
+  "task.repeatHoursPlaceholder": "örn. 48",
+  "account.signOut": "Çıkış yap",
+  "devices.desktopOnlyHint": "Bluetooth sensörleri ve Tuya cihazları yalnızca masaüstü uygulamasında bağlanabilir: tarayıcıların yerel ağdaki cihazlara erişmesine izin verilmez ve iPhone ile iPad Web Bluetooth desteklemez. Masaüstü uygulamasının kaydettiği ölçümler yine de burada görünür.",
+  "auth.webModalHint": "Giriş yap veya bir hesap oluştur. Bitkilerin, görevlerin ve kayıtların hesabında saklanır ve tüm cihazlarında kullanılabilir."
 }

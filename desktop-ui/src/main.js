@@ -1,5 +1,6 @@
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { open as tauriOpenDialog, save as tauriSaveDialog } from "@tauri-apps/plugin-dialog";
+// Runs both inside the Tauri desktop app and as a plain web app: transport.js
+// forwards to the Rust process or to the HTTP backend depending on the build.
+import { invoke, convertFileSrc, openDialog as tauriOpenDialog, saveDialog as tauriSaveDialog, IS_TAURI, DESKTOP_ONLY } from "./api/transport.js";
 
 // ── i18n: locale JSON imports ──
 import localeDe from './locales/de.json';
@@ -300,8 +301,8 @@ root.innerHTML = `
         <div id="authStatusDisplay" style="margin-bottom:10px;"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button id="openAuthModal" class="btn btn--primary btn--sm">${t('account.signInOrRegister')}</button>
-          <button id="bootstrap" class="btn btn--sm">${t('account.startGuest')}</button>
-          <button id="syncNow" class="btn btn--sm">${t('account.syncNow')}</button>
+          ${IS_TAURI ? `<button id="bootstrap" class="btn btn--sm">${t('account.startGuest')}</button>
+          <button id="syncNow" class="btn btn--sm">${t('account.syncNow')}</button>` : `<button id="webLogout" class="btn btn--sm" style="display:none;">${t('account.signOut')}</button>`}
           <button id="me" class="btn btn--sm">${t('account.fetchProfile')}</button>
         </div>
       </div>
@@ -485,12 +486,7 @@ function renderConsentModal() {
   const overlay = document.createElement('div');
   overlay.id = 'consentOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
-  const rows = [
-    { key: 'cloud_sync', t: 'consent.cloudSync', d: 'consent.cloudSyncDesc' },
-    { key: 'weather', t: 'consent.weather', d: 'consent.weatherDesc' },
-    { key: 'devices', t: 'consent.devices', d: 'consent.devicesDesc' },
-    { key: 'billing_stripe', t: 'consent.billing', d: 'consent.billingDesc' },
-  ];
+  const rows = consentRows();
   overlay.innerHTML = `
     <div style="max-width:520px;width:100%;background:${TC.cardSolid || '#0b1a14'};border:1px solid rgba(${TC.accentRgb},0.2);border-radius:16px;padding:24px;color:${TC.text};max-height:90vh;overflow:auto;">
       <h2 style="margin:0 0 8px 0;color:${TC.accent};font-size:20px;">${escapeHtml(t('consent.title'))}</h2>
@@ -525,6 +521,24 @@ function renderConsentModal() {
   });
 }
 
+/**
+ * Consent choices offered in this build.
+ *
+ * In the browser, the server is where the data lives — the app cannot work
+ * without it — so storing it there is contract performance (GDPR Art. 6(1)(b)),
+ * not consent. Offering "cloud sync" as an opt-out would misdescribe that.
+ * Device integrations do not exist in the browser at all.
+ */
+function consentRows() {
+  const all = [
+    { key: 'cloud_sync', t: 'consent.cloudSync', d: 'consent.cloudSyncDesc' },
+    { key: 'weather', t: 'consent.weather', d: 'consent.weatherDesc' },
+    { key: 'devices', t: 'consent.devices', d: 'consent.devicesDesc' },
+    { key: 'billing_stripe', t: 'consent.billing', d: 'consent.billingDesc' },
+  ];
+  return IS_TAURI ? all : all.filter((r) => r.key !== 'cloud_sync' && r.key !== 'devices');
+}
+
 async function maybeShowConsentModal() {
   if (!consentsLoaded) await loadConsents();
   // If no record for any of the four types, this is first-run → show modal.
@@ -542,12 +556,7 @@ async function maybeShowConsentModal() {
 function renderConsentToggles(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const rows = [
-    { key: 'cloud_sync', t: 'consent.cloudSync', d: 'consent.cloudSyncDesc' },
-    { key: 'weather', t: 'consent.weather', d: 'consent.weatherDesc' },
-    { key: 'devices', t: 'consent.devices', d: 'consent.devicesDesc' },
-    { key: 'billing_stripe', t: 'consent.billing', d: 'consent.billingDesc' },
-  ];
+  const rows = consentRows();
   el.innerHTML = rows.map(r => `
     <label style="display:flex;gap:12px;align-items:flex-start;padding:10px;border-radius:10px;background:${TC.surface};border:1px solid rgba(${TC.accentRgb},0.06);cursor:pointer;">
       <input type="checkbox" data-settings-consent="${r.key}" ${hasConsent(r.key) ? 'checked' : ''} />
@@ -2295,6 +2304,16 @@ function renderDeviceManagementPanel() {
   const panel = document.getElementById("deviceManagementPanel");
   if (!panel) return;
 
+  // Browsers cannot reach devices on the local network (Tuya) and iOS has no
+  // Web Bluetooth at all, so device management lives in the desktop app.
+  if (!IS_TAURI) {
+    panel.innerHTML = `<div class="view-card">
+      <h3>${t('nav.devices')}</h3>
+      <div class="settings-info">${t('devices.desktopOnlyHint')}</div>
+    </div>`;
+    return;
+  }
+
   const deviceRows = devices.map(d => {
     const linkedPlant = plants.find(p => p.plant_id === d.linked_plant_id);
     const plantOptions = plants.map(p =>
@@ -2609,6 +2628,11 @@ function formatUpTime(seconds) {
 function renderSensorWidget() {
   const widget = document.getElementById("sensorWidget");
   if (!widget) return;
+  // Live sensor reads need Bluetooth/LAN access, which only the desktop app has.
+  if (!IS_TAURI) {
+    widget.style.display = "none";
+    return;
+  }
 
   if (!selectedPlantId) {
     widget.style.display = "none";
@@ -4774,9 +4798,9 @@ function openModal(type, prefill = {}) {
     titleEl.textContent = t('settings.login');
     body.innerHTML = `
       <div style="padding:12px; border-radius:12px; background:rgba(${TC.accentRgb},0.06); border:1px solid rgba(${TC.accentRgb},0.12); margin-bottom:14px; font-size:13px; color:${TC.textMuted};">
-        ${t('auth.modalHint')}
+        ${IS_TAURI ? t('auth.modalHint') : t('auth.webModalHint')}
       </div>
-      <div class="form-group">
+      <div class="form-group"${IS_TAURI ? '' : ' style="display:none;"'}>
         <label class="form-label">${t('auth.field.backendUrl')}</label>
         <input id="authModalBackendUrl" class="form-input" placeholder="http://localhost:8080" value="${escapeHtml($('backendUrl')?.value || 'http://localhost:8080')}" />
       </div>
@@ -5252,9 +5276,36 @@ async function handleCreateLog() {
   }
 }
 
+// Browser build only: whether the HTTP session is live. The desktop always has
+// its local database, so this stays irrelevant there.
+let webSignedIn = false;
+
+/** Re-read the browser session and sync the account controls to it. */
+async function refreshWebSessionState() {
+  if (IS_TAURI) return;
+  try {
+    const status = await invoke("get_sync_status");
+    webSignedIn = !!status.session_active;
+  } catch (_) {
+    webSignedIn = false;
+  }
+  const signIn = document.getElementById('openAuthModal');
+  const signOut = document.getElementById('webLogout');
+  if (signIn) signIn.style.display = webSignedIn ? 'none' : '';
+  if (signOut) signOut.style.display = webSignedIn ? '' : 'none';
+  updateOnboardingVisibility();
+}
+
 function updateOnboardingVisibility() {
   const overlay = document.getElementById('onboardingOverlay');
   if (!overlay) return;
+  // In the browser nothing can be saved before signing in, so the "create your
+  // first plant" prompt would only lead to an error. The sign-in dialog takes
+  // its place.
+  if (!IS_TAURI && !webSignedIn) {
+    overlay.style.display = 'none';
+    return;
+  }
   const hasPlants = plants.some(p => plantStatusValue(p) !== 'deleted');
   overlay.style.display = hasPlants ? 'none' : '';
 }
@@ -8056,8 +8107,11 @@ async function loadAllLogs() {
 }
 
 async function refreshAll(options = {}) {
+  // Sign-in and sign-out both end in a refresh, so this keeps the account
+  // controls in step without touching every auth handler. Local only, no request.
+  await refreshWebSessionState();
   const { autoReminderReason = null } = options;
-  showLoading("Daten laden...");
+  showLoading(t('misc.loading'));
   try {
     await refreshStatus();
     await loadCatalog();
@@ -8105,6 +8159,20 @@ function friendlyAuthError(err) {
 
 // Auth modal button
 $("openAuthModal")?.addEventListener("click", () => openModal('auth'));
+$("webLogout")?.addEventListener("click", async () => {
+  try {
+    await invoke("web_logout");
+  } catch (err) {
+    logOut(String(err));
+  }
+  plants = [];
+  allTasks = [];
+  allLogs = [];
+  selectedPlantId = null;
+  await refreshWebSessionState();
+  await refreshAll({ autoReminderReason: "web_logout" });
+  openModal('auth');
+});
 
 // Update auth status display
 function updateAuthStatusDisplay() {
@@ -8333,11 +8401,18 @@ document.addEventListener('keydown', (e) => {
 // Keep existing filter bindings
 bindPlantFilterControls();
 
-// Load data
-refreshAll({ autoReminderReason: "app_start" }).then(() => {
-  // Show first-run consent modal if no consent records exist yet.
-  try { maybeShowConsentModal(); } catch (_) {}
-}).catch((err) => {
+// Load data. In the browser, first exchange the refresh cookie for a session
+// so the initial load already sees the user's data.
+const startupSession = IS_TAURI ? Promise.resolve() : invoke("bootstrap_local_user").catch(() => {});
+startupSession
+  .then(() => refreshWebSessionState())
+  .then(() => refreshAll({ autoReminderReason: "app_start" }))
+  .then(() => {
+    // Show first-run consent modal if no consent records exist yet.
+    try { maybeShowConsentModal(); } catch (_) {}
+    // The browser has no local database, so it needs an account to store anything.
+    if (!IS_TAURI && !webSignedIn) openModal('auth');
+  }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
   logOut(String(err));
