@@ -2379,8 +2379,8 @@ fn start_new_season(state: State<AppLocalState>, plant_id: String) -> Result<Pla
 // ── Photo commands (local-only) ─────────────────────────────────
 
 #[tauri::command]
-fn add_photo(
-    state: State<AppLocalState>,
+async fn add_photo(
+    state: State<'_, AppLocalState>,
     plant_id: String,
     log_id: Option<String>,
     season_id: Option<String>,
@@ -2394,21 +2394,24 @@ fn add_photo(
     let photos_dir = app_dir.join("photos").join(&plant_id);
     std::fs::create_dir_all(&photos_dir).map_err(|e| e.to_string())?;
 
-    // Copy file to app storage
-    let source = std::path::Path::new(&source_path);
-    let ext = source
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("jpg");
+    // Store a WebP scaled to fit 1000x1000 instead of the original: same
+    // pipeline as the server (shared::images), so a phone photo of several MB
+    // becomes a few hundred KB and loses its EXIF/GPS metadata on the way.
+    // Decoding and encoding take a moment for a large photo; off the UI thread.
+    let processed = tauri::async_runtime::spawn_blocking(move || {
+        let bytes = std::fs::read(&source_path).map_err(|e| format!("Failed to read photo: {e}"))?;
+        shared::images::to_webp(&bytes).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     let now = Utc::now();
     let filename = format!(
-        "{}_{}.{}",
+        "{}_{}.webp",
         now.format("%Y%m%d_%H%M%S"),
         &Uuid::new_v4().to_string()[..8],
-        ext
     );
     let dest_path = photos_dir.join(&filename);
-    std::fs::copy(&source, &dest_path).map_err(|e| format!("Failed to copy photo: {e}"))?;
+    std::fs::write(&dest_path, &processed.webp).map_err(|e| format!("Failed to save photo: {e}"))?;
 
     let relative_path = format!("photos/{}/{}", plant_id, filename);
 

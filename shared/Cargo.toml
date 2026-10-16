@@ -10,3 +10,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 validator.workspace = true
+# Photo pipeline (decode, EXIF orientation, fit 1000x1000, WebP). Opt-in, so
+# crates that only need the domain types do not build libwebp.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"], optional = true }
+webp = { version = "0.3", optional = true }
+
+[features]
+images = ["dep:image", "dep:webp"]

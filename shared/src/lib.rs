@@ -1,5 +1,7 @@
 pub mod catalog;
 pub mod domain;
+#[cfg(feature = "images")]
+pub mod images;
 pub mod ggs;
 pub mod lc_controller;
 pub mod rules;

@@ -1,7 +1,10 @@
-//! Photo normalisation: every upload is decoded and re-encoded as lossy WebP.
+//! Photo normalisation: every photo is decoded, scaled to fit 1000x1000 and
+//! re-encoded as WebP. Shared by the backend (web uploads) and the desktop app
+//! (local photos), so both store exactly the same kind of file.
+//! Enabled with the `images` feature of this crate.
 //!
-//! Re-encoding on the server (rather than trusting the browser) is what makes
-//! the guarantees hold for every client:
+//! Re-encoding (rather than trusting the browser) is what makes the
+//! guarantees hold for every client:
 //! - storage: lossy WebP at a capped resolution, whatever the phone sent
 //! - privacy: metadata such as EXIF GPS does not survive a decode/encode
 //! - safety: the stored file is always a well-formed image we produced
@@ -13,8 +16,10 @@ use std::io::Cursor;
 
 use image::{imageops::FilterType, DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
 
-/// Longest edge of a stored photo. Plenty for a plant diary on any screen.
-pub const MAX_EDGE: u32 = 2048;
+/// Stored photos fit within MAX_EDGE x MAX_EDGE; larger ones are scaled down
+/// keeping their aspect ratio (4000x3000 becomes 1000x750). Smaller ones are
+/// never enlarged.
+pub const MAX_EDGE: u32 = 1000;
 /// libwebp quality (0-100). 80 is visually close to the source at a fraction
 /// of a phone JPEG's size.
 pub const WEBP_QUALITY: f32 = 80.0;
@@ -171,7 +176,19 @@ mod tests {
     fn large_images_are_downscaled_keeping_aspect_ratio() {
         let img = DynamicImage::ImageRgb8(RgbImage::from_pixel(4000, 3000, Rgb([200, 200, 200])));
         let out = to_webp(&encode(&img, ImageFormat::Png)).unwrap();
-        assert_eq!((out.width, out.height), (2048, 1536));
+        assert_eq!((out.width, out.height), (1000, 750));
+        let portrait = DynamicImage::ImageRgb8(RgbImage::from_pixel(3000, 4000, Rgb([200, 200, 200])));
+        let out = to_webp(&encode(&portrait, ImageFormat::Png)).unwrap();
+        assert_eq!((out.width, out.height), (750, 1000));
+    }
+
+    #[test]
+    fn images_within_the_limit_keep_their_size() {
+        for (w, h) in [(1000, 1000), (999, 400), (64, 48)] {
+            let img = DynamicImage::ImageRgb8(RgbImage::from_pixel(w, h, Rgb([20, 90, 40])));
+            let out = to_webp(&encode(&img, ImageFormat::Png)).unwrap();
+            assert_eq!((out.width, out.height), (w, h));
+        }
     }
 
     #[test]
