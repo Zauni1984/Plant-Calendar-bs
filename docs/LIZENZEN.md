@@ -31,12 +31,12 @@ plants-backend license reset-devices <lizenz-id>
 
 Schlüssel werden nur als Hash gespeichert. Wer einen selbst ausgestellten Schlüssel verliert, bekommt einen neuen; den alten widerrufen.
 
-**Käufer-Schlüssel** stehen dauerhaft im Web-Konto (Konto → Desktop-App). Sie werden nicht gespeichert, sondern aus `LICENSE_SIGNING_KEY` und der Lizenz-ID berechnet. Nach einer Kontolöschung funktioniert der Schlüssel weiter; die Lizenz verliert nur den Bezug zur Person. **Deshalb `LICENSE_SIGNING_KEY` nie wechseln** – sonst passen die angezeigten Käufer-Schlüssel nicht mehr (die App zeigt dann keinen an; bestehende Aktivierungen laufen per Erneuerung weiter, sobald die Geräte online sind).
+**Käufer-Schlüssel** stehen dauerhaft im Web-Konto (Konto → Desktop-App). Sie werden nicht gespeichert, sondern aus `LICENSE_SIGNING_KEY` und der Lizenz-ID berechnet. Nach einer Kontolöschung funktioniert der Schlüssel weiter; die Lizenz verliert nur den Bezug zur Person. **Deshalb `LICENSE_SIGNING_KEY` nie wechseln** – sonst passen die angezeigten Käufer-Schlüssel nicht mehr (das Konto zeigt dann keinen an).
 
 ## Einmalig einrichten (Produktion)
 
 1. Schlüsselpaar erzeugen: `plants-backend gen-license-keys`
-   - `LICENSE_SIGNING_KEY` → Server-Umgebung (**geheim**, sicher aufbewahren; ein Wechsel macht alle Zertifikate ungültig, bis die Geräte online erneuern).
+   - `LICENSE_SIGNING_KEY` → Server-Umgebung (**geheim**, sicher aufbewahren, **nie wechseln**). Ein Wechsel bräuchte eine neue App-Version mit dem neuen öffentlichen Schlüssel, alle Geräte müssten neu freigeschaltet werden, und Käufer-Schlüssel änderten sich. Nur bei einem Leck des Schlüssels.
    - `PLANTS_LICENSE_PUBLIC_KEY` → beim Bauen der Desktop-App setzen. Release-Builds brechen ohne ihn ab.
 2. Desktop-Build-Variablen: `PLANTS_LICENSE_PUBLIC_KEY`, `PLANTS_API_URL` (z. B. `https://api.deine-domain.de`), `PLANTS_WEB_URL` (Web-App, für „Kaufen“).
 3. Stripe: Produkt „Desktop-App“ als **einmalige Zahlung** anlegen, Preis-ID als `STRIPE_PRICE_DESKTOP`. Webhook `checkout.session.completed` ist bereits eingerichtet (`STRIPE_WEBHOOK_SECRET`).
