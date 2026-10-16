@@ -198,6 +198,8 @@ function applyTheme(themeId) {
   document.documentElement.setAttribute('data-theme', themeId);
   localStorage.setItem('plants_calendar_theme', themeId);
   TC = getThemeColors();
+  // Browser chrome / phone status bar follows the mood (Arctic is light).
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', TC.bg || '#091310');
   // Re-render all views that use TC colors
   try {
     renderAppNav();

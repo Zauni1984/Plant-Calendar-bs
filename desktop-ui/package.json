@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "check": "node --check src/main.js",
-    "test:smoke": "node scripts/smoke-status-tests.mjs"
+    "test:smoke": "node scripts/smoke-status-tests.mjs",
+    "icons": "node scripts/build-icons.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "vite": "^6.3.5"
   },
   "dependencies": {

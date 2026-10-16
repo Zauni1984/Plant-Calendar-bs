@@ -2,8 +2,22 @@
 <html lang="de" data-theme="forest">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) non-zero on
+         iPhones; without it the notch/home-indicator padding in style.css is 0. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>BlockSocial Plants Calendar</title>
+    <meta name="description" content="Pflanzenkalender: Aufgaben, Logs, Wetter und Wachstum deiner Pflanzen auf allen Geräten." />
+    <!-- Updated at runtime to the active mood's background (see applyTheme). -->
+    <meta name="theme-color" content="#091310" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- iOS standalone mode; "black" keeps the status bar from overlapping content. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Plants" />
     <link rel="stylesheet" href="/src/style.css">
     <script type="module" src="/src/main.js"></script>
     <style>

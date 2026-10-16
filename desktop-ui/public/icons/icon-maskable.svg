@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed square: the OS applies its own mask (circle, squircle, ...).
+       All content sits inside the central safe zone (radius ~205 px). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14573f"/>
+      <stop offset="1" stop-color="#091310"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 256) scale(0.82) translate(-256 -262)">
+    <ellipse cx="256" cy="402" rx="132" ry="22" fill="#6bffbc" opacity="0.18"/>
+    <path d="M256 398 C256 340 252 300 256 236" fill="none" stroke="#6bffbc" stroke-width="22" stroke-linecap="round"/>
+    <path d="M254 262 C200 266 152 236 140 172 C204 166 248 196 254 262 Z" fill="#6bffbc" opacity="0.85"/>
+    <path d="M258 240 C266 168 318 124 384 126 C384 200 330 246 258 240 Z" fill="#6bffbc"/>
+  </g>
+</svg>
