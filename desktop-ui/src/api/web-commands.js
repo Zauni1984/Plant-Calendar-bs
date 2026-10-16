@@ -414,8 +414,14 @@ export const webCommands = {
   },
 
   // --- subscription ----------------------------------------------------------
-  subscription_status_smart: () => api("/subscription/status"),
-  subscription_history_smart: () => api("/subscription/history"),
+  // Signed out there is no account to ask about; answer like the server would
+  // for a fresh Free account (SubscriptionStatusSummary::empty_for_plan).
+  subscription_status_smart: () => (hasSession() ? api("/subscription/status") : Promise.resolve({
+    plan: "free", plant_limit: 1, active_plants: 0, ended_plants: 0, archived_plants: 0,
+    inactive_plants: 0, visible_plants: 0, grandfathered_active_plants: 0,
+    remaining_slots: 1, over_limit_by: 0, can_create: true, can_reactivate: true,
+  })),
+  subscription_history_smart: () => (hasSession() ? api("/subscription/history") : Promise.resolve([])),
   subscription_checkout_smart: ({ plan }) => {
     requireSession();
     return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan) } });

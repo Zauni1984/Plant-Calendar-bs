@@ -74,8 +74,11 @@ async function readError(r) {
 
 /** Authenticated JSON request with one transparent refresh-and-retry on 401. */
 export async function api(path, opts = {}) {
+  const hadSession = !!accessToken;
   let r = await rawFetch(path, opts);
-  if (r.status === 401 && opts.auth !== false) {
+  // Only an expired token is worth refreshing. Signed out, the cookie is gone
+  // too, and a refresh attempt would just be a second guaranteed 401.
+  if (r.status === 401 && opts.auth !== false && hadSession) {
     if (await refreshSession()) r = await rawFetch(path, opts);
   }
   if (!r.ok) throw await readError(r);

@@ -94,6 +94,10 @@ async fn main() -> anyhow::Result<()> {
                 // browser only sends cross-origin when credentials are allowed.
                 // Safe here because allow_origin is an explicit list, never "*".
                 .allow_credentials(true)
+                // Every authenticated call is preflighted (Authorization and
+                // X-Client are non-simple headers). Caching the preflight halves
+                // the round-trips on mobile. Chromium caps this at 2 hours.
+                .max_age(std::time::Duration::from_secs(7200))
         })
         .layer(TraceLayer::new_for_http())
         // GDPR Art. 32 / OWASP — defence-in-depth security response headers.
