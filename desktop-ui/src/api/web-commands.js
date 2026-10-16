@@ -18,9 +18,14 @@
 //                            cannot reach LAN devices, and iOS has no Web
 //                            Bluetooth at all
 //   not on the web ......... local profiles (a desktop multi-user feature)
+//   guest mode ............. without an account, plants/tasks/logs/locations/
+//                            seasons live in this browser (guest-api.js) and
+//                            can later be moved into an account
 
 import { api, apiBlob, apiUpload, authenticate, logout, refreshSession, getSession, hasSession, API_BASE_URL } from "./http.js";
 import { takeUpload, takeUploadFile, triggerDownload } from "./web-files.js";
+import { guestApi, exportForImport } from "./guest-api.js";
+import * as guestStore from "./guest-store.js";
 
 export const DESKTOP_ONLY = "desktop-only";
 
@@ -35,6 +40,24 @@ const requireSession = () => {
 };
 /** List reads degrade to an empty list while signed out, so the UI can render. */
 const listOrEmpty = (fn) => async (args) => (hasSession() ? fn(args) : []);
+
+// --- guest mode ------------------------------------------------------------------
+// Chosen explicitly ("try without an account"). A session always wins: once
+// signed in, the data endpoints go to the server again.
+const GUEST_MODE_KEY = "pc_guest_mode";
+function isGuest() {
+  if (hasSession()) return false;
+  try { return localStorage.getItem(GUEST_MODE_KEY) === "1"; } catch { return false; }
+}
+function setGuestFlag(on) {
+  try { on ? localStorage.setItem(GUEST_MODE_KEY, "1") : localStorage.removeItem(GUEST_MODE_KEY); } catch { /* storage unavailable */ }
+}
+/** Garden data: the account's, or this browser's in guest mode. */
+const dataApi = (path, opts) => (isGuest() ? guestApi(path, opts) : api(path, opts));
+const requireData = () => {
+  if (!hasSession() && !isGuest()) throw "Bitte melde dich an, um diese Funktion zu nutzen.";
+};
+const dataListOrEmpty = (fn) => async (args) => (hasSession() || isGuest() ? fn(args) : []);
 
 const enc = encodeURIComponent;
 const lower = (v, fallback) => (v == null || v === "" ? fallback : String(v).toLowerCase());
@@ -192,8 +215,8 @@ async function openMeteo(lat, lon, query) {
 
 // --- photos -------------------------------------------------------------------
 
-/** Longest edge sent from the browser; the server caps stored photos at 2048. */
-const UPLOAD_MAX_EDGE = 2048;
+/** Photos are stored at most 1000x1000; shrinking before upload saves mobile data. */
+const UPLOAD_MAX_EDGE = 1000;
 
 /**
  * Shrink camera JPEGs before upload to spare mobile data. Purely a bandwidth
@@ -245,9 +268,9 @@ function forgetPhotoUrl(photoPath) {
 // --- reminders: computed from the user's tasks while the tab is open ----------
 
 async function dueReminders(withinMinutes = 30) {
-  if (!hasSession()) return { count: 0, reminders: [] };
+  if (!hasSession() && !isGuest()) return { count: 0, reminders: [] };
   const sent = readJson(SENT_REMINDERS_KEY, {});
-  const tasks = await api("/tasks");
+  const tasks = await dataApi("/tasks");
   const now = Date.now();
   const horizon = now + withinMinutes * 60 * 1000;
   const reminders = tasks
@@ -357,6 +380,7 @@ export const webCommands = {
     const s = getSession();
     return {
       session_active: hasSession(),
+      guest_mode: isGuest(),
       user_id: s?.user_id ?? null,
       auth_mode: s?.auth_mode ?? null,
       backend_url: API_BASE_URL,
@@ -376,6 +400,24 @@ export const webCommands = {
     pulled_plants: 0, pulled_tasks: 0, pulled_logs: 0, pulled_deleted: 0,
   }),
 
+  // --- guest mode --------------------------------------------------------------
+  web_guest_start: async () => { setGuestFlag(true); return "guest mode"; },
+  web_guest_status: async () => {
+    const plants = await guestStore.plantCount();
+    return { guest: isGuest(), has_data: plants > 0, plants, persistent: await guestStore.isPersistent() };
+  },
+  // Moves this browser's garden into the signed-in account, then forgets it
+  // locally. The server writes all of it in one transaction or nothing.
+  web_guest_import: async () => {
+    requireSession();
+    const report = await api("/me/import-guest", { method: "POST", body: await exportForImport() });
+    await guestStore.clearAll();
+    setGuestFlag(false);
+    return report;
+  },
+  web_guest_discard: async () => { await guestStore.clearAll(); setGuestFlag(false); return "discarded"; },
+  web_guest_leave: async () => { setGuestFlag(false); return "left guest mode"; },
+
   // --- account ---------------------------------------------------------------
   update_profile_smart: ({ payload }) =>
     api("/me", { method: "PATCH", body: { locale: payload.locale ?? null, timezone: payload.timezone ?? null } }),
@@ -393,17 +435,20 @@ export const webCommands = {
     return "account deleted";
   },
   export_account_json: async ({ path }) => {
-    requireSession();
-    const data = await api("/me/export");
+    requireData();
+    // A guest's export is simply everything this browser holds.
+    const data = isGuest()
+      ? { schema_version: 1, exported_at: new Date().toISOString(), guest: true, ...(await exportForImport()) }
+      : await api("/me/export");
     triggerDownload(path, JSON.stringify(data, null, 2), "application/json");
     return path;
   },
 
   // --- plants ----------------------------------------------------------------
-  list_current_plants: listOrEmpty(() => api("/plants")),
+  list_current_plants: dataListOrEmpty(() => dataApi("/plants")),
   create_plant_smart: ({ payload }) => {
-    requireSession();
-    return api("/plants", {
+    requireData();
+    return dataApi("/plants", {
       method: "POST",
       body: {
         name: String(payload.name || "").trim(),
@@ -420,9 +465,9 @@ export const webCommands = {
     });
   },
   update_plant_smart: ({ payload }) => {
-    requireSession();
+    requireData();
     // The server resolves the target status from status/archived itself.
-    return api(`/plants/${enc(payload.plant_id)}`, {
+    return dataApi(`/plants/${enc(payload.plant_id)}`, {
       method: "PATCH",
       body: {
         name: String(payload.name || "").trim(),
@@ -440,18 +485,18 @@ export const webCommands = {
     });
   },
   delete_plant_smart: async ({ plantId }) => {
-    requireSession();
-    await api(`/plants/${enc(plantId)}`, { method: "DELETE" });
+    requireData();
+    await dataApi(`/plants/${enc(plantId)}`, { method: "DELETE" });
     return "plant deleted";
   },
   get_plant_catalog: () => api("/catalog", { auth: false }),
 
   // --- tasks -----------------------------------------------------------------
-  list_current_tasks: listOrEmpty(({ plantId } = {}) => api(plantId ? `/plants/${enc(plantId)}/tasks` : "/tasks")),
+  list_current_tasks: dataListOrEmpty(({ plantId } = {}) => dataApi(plantId ? `/plants/${enc(plantId)}/tasks` : "/tasks")),
   create_task_smart: ({ payload }) => {
-    requireSession();
+    requireData();
     const due_at = parseDueAt(payload.due_at, new Date(Date.now() + 24 * 3600 * 1000));
-    return api(`/plants/${enc(payload.plant_id)}/tasks`, {
+    return dataApi(`/plants/${enc(payload.plant_id)}/tasks`, {
       method: "POST",
       body: {
         title: String(payload.title || "").trim(),
@@ -464,8 +509,8 @@ export const webCommands = {
     });
   },
   update_task_smart: ({ payload }) => {
-    requireSession();
-    return api(`/tasks/${enc(payload.task_id)}`, {
+    requireData();
+    return dataApi(`/tasks/${enc(payload.task_id)}`, {
       method: "PATCH",
       body: {
         title: payload.title ?? null,
@@ -477,20 +522,20 @@ export const webCommands = {
     });
   },
   update_task_status_smart: ({ payload }) => {
-    requireSession();
-    return api(`/tasks/${enc(payload.task_id)}`, { method: "PATCH", body: { status: lower(payload.status, "open") } });
+    requireData();
+    return dataApi(`/tasks/${enc(payload.task_id)}`, { method: "PATCH", body: { status: lower(payload.status, "open") } });
   },
   delete_task_smart: async ({ taskId }) => {
-    requireSession();
-    await api(`/tasks/${enc(taskId)}`, { method: "DELETE" });
+    requireData();
+    await dataApi(`/tasks/${enc(taskId)}`, { method: "DELETE" });
     return "task deleted";
   },
 
   // --- logs ------------------------------------------------------------------
-  list_current_logs: listOrEmpty(({ plantId } = {}) => api(plantId ? `/plants/${enc(plantId)}/logs` : "/logs")),
+  list_current_logs: dataListOrEmpty(({ plantId } = {}) => dataApi(plantId ? `/plants/${enc(plantId)}/logs` : "/logs")),
   create_log_smart: ({ payload }) => {
-    requireSession();
-    return api(`/plants/${enc(payload.plant_id)}/logs`, {
+    requireData();
+    return dataApi(`/plants/${enc(payload.plant_id)}/logs`, {
       method: "POST",
       body: {
         log_type: lower(payload.log_type, "note"),
@@ -501,8 +546,8 @@ export const webCommands = {
     });
   },
   update_log_smart: ({ payload }) => {
-    requireSession();
-    return api(`/logs/${enc(payload.log_id)}`, {
+    requireData();
+    return dataApi(`/logs/${enc(payload.log_id)}`, {
       method: "PATCH",
       body: {
         log_type: payload.log_type ? lower(payload.log_type) : null,
@@ -512,17 +557,17 @@ export const webCommands = {
     });
   },
   delete_log_smart: async ({ logId }) => {
-    requireSession();
-    await api(`/logs/${enc(logId)}`, { method: "DELETE" });
+    requireData();
+    await dataApi(`/logs/${enc(logId)}`, { method: "DELETE" });
     return "log deleted";
   },
 
   // --- locations -------------------------------------------------------------
   // The server rounds coordinates to ~1 km before storing them.
-  list_locations: listOrEmpty(() => api("/locations")),
+  list_locations: dataListOrEmpty(() => dataApi("/locations")),
   create_location: ({ name, locationType, description, latitude, longitude }) => {
-    requireSession();
-    return api("/locations", {
+    requireData();
+    return dataApi("/locations", {
       method: "POST",
       body: {
         name,
@@ -534,8 +579,8 @@ export const webCommands = {
     });
   },
   update_location: ({ locationId, name, locationType, description, latitude, longitude }) => {
-    requireSession();
-    return api(`/locations/${enc(locationId)}`, {
+    requireData();
+    return dataApi(`/locations/${enc(locationId)}`, {
       method: "PATCH",
       body: {
         name,
@@ -547,32 +592,32 @@ export const webCommands = {
     });
   },
   delete_location: async ({ locationId }) => {
-    requireSession();
-    await api(`/locations/${enc(locationId)}`, { method: "DELETE" });
+    requireData();
+    await dataApi(`/locations/${enc(locationId)}`, { method: "DELETE" });
     return "location deleted";
   },
 
   // --- seasons (perennials) --------------------------------------------------
-  list_plant_seasons: listOrEmpty(({ plantId }) => api(`/plants/${enc(plantId)}/seasons`)),
+  list_plant_seasons: dataListOrEmpty(({ plantId }) => dataApi(`/plants/${enc(plantId)}/seasons`)),
   create_plant_season: ({ plantId, year, notes }) => {
-    requireSession();
-    return api(`/plants/${enc(plantId)}/seasons`, { method: "POST", body: { year, notes: notes ?? null } });
+    requireData();
+    return dataApi(`/plants/${enc(plantId)}/seasons`, { method: "POST", body: { year, notes: notes ?? null } });
   },
   start_new_season: ({ plantId }) => {
-    requireSession();
-    return api(`/plants/${enc(plantId)}/seasons`, {
+    requireData();
+    return dataApi(`/plants/${enc(plantId)}/seasons`, {
       method: "POST",
       body: { year: new Date().getFullYear(), notes: null },
     });
   },
   update_plant_season: ({ payload }) => {
-    requireSession();
+    requireData();
     const { season_id, ...rest } = payload;
-    return api(`/seasons/${enc(season_id)}`, { method: "PATCH", body: rest });
+    return dataApi(`/seasons/${enc(season_id)}`, { method: "PATCH", body: rest });
   },
   delete_plant_season: async ({ seasonId }) => {
-    requireSession();
-    await api(`/seasons/${enc(seasonId)}`, { method: "DELETE" });
+    requireData();
+    await dataApi(`/seasons/${enc(seasonId)}`, { method: "DELETE" });
     return "season deleted";
   },
 
@@ -598,7 +643,7 @@ export const webCommands = {
   // --- subscription ----------------------------------------------------------
   // Signed out there is no account to ask about; answer like the server would
   // for a fresh Free account (SubscriptionStatusSummary::empty_for_plan).
-  subscription_status_smart: () => (hasSession() ? api("/subscription/status") : Promise.resolve({
+  subscription_status_smart: () => (hasSession() || isGuest() ? dataApi("/subscription/status") : Promise.resolve({
     plan: "free", plant_limit: 1, active_plants: 0, ended_plants: 0, archived_plants: 0,
     inactive_plants: 0, visible_plants: 0, grandfathered_active_plants: 0,
     remaining_slots: 1, over_limit_by: 0, can_create: true, can_reactivate: true,

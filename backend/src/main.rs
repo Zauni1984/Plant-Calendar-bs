@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(password_change_routes)
         .route("/me", get(api::get_me).patch(api::update_profile).delete(api::delete_account))
         .route("/me/export", get(api::export_me))
+        .route("/me/import-guest", post(api::guest_import::import_guest_data))
         .route("/me/consents", get(api::list_consents).post(api::upsert_consent))
         .route("/me/adult-confirmation", patch(api::patch_adult_confirmation))
         .route("/locations", get(api::list_locations).post(api::create_location))

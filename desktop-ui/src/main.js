@@ -322,6 +322,7 @@ root.innerHTML = `
           <button id="me" class="btn btn--sm">${t('account.fetchProfile')}</button>
         </div>
       </div>
+      ${IS_TAURI ? '' : '<div id="guestCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
       <!-- Hidden inputs for auth (used by handlers) -->
       <div style="display:none;">
         <input id="backendUrl" value="http://localhost:8080" />
@@ -1107,10 +1108,10 @@ function calculateWateringNeed(plant) {
 
   let urgency = 'ok';
   let reason = '';
-  if (hoursUntilWater <= 0) { urgency = 'overdue'; reason = 'Giessen ueberfaellig!'; }
-  else if (hoursUntilWater < 6) { urgency = 'soon'; reason = 'In ~' + Math.round(hoursUntilWater) + 'h giessen'; }
-  else if (hoursUntilWater < 24) { urgency = 'ok'; reason = 'Naechstes Giessen in ~' + Math.round(hoursUntilWater) + 'h'; }
-  else { urgency = 'ok'; reason = 'Naechstes Giessen in ~' + Math.round(hoursUntilWater / 24) + ' Tagen'; }
+  if (hoursUntilWater <= 0) { urgency = 'overdue'; reason = t('water.overdue'); }
+  else if (hoursUntilWater < 6) { urgency = 'soon'; reason = t('water.soonHours', Math.round(hoursUntilWater)); }
+  else if (hoursUntilWater < 24) { urgency = 'ok'; reason = t('water.nextHours', Math.round(hoursUntilWater)); }
+  else { urgency = 'ok'; reason = t('water.nextDays', Math.round(hoursUntilWater / 24)); }
 
   return { hoursUntilWater, urgency, reason, baseHours: Math.round(baseHours), hoursSinceWatering: Math.round(hoursSinceWatering) };
 }
@@ -1791,6 +1792,7 @@ function renderSettingsPanel() {
     try { renderClimateSettings && renderClimateSettings(); } catch (_) {}
     try { renderInstallCard(); } catch (_) {}
     try { renderPushCard(); } catch (_) {}
+    try { renderGuestCard(); } catch (_) {}
     if (!IS_TAURI) invoke('web_push_sync', { lang: currentLang }).catch(() => {});
     try { refreshAppBanners(); } catch (_) {}
     try { refreshStatus(); } catch (_) {}
@@ -3841,14 +3843,14 @@ function computePlantDashboardSummary(plant) {
   });
   const weekDone = weekTasks.filter((task) => task.status === "done").length;
   const weekTotal = weekTasks.length;
-  const weekProgressLabel = weekTotal ? `${weekDone}/${weekTotal} erledigt` : 'Noch keine Wochen-Tasks';
+  const weekProgressLabel = weekTotal ? t('detail.weekDone', weekDone, weekTotal) : t('detail.weekNoTasks');
   const weekProgressPercent = weekTotal ? Math.max(6, Math.round((weekDone / weekTotal) * 100)) : 0;
 
   return {
     nextOpenTask,
     nextReminder,
     lastLog,
-    phaseText: `${phaseLabel(plant.phase)} · Woche ${plant.phase_week ?? '-'}`,
+    phaseText: `${phaseLabel(plant.phase)} · ${t('plant.week')} ${plant.phase_week ?? '-'}`,
     weekProgressLabel,
     weekProgressPercent,
   };
@@ -4462,7 +4464,7 @@ function showDayDetail(dayKey) {
           const plant = plants.find(p => p.plant_id === tsk.plant_id);
           const isVirtual = tsk._virtual;
           const isFuture = new Date(tsk.due_at) > new Date(Date.now() + 24 * 3600000); // more than 1 day in future
-          const repeatLabel = tsk.repeat_interval_hours ? ` · alle ${tsk.repeat_interval_hours}h` : '';
+          const repeatLabel = tsk.repeat_interval_hours ? ` · ${t('task.everyHours', tsk.repeat_interval_hours)}` : '';
           const showDoneBtn = !isFuture; // Show Done for all non-future tasks (real or virtual)
           return `<div class="day-detail-item" ${isVirtual ? `style="opacity:0.85; border-style:dashed;"` : ''}>
             <span class="cal-dot" style="background:${sanitizeColorTag(plant?.color_tag || TC.accent)};"></span>
@@ -4674,7 +4676,7 @@ function openPlantStatPopup(plant, kind) {
   const rowsHtml = items.length ? items.map(it => {
     if (itemType === 'task') {
       const statusColor = it.status === 'open' ? TC.warning : it.status === 'done' ? TC.accent : TC.textMuted;
-      const repeatLbl = it.repeat_interval_hours ? ` · alle ${it.repeat_interval_hours}h` : '';
+      const repeatLbl = it.repeat_interval_hours ? ` · ${t('task.everyHours', it.repeat_interval_hours)}` : '';
       return `<div style="padding:10px; border-radius:8px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.1); display:flex; gap:8px; align-items:center;">
         <div style="flex:1;">
           <div style="font-weight:600; color:${TC.text};">${escapeHtml(it.title)}</div>
@@ -4855,6 +4857,42 @@ function openModal(type, prefill = {}) {
         if (labelEl) labelEl.textContent = filePath.split(/[/\\]/).pop();
       } catch (_) {}
     });
+  } else if (type === 'guestImport') {
+    titleEl.textContent = t('guest.importTitle');
+    body.innerHTML = `
+      <p style="margin:0 0 8px; font-size:14px;">${escapeHtml(t('guest.importText', prefill.plants ?? 0))}</p>
+      <div id="guestImportResult" class="form-hint" style="display:none;" role="status"></div>`;
+    footer.innerHTML = `
+      <button class="btn btn--ghost" id="modalCancel">${escapeHtml(t('guest.later'))}</button>
+      <button class="btn" id="guestImportDiscard">${escapeHtml(t('guest.discard'))}</button>
+      <button class="btn btn--primary" id="guestImportGo">${escapeHtml(t('guest.import'))}</button>`;
+    document.getElementById('guestImportGo')?.addEventListener('click', async (e) => {
+      const button = e.currentTarget;
+      const result = document.getElementById('guestImportResult');
+      button.disabled = true;
+      try {
+        const r = await invoke('web_guest_import');
+        let text = t('guest.importDone', r.plants, r.tasks, r.logs);
+        if (r.plants_ended_for_limit) text += ' ' + t('guest.importLimited', r.plants_ended_for_limit);
+        result.textContent = text;
+        result.style.color = TC.accent;
+        footer.innerHTML = `<button class="btn btn--primary" id="modalCancel">${escapeHtml(t('action.close'))}</button>`;
+        document.getElementById('modalCancel')?.addEventListener('click', closeModal);
+        await refreshWebSessionState();
+        await refreshAll({ autoReminderReason: 'guest_import' });
+      } catch (err) {
+        result.textContent = t('guest.importFailed', String(err?.message || err));
+        result.style.color = '';
+        button.disabled = false;
+      }
+      result.style.display = 'block';
+    });
+    document.getElementById('guestImportDiscard')?.addEventListener('click', async () => {
+      if (!confirm(t('guest.discardConfirm'))) return;
+      await invoke('web_guest_discard');
+      closeModal();
+      await renderGuestCard();
+    });
   } else if (type === 'auth') {
     titleEl.textContent = t('settings.login');
     body.innerHTML = `
@@ -4875,6 +4913,11 @@ function openModal(type, prefill = {}) {
       </div>
       <div id="authModalError" class="form-error" style="display:none;"></div>
       <div id="authModalSuccess" class="form-hint" style="display:none; color:${TC.accent};"></div>
+      ${IS_TAURI || webGuest ? '' : `
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(${TC.accentRgb},0.12); text-align:center;">
+        <button type="button" class="btn btn--ghost btn--sm" id="authModalGuest">${escapeHtml(t('guest.try'))}</button>
+        <div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">${escapeHtml(t('guest.tryHint'))}</div>
+      </div>`}
     `;
     footer.innerHTML = `
       <button class="btn btn--ghost" id="modalCancel">${t('action.cancel')}</button>
@@ -4910,11 +4953,12 @@ function openModal(type, prefill = {}) {
         const result = await invoke("auth_login", { payload: { email, password, backend_url: backendUrl || null } });
         logOut(result);
         showAuthSuccess(t('auth.loginSuccess'));
-        setTimeout(() => { closeModal(); refreshAll({ autoReminderReason: "auth_change" }); }, 800);
+        setTimeout(() => { closeModal(); afterSignIn(); }, 800);
       } catch (err) {
         showAuthError(friendlyAuthError(err));
       }
     });
+    document.getElementById('authModalGuest')?.addEventListener('click', startGuestMode);
     document.getElementById('authModalRegister')?.addEventListener('click', async () => {
       const { email, password, backendUrl } = getAuthFields();
       if (!email || !password) { showAuthError(t('auth.emailPasswordRequired')); return; }
@@ -4923,7 +4967,7 @@ function openModal(type, prefill = {}) {
         const result = await invoke("auth_register", { payload: { email, password, backend_url: backendUrl || null } });
         logOut(result);
         showAuthSuccess(t('auth.registerSuccess'));
-        setTimeout(() => { closeModal(); refreshAll({ autoReminderReason: "auth_change" }); }, 800);
+        setTimeout(() => { closeModal(); afterSignIn(); }, 800);
       } catch (err) {
         showAuthError(friendlyAuthError(err));
       }
@@ -5002,7 +5046,7 @@ function renderPlantFormHTML(prefill = {}) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">${t('plant.potSize')}</label>
-        <input id="plantPotSize" type="number" step="0.5" class="form-input" placeholder="z.B. 11" />
+        <input id="plantPotSize" type="number" step="0.5" class="form-input" placeholder="${t('form.example', '11')}" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('plant.soil')}</label>
@@ -5111,31 +5155,31 @@ function renderLogFormHTML(prefill = {}) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">pH</label>
-        <input id="logPh" type="number" step="0.1" class="form-input" placeholder="z.B. 6.2" />
+        <input id="logPh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '6.2')}" />
       </div>
       <div class="form-group">
         <label class="form-label">EC</label>
-        <input id="logEc" type="number" step="0.1" class="form-input" placeholder="z.B. 1.2" />
+        <input id="logEc" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '1.2')}" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Temp (\u00b0C)</label>
-        <input id="logTemp" type="number" step="0.1" class="form-input" placeholder="z.B. 24" />
+        <input id="logTemp" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '24')}" />
       </div>
       <div class="form-group">
         <label class="form-label">RH (%)</label>
-        <input id="logRh" type="number" step="0.1" class="form-input" placeholder="z.B. 55" />
+        <input id="logRh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '55')}" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">${t('harvest.kg')}</label>
-        <input id="logHarvestKg" type="number" step="0.1" class="form-input" placeholder="z.B. 2.5" />
+        <input id="logHarvestKg" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '2.5')}" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('harvest.count')}</label>
-        <input id="logHarvestCount" type="number" class="form-input" placeholder="z.B. 12" />
+        <input id="logHarvestCount" type="number" class="form-input" placeholder="${t('form.example', '12')}" />
       </div>
     </div>
     <div class="form-group">
@@ -5151,7 +5195,7 @@ function renderLogFormHTML(prefill = {}) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">${t('water.liters')}</label>
-        <input id="logWaterLiters" type="number" step="0.1" class="form-input" placeholder="z.B. 2.0" />
+        <input id="logWaterLiters" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '2.0')}" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('water.method')}</label>
@@ -5340,6 +5384,8 @@ async function handleCreateLog() {
 // Browser build only: whether the HTTP session is live. The desktop always has
 // its local database, so this stays irrelevant there.
 let webSignedIn = false;
+// Web only: using the app without an account; data lives in this browser.
+let webGuest = false;
 
 /** Re-read the browser session and sync the account controls to it. */
 async function refreshWebSessionState() {
@@ -5347,8 +5393,10 @@ async function refreshWebSessionState() {
   try {
     const status = await invoke("get_sync_status");
     webSignedIn = !!status.session_active;
+    webGuest = !!status.guest_mode;
   } catch (_) {
     webSignedIn = false;
+    webGuest = false;
   }
   const signIn = document.getElementById('openAuthModal');
   const signOut = document.getElementById('webLogout');
@@ -5361,6 +5409,7 @@ async function refreshWebSessionState() {
     try { await invoke('web_push_sync', { lang: currentLang }); } catch (_) {}
   }
   await renderPushCard();
+  await renderGuestCard();
 }
 
 function updateOnboardingVisibility() {
@@ -5369,7 +5418,7 @@ function updateOnboardingVisibility() {
   // In the browser nothing can be saved before signing in, so the "create your
   // first plant" prompt would only lead to an error. The sign-in dialog takes
   // its place.
-  if (!IS_TAURI && !webSignedIn) {
+  if (!IS_TAURI && !webSignedIn && !webGuest) {
     overlay.style.display = 'none';
     return;
   }
@@ -5925,7 +5974,7 @@ function renderDetailPanel() {
             <div style="font-size:12px; color:${TC.textMuted};">${t('plant.dashboardLabel')}</div>
             <div style="margin-top:4px; color:${TC.textMuted}; font-size:13px;">${t('plant.dashboardHint')}</div>
           </div>
-          <div style="font-size:12px; color:${TC.textMuted};">Fokuswoche: ${weekRangeLabelFromKey(timelineFocusKey)}</div>
+          <div style="font-size:12px; color:${TC.textMuted};">${t('detail.focusWeek')} ${weekRangeLabelFromKey(timelineFocusKey)}</div>
         </div>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
           <div style="padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12);">
@@ -6508,7 +6557,7 @@ function renderTasks() {
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(task.title)}</div>
-          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · alle ${task.repeat_interval_hours}h` : ''}${task.repeat_until ? ` bis ${new Date(task.repeat_until).toLocaleDateString(localeTag())}` : ''}</div>
+          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · ${t('task.everyHours', task.repeat_interval_hours)}` : ''}${task.repeat_until ? ` ${t('task.until', new Date(task.repeat_until).toLocaleDateString(localeTag()))}` : ''}</div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
           <button data-action="done" data-task-id="${task.task_id}">${t('task.doneBtn')}</button>
@@ -8514,7 +8563,7 @@ startupSession
     // Show first-run consent modal if no consent records exist yet.
     try { maybeShowConsentModal(); } catch (_) {}
     // The browser has no local database, so it needs an account to store anything.
-    if (!IS_TAURI && !webSignedIn) openModal('auth');
+    if (!IS_TAURI && !webSignedIn && !webGuest) openModal('auth');
   }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
@@ -8846,4 +8895,68 @@ async function sendWebPushTest() {
     pushCardMessage = t('push.failed', String(err));
   }
   await renderPushCard();
+}
+
+// ── Guest mode (web) ────────────────────────────────────────────────────────
+// Trying the app without an account: data lives in this browser (IndexedDB,
+// see api/guest-store.js). Signing in offers to move it into the account.
+
+async function startGuestMode() {
+  await invoke('web_guest_start');
+  closeModal();
+  await refreshWebSessionState();
+  await refreshAll({ autoReminderReason: 'guest_start' });
+  showTranslatedBanner('guestBanner', () => [t('guest.banner'), {
+    label: t('guest.createAccount'),
+    run: () => { hideAppBanner('guestBanner'); openModal('auth'); },
+    dismiss: { label: t('action.close') },
+  }]);
+}
+
+/** After a web sign-in or registration: offer to bring guest data along. */
+async function afterSignIn() {
+  await refreshWebSessionState();
+  await refreshAll({ autoReminderReason: 'auth_change' });
+  hideAppBanner('guestBanner');
+  if (IS_TAURI) return;
+  try {
+    const st = await invoke('web_guest_status');
+    if (st.has_data) openModal('guestImport', { plants: st.plants });
+  } catch (_) {}
+}
+
+async function renderGuestCard() {
+  const card = document.getElementById('guestCard');
+  if (!card) return;
+  let st;
+  try { st = await invoke('web_guest_status'); } catch (_) { st = null; }
+  const muted = (text) => `<p style="margin:0 0 10px;font-size:12px;color:${TC.textMuted};">${escapeHtml(text)}</p>`;
+  let html = '';
+  if (webGuest) {
+    html = `<h3>${escapeHtml(t('guest.title'))}</h3>${muted(t('guest.text'))}
+      ${st && !st.persistent ? muted(t('guest.notPersistent')) : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" id="guestCardAccount" class="btn btn--primary btn--sm">${escapeHtml(t('guest.createAccount'))}</button>
+        <button type="button" id="guestCardDiscard" class="btn btn--sm btn--ghost">${escapeHtml(t('guest.discard'))}</button>
+      </div>`;
+  } else if (webSignedIn && st?.has_data) {
+    html = `<h3>${escapeHtml(t('guest.leftoverTitle'))}</h3>${muted(t('guest.leftoverText', st.plants))}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" id="guestCardImport" class="btn btn--primary btn--sm">${escapeHtml(t('guest.import'))}</button>
+        <button type="button" id="guestCardDiscard" class="btn btn--sm btn--ghost">${escapeHtml(t('guest.discard'))}</button>
+      </div>`;
+  }
+  card.innerHTML = html;
+  card.style.display = html ? '' : 'none';
+  card.querySelector('#guestCardAccount')?.addEventListener('click', () => openModal('auth'));
+  card.querySelector('#guestCardImport')?.addEventListener('click', () => openModal('guestImport', { plants: st?.plants ?? 0 }));
+  card.querySelector('#guestCardDiscard')?.addEventListener('click', async () => {
+    if (!confirm(t('guest.discardConfirm'))) return;
+    const wasGuest = webGuest;
+    await invoke('web_guest_discard');
+    hideAppBanner('guestBanner');
+    await refreshWebSessionState();
+    await refreshAll({ autoReminderReason: 'guest_discard' });
+    if (wasGuest) openModal('auth');
+  });
 }

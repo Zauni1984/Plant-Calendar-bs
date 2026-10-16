@@ -1,3 +1,4 @@
+pub mod guest_import;
 pub mod photos;
 pub mod push;
 pub mod weather;
