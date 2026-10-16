@@ -1297,5 +1297,11 @@
   "photo.downloadFailed": "İndirme başarısız: {0}",
   "pwa.offline": "Çevrimdışısın. Değişiklikler şu anda kaydedilemiyor.",
   "pwa.updateAvailable": "Yeni bir sürüm mevcut.",
-  "pwa.reload": "Yeniden yükle"
+  "pwa.reload": "Yeniden yükle",
+  "pwa.installTitle": "Uygulamayı yükle",
+  "pwa.installText": "Plants Calendar’ı bu cihaza yükle: kendi simgesi olur, bir uygulama gibi açılır ve bağlantı olmadan da çalışır.",
+  "pwa.installButton": "Yükle",
+  "pwa.iosInstructions": "Plants Calendar’ı uygulama gibi kullanmak için Safari’de “Paylaş”a, ardından “Ana Ekrana Ekle”ye dokun.",
+  "pwa.installBanner": "Plants Calendar bu cihaza uygulama olarak yüklensin mi?",
+  "pwa.notNow": "Şimdi değil"
 }

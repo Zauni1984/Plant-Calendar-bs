@@ -329,6 +329,7 @@ root.innerHTML = `
       </div>
       <div id="settingsPanel" class="view-card" style="margin-top:14px;"></div>
       <div id="climateSettingsPanel" class="view-card" style="margin-top:14px;"></div>
+      ${IS_TAURI ? '' : '<div id="installAppCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
       <div id="liveStatusCard" class="view-card" style="margin-top:14px;">
         <h3>${t('account.liveStatus')}</h3>
         <div id="status"></div>
@@ -494,6 +495,20 @@ async function openImprintDoc() {
   } catch (err) {
     try { window.open(`../docs/IMPRESSUM_DE.md`, '_blank'); } catch (_) {}
   }
+}
+
+// Rebuilds an open consent dialog in the new language, keeping the ticks.
+function rerenderConsentModal() {
+  const open = document.getElementById('consentOverlay');
+  if (!open) return;
+  const ticks = {};
+  open.querySelectorAll('[data-consent-toggle]').forEach(cb => { ticks[cb.dataset.consentToggle] = cb.checked; });
+  open.remove();
+  consentModalShown = false;
+  renderConsentModal();
+  document.querySelectorAll('#consentOverlay [data-consent-toggle]').forEach(cb => {
+    if (cb.dataset.consentToggle in ticks) cb.checked = ticks[cb.dataset.consentToggle];
+  });
 }
 
 function renderConsentModal() {
@@ -1769,6 +1784,10 @@ function renderSettingsPanel() {
     try { renderDeviceManagementPanel && renderDeviceManagementPanel(); } catch (_) {}
     try { renderSensorWidget && renderSensorWidget(); } catch (_) {}
     try { renderClimateSettings && renderClimateSettings(); } catch (_) {}
+    try { renderInstallCard(); } catch (_) {}
+    try { refreshAppBanners(); } catch (_) {}
+    try { refreshStatus(); } catch (_) {}
+    try { rerenderConsentModal(); } catch (_) {}
     try { if (currentView === 'weather' && typeof renderWeatherDashboard === 'function') renderWeatherDashboard(); } catch (_) {}
     try { if (focusedDayKey && typeof showDayDetail === 'function') showDayDetail(focusedDayKey); } catch (_) {}
   };
@@ -8606,18 +8625,39 @@ function showAppBanner(id, text, action) {
     btn.addEventListener('click', action.run);
     el.appendChild(btn);
   }
+  if (action?.dismiss) {
+    const close = document.createElement('button');
+    close.className = 'btn btn--sm btn--ghost';
+    close.textContent = action.dismiss.label;
+    close.addEventListener('click', () => { hideAppBanner(id); action.dismiss.run?.(); });
+    el.appendChild(close);
+  }
   el.hidden = false;
 }
 
 function hideAppBanner(id) {
+  appBannerBuilders.delete(id);
   const el = document.getElementById(id);
   if (el) el.hidden = true;
+}
+
+// Banners whose text comes from t(): build() returns [text, action] and is
+// called again after a language switch.
+const appBannerBuilders = new Map();
+
+function showTranslatedBanner(id, build) {
+  appBannerBuilders.set(id, build);
+  showAppBanner(id, ...build());
+}
+
+function refreshAppBanners() {
+  for (const [id, build] of appBannerBuilders) showAppBanner(id, ...build());
 }
 
 if (!IS_TAURI) {
   const syncOnlineState = () => {
     if (navigator.onLine) hideAppBanner('offlineBanner');
-    else showAppBanner('offlineBanner', t('pwa.offline'));
+    else showTranslatedBanner('offlineBanner', () => [t('pwa.offline')]);
   };
   window.addEventListener('online', syncOnlineState);
   window.addEventListener('offline', syncOnlineState);
@@ -8628,13 +8668,92 @@ if (!IS_TAURI) {
       .then(({ registerSW }) => {
         const updateSW = registerSW({
           onNeedRefresh() {
-            showAppBanner('updateBanner', t('pwa.updateAvailable'), {
+            showTranslatedBanner('updateBanner', () => [t('pwa.updateAvailable'), {
               label: t('pwa.reload'),
               run: () => updateSW(true),
-            });
+            }]);
           },
         });
       })
       .catch((err) => console.warn('service worker registration failed', err));
   }
+}
+
+// ── Install prompt ──────────────────────────────────────────────────────────
+// Chromium browsers (Android, desktop Chrome/Edge) fire beforeinstallprompt;
+// we keep the event and offer our own button. iOS/iPadOS Safari has no such
+// API, so there we explain the Share → "Add to Home Screen" steps instead.
+// Firefox desktop cannot install web apps; the card simply stays hidden.
+let deferredInstallPrompt = null;
+const INSTALL_BANNER_DISMISSED_KEY = 'pc_install_banner_dismissed';
+
+function isStandaloneApp() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIosSafari() {
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // Only Safari can add to the home screen on older iOS; other iOS browsers
+  // identify themselves with CriOS/FxiOS/EdgiOS.
+  return ios && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+}
+
+async function runInstallPrompt() {
+  const promptEvent = deferredInstallPrompt;
+  if (!promptEvent) return;
+  deferredInstallPrompt = null;
+  hideAppBanner('installBanner');
+  promptEvent.prompt();
+  try { await promptEvent.userChoice; } catch (_) {}
+  renderInstallCard();
+}
+
+function renderInstallCard() {
+  const card = document.getElementById('installAppCard');
+  if (!card) return;
+  let body = '';
+  if (!isStandaloneApp()) {
+    if (deferredInstallPrompt) {
+      body = `<p class="muted" style="margin:0 0 10px;">${escapeHtml(t('pwa.installText'))}</p>
+        <button type="button" id="installAppBtn" class="btn btn--primary btn--sm">${escapeHtml(t('pwa.installButton'))}</button>`;
+    } else if (isIosSafari()) {
+      body = `<p class="muted" style="margin:0;">${escapeHtml(t('pwa.iosInstructions'))}</p>`;
+    }
+  }
+  if (!body) { card.style.display = 'none'; card.innerHTML = ''; return; }
+  card.innerHTML = `<h3>${escapeHtml(t('pwa.installTitle'))}</h3>${body}`;
+  card.style.display = '';
+  card.querySelector('#installAppBtn')?.addEventListener('click', runInstallPrompt);
+}
+
+function installBannerDismissed() {
+  try { return localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY) === '1'; } catch (_) { return true; }
+}
+
+function dismissInstallBanner() {
+  try { localStorage.setItem(INSTALL_BANNER_DISMISSED_KEY, '1'); } catch (_) {}
+}
+
+if (!IS_TAURI) {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    renderInstallCard();
+    // One gentle hint per browser; afterwards the option lives in Settings.
+    if (!installBannerDismissed()) {
+      showTranslatedBanner('installBanner', () => [t('pwa.installBanner'), {
+        label: t('pwa.installButton'),
+        run: () => { dismissInstallBanner(); runInstallPrompt(); },
+        dismiss: { label: t('pwa.notNow'), run: dismissInstallBanner },
+      }]);
+    }
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    dismissInstallBanner();
+    hideAppBanner('installBanner');
+    renderInstallCard();
+  });
+  renderInstallCard();
 }

@@ -1297,5 +1297,11 @@
   "photo.downloadFailed": "Download failed: {0}",
   "pwa.offline": "You are offline. Changes cannot be saved right now.",
   "pwa.updateAvailable": "A new version is available.",
-  "pwa.reload": "Reload"
+  "pwa.reload": "Reload",
+  "pwa.installTitle": "Install app",
+  "pwa.installText": "Install Plants Calendar on this device: its own icon, launches like an app and opens even without a connection.",
+  "pwa.installButton": "Install",
+  "pwa.iosInstructions": "In Safari, tap “Share” and then “Add to Home Screen” to use Plants Calendar like an app.",
+  "pwa.installBanner": "Install Plants Calendar as an app on this device?",
+  "pwa.notNow": "Not now"
 }

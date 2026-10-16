@@ -1297,5 +1297,11 @@
   "photo.downloadFailed": "Depromptio defecit: {0}",
   "pwa.offline": "Sine conexu es. Mutationes nunc servari non possunt.",
   "pwa.updateAvailable": "Nova versio praesto est.",
-  "pwa.reload": "Renovare"
+  "pwa.reload": "Renovare",
+  "pwa.installTitle": "Applicationem installa",
+  "pwa.installText": "Plants Calendar in hoc instrumento installa: icon propria, ut applicatio incipit et etiam sine conexu aperitur.",
+  "pwa.installButton": "Installa",
+  "pwa.iosInstructions": "In Safari tange „Communica“ deinde „Ad Paginam Domesticam“ ut Plants Calendar ut applicatione utaris.",
+  "pwa.installBanner": "Plants Calendar ut applicationem in hoc instrumento installare?",
+  "pwa.notNow": "Non nunc"
 }

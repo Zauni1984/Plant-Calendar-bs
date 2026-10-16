@@ -1297,5 +1297,11 @@
   "photo.downloadFailed": "Downloaden mislukt: {0}",
   "pwa.offline": "Je bent offline. Wijzigingen kunnen nu niet worden opgeslagen.",
   "pwa.updateAvailable": "Er is een nieuwe versie beschikbaar.",
-  "pwa.reload": "Opnieuw laden"
+  "pwa.reload": "Opnieuw laden",
+  "pwa.installTitle": "App installeren",
+  "pwa.installText": "Installeer Plants Calendar op dit apparaat: eigen pictogram, start als een app en opent ook zonder verbinding.",
+  "pwa.installButton": "Installeren",
+  "pwa.iosInstructions": "Tik in Safari op ‘Deel’ en daarna op ‘Zet op beginscherm’ om Plants Calendar als app te gebruiken.",
+  "pwa.installBanner": "Plants Calendar als app op dit apparaat installeren?",
+  "pwa.notNow": "Niet nu"
 }

@@ -1297,5 +1297,11 @@
   "photo.downloadFailed": "Pobieranie nie powiodło się: {0}",
   "pwa.offline": "Jesteś offline. Nie można teraz zapisać zmian.",
   "pwa.updateAvailable": "Dostępna jest nowa wersja.",
-  "pwa.reload": "Odśwież"
+  "pwa.reload": "Odśwież",
+  "pwa.installTitle": "Zainstaluj aplikację",
+  "pwa.installText": "Zainstaluj Plants Calendar na tym urządzeniu: własna ikona, uruchamia się jak aplikacja i działa nawet bez połączenia.",
+  "pwa.installButton": "Zainstaluj",
+  "pwa.iosInstructions": "W Safari stuknij „Udostępnij”, a potem „Do ekranu początkowego”, aby używać Plants Calendar jak aplikacji.",
+  "pwa.installBanner": "Zainstalować Plants Calendar jako aplikację na tym urządzeniu?",
+  "pwa.notNow": "Nie teraz"
 }
