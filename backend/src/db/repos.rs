@@ -180,8 +180,8 @@ pub fn plant_from_row(row: PlantRow) -> Plant {
         lifecycle: parse_lifecycle(row.lifecycle.as_deref()),
         plant_year: row.plant_year,
         catalog_id: row.catalog_id,
-        pot_size_liters: None,
-        soil_type: None,
+        pot_size_liters: row.pot_size_liters,
+        soil_type: row.soil_type,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -344,7 +344,7 @@ pub async fn subscription_status_summary(state: &AppState, user_id: Uuid, plan: 
 
 pub async fn list_plants(state: &AppState, user_id: Uuid) -> anyhow::Result<Vec<Plant>> {
     let rows = sqlx::query_as::<_, PlantRow>(
-        "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at
+        "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, pot_size_liters, soil_type, created_at, updated_at
          FROM plants WHERE user_id = $1 AND plant_status != 'deleted' ORDER BY updated_at DESC",
     )
     .bind(user_id)
@@ -355,7 +355,7 @@ pub async fn list_plants(state: &AppState, user_id: Uuid) -> anyhow::Result<Vec<
 
 pub async fn get_plant(state: &AppState, user_id: Uuid, plant_id: Uuid) -> anyhow::Result<Option<Plant>> {
     let row = sqlx::query_as::<_, PlantRow>(
-        "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at
+        "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, pot_size_liters, soil_type, created_at, updated_at
          FROM plants WHERE user_id = $1 AND plant_id = $2 AND plant_status != 'deleted'",
     )
     .bind(user_id)
@@ -368,8 +368,8 @@ pub async fn get_plant(state: &AppState, user_id: Uuid, plant_id: Uuid) -> anyho
 pub async fn insert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()> {
     let plant = plant.normalized_ref();
     sqlx::query(
-        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
+        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at, pot_size_liters, soil_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
     )
     .bind(plant.plant_id)
     .bind(plant.user_id)
@@ -387,6 +387,8 @@ pub async fn insert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()>
     .bind(&plant.catalog_id)
     .bind(plant.created_at)
     .bind(plant.updated_at)
+    .bind(plant.pot_size_liters)
+    .bind(&plant.soil_type)
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -395,8 +397,8 @@ pub async fn insert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()>
 pub async fn upsert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()> {
     let plant = plant.normalized_ref();
     sqlx::query(
-        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at, pot_size_liters, soil_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          ON CONFLICT (plant_id) DO UPDATE SET
             user_id = EXCLUDED.user_id,
             name = EXCLUDED.name,
@@ -411,6 +413,8 @@ pub async fn upsert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()>
             lifecycle = EXCLUDED.lifecycle,
             plant_year = EXCLUDED.plant_year,
             catalog_id = EXCLUDED.catalog_id,
+            pot_size_liters = EXCLUDED.pot_size_liters,
+            soil_type = EXCLUDED.soil_type,
             updated_at = EXCLUDED.updated_at",
     )
     .bind(plant.plant_id)
@@ -429,6 +433,8 @@ pub async fn upsert_plant(state: &AppState, plant: &Plant) -> anyhow::Result<()>
     .bind(&plant.catalog_id)
     .bind(plant.created_at)
     .bind(plant.updated_at)
+    .bind(plant.pot_size_liters)
+    .bind(&plant.soil_type)
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -776,7 +782,7 @@ pub async fn delete_log(state: &AppState, user_id: Uuid, log_id: Uuid) -> anyhow
 pub async fn list_changes_since(state: &AppState, user_id: Uuid, since: Option<DateTime<Utc>>) -> anyhow::Result<(Vec<Plant>, Vec<Task>, Vec<LogEntry>)> {
     let plants = if let Some(since) = since {
         let rows = sqlx::query_as::<_, PlantRow>(
-            "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at
+            "SELECT plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, pot_size_liters, soil_type, created_at, updated_at
              FROM plants WHERE user_id = $1 AND plant_status != 'deleted' AND updated_at > $2 ORDER BY updated_at DESC",
         ).bind(user_id).bind(since).fetch_all(&state.pg).await?;
         rows.into_iter().map(plant_from_row).collect()
@@ -1364,8 +1370,8 @@ pub async fn get_password_hash_by_user_id(state: &AppState, user_id: Uuid) -> an
 pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, plant: &Plant) -> anyhow::Result<()> {
     let plant = plant.normalized_ref();
     sqlx::query(
-        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        "INSERT INTO plants (plant_id, user_id, name, color_tag, start_date, phase, phase_week, plant_status, is_active, archived, location_id, lifecycle, plant_year, catalog_id, created_at, updated_at, pot_size_liters, soil_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          ON CONFLICT (plant_id) DO UPDATE SET
             user_id = EXCLUDED.user_id,
             name = EXCLUDED.name,
@@ -1380,6 +1386,8 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
             lifecycle = EXCLUDED.lifecycle,
             plant_year = EXCLUDED.plant_year,
             catalog_id = EXCLUDED.catalog_id,
+            pot_size_liters = EXCLUDED.pot_size_liters,
+            soil_type = EXCLUDED.soil_type,
             updated_at = EXCLUDED.updated_at
          WHERE plants.updated_at < EXCLUDED.updated_at",
     )
@@ -1399,6 +1407,8 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
     .bind(&plant.catalog_id)
     .bind(plant.created_at)
     .bind(plant.updated_at)
+    .bind(plant.pot_size_liters)
+    .bind(&plant.soil_type)
     .execute(&mut **tx)
     .await?;
     Ok(())

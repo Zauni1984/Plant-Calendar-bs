@@ -32,6 +32,8 @@ pub struct PlantRow {
     pub lifecycle: Option<String>,
     pub plant_year: Option<i32>,
     pub catalog_id: Option<String>,
+    pub pot_size_liters: Option<f32>,
+    pub soil_type: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
