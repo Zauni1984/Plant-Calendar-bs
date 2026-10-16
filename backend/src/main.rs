@@ -66,6 +66,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/plants/{id}", get(api::get_plant).patch(api::update_plant).delete(api::delete_plant))
         .route("/plants/{id}/seasons", get(api::list_seasons_for_plant).post(api::create_season_for_plant))
         .route("/seasons/{id}", patch(api::update_season).delete(api::delete_season))
+        .route("/me/climate", get(api::weather::get_climate).put(api::weather::put_climate))
+        .route(
+            "/weather/history",
+            get(api::weather::list_weather_history)
+                .post(api::weather::post_weather_reading)
+                .delete(api::weather::prune_weather_history),
+        )
         .route("/tasks", get(api::list_my_tasks))
         .route("/logs", get(api::list_my_logs))
         .route("/plants/{id}/tasks", get(api::list_tasks_for_plant).post(api::create_task_for_plant))
@@ -145,16 +152,19 @@ async fn main() -> anyhow::Result<()> {
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(180);
             let history_keep: i64 = std::env::var("RETENTION_HISTORY_PER_USER")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(200);
+            let weather_days: i64 = std::env::var("RETENTION_WEATHER_DAYS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(365);
             let mut ticker = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
             loop {
                 ticker.tick().await;
                 match db::repos::prune_operational_data(
-                    &prune_state, token_grace_days, tombstone_days, history_keep,
+                    &prune_state, token_grace_days, tombstone_days, history_keep, weather_days,
                 ).await {
                     Ok(report) => tracing::info!(
                         refresh_tokens = report.refresh_tokens,
                         deleted_records = report.deleted_records,
                         subscription_history = report.subscription_history,
+                        weather_history = report.weather_history,
                         "retention sweep complete"
                     ),
                     Err(err) => tracing::warn!("retention sweep failed: {err}"),

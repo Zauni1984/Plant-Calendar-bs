@@ -106,6 +106,8 @@ pub struct LocationRow {
     pub name: String,
     pub location_type: String,
     pub description: Option<String>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

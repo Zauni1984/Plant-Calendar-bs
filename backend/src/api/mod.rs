@@ -1,3 +1,5 @@
+pub mod weather;
+
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{HeaderMap, StatusCode}, response::{IntoResponse, Response}, Json};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -749,13 +751,21 @@ pub struct CreateLocationPayload {
     pub name: String,
     pub location_type: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    pub latitude: Option<f64>,
+    #[serde(default)]
+    pub longitude: Option<f64>,
 }
 
 pub async fn create_location(State(state): State<AppState>, session: SessionUser, Json(payload): Json<CreateLocationPayload>) -> impl IntoResponse {
     if payload.name.trim().is_empty() || payload.name.len() > 120 {
         return api_error(StatusCode::BAD_REQUEST, "location name must be 1-120 characters");
     }
-    match repos::create_location(&state, session.user_id, payload.name.trim().to_string(), payload.location_type.unwrap_or_else(|| "custom".into()), payload.description).await {
+    let coords = match repos::Coords::parse(payload.latitude, payload.longitude) {
+        Ok(c) => c,
+        Err(msg) => return api_error(StatusCode::BAD_REQUEST, msg),
+    };
+    match repos::create_location(&state, session.user_id, payload.name.trim().to_string(), payload.location_type.unwrap_or_else(|| "custom".into()), payload.description, coords).await {
         Ok(loc) => (StatusCode::CREATED, Json(loc)).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -766,6 +776,10 @@ pub struct UpdateLocationPayload {
     pub name: Option<String>,
     pub location_type: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    pub latitude: Option<f64>,
+    #[serde(default)]
+    pub longitude: Option<f64>,
 }
 
 pub async fn update_location(Path(id): Path<Uuid>, State(state): State<AppState>, session: SessionUser, Json(payload): Json<UpdateLocationPayload>) -> impl IntoResponse {
@@ -774,7 +788,11 @@ pub async fn update_location(Path(id): Path<Uuid>, State(state): State<AppState>
             return api_error(StatusCode::BAD_REQUEST, "location name must be 1-120 characters");
         }
     }
-    match repos::update_location(&state, session.user_id, id, payload.name, payload.location_type, payload.description).await {
+    let coords = match repos::Coords::parse(payload.latitude, payload.longitude) {
+        Ok(c) => c,
+        Err(msg) => return api_error(StatusCode::BAD_REQUEST, msg),
+    };
+    match repos::update_location(&state, session.user_id, id, payload.name, payload.location_type, payload.description, coords).await {
         Ok(loc) => Json(loc).into_response(),
         Err(err) if err.to_string().contains("not found") => api_error(StatusCode::NOT_FOUND, err),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -1359,6 +1377,10 @@ pub async fn export_me(
     };
     let consents = repos::list_user_consents(&state, user_id).await.unwrap_or_default();
 
+    let weather_export = match weather::export_for_user(&state, user_id).await {
+        Ok(v) => v,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let body = serde_json::json!({
         "schema_version": 1,
         "exported_at": Utc::now().to_rfc3339(),
@@ -1371,6 +1393,7 @@ pub async fn export_me(
         "subscriptions": [subscription],
         "subscription_history": subscription_history,
         "consents": consents,
+        "weather": weather_export,
     });
 
     let json = match serde_json::to_vec(&body) {

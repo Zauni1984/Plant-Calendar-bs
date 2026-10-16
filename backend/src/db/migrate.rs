@@ -28,6 +28,8 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
     ("021_postgres_consents", include_str!("../../../migrations/021_postgres_consents.sql")),
     ("022_postgres_log_updated_at", include_str!("../../../migrations/022_postgres_log_updated_at.sql")),
     ("022_postgres_tombstone_scope", include_str!("../../../migrations/022_postgres_tombstone_scope.sql")),
+    ("023_postgres_location_coords", include_str!("../../../migrations/023_postgres_location_coords.sql")),
+    ("024_postgres_weather", include_str!("../../../migrations/024_postgres_weather.sql")),
 ];
 
 /// Arbitrary but fixed key for the advisory lock that serialises migration

@@ -7,15 +7,16 @@
 // both builds.
 //
 // Coverage
-//   server-backed .......... account, plants, tasks, logs, locations, seasons,
-//                            consents, subscription, export
-//   browser-only ........... weather (Open-Meteo is called directly), climate
-//                            settings and reminders (kept per browser for now),
-//                            file import/export (download/upload)
+//   server-backed .......... account, plants, tasks, logs, locations (with
+//                            coordinates), seasons, consents, subscription,
+//                            export, climate settings, weather history
+//   browser-side ........... forecasts (Open-Meteo is called directly; the
+//                            current reading is then posted to the history),
+//                            reminders, file import/export (download/upload)
 //   desktop-only ........... Bluetooth, Tuya, device management — browsers
 //                            cannot reach LAN devices, and iOS has no Web
 //                            Bluetooth at all
-//   not yet on the server .. photos, weather history, local profiles
+//   not yet on the server .. photos, local profiles
 
 import { api, authenticate, logout, refreshSession, getSession, hasSession, API_BASE_URL } from "./http.js";
 import { takeUpload, triggerDownload } from "./web-files.js";
@@ -146,6 +147,40 @@ const WEATHER_EXTENDED =
   "precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant," +
   "shortwave_radiation_sum,et0_fao_evapotranspiration" +
   "&timezone=auto&forecast_days=7";
+
+/**
+ * Build a history reading from an extended Open-Meteo response — the same
+ * field mapping the desktop uses in fetch_and_log_weather (soil, visibility
+ * and dew point come from the first hourly slot).
+ */
+function readingFrom(data, locationId, lat, lon) {
+  const c = data?.current || {};
+  const h = data?.hourly || {};
+  const first = (key) => (Array.isArray(h[key]) && h[key].length ? h[key][0] : null);
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const visibility = num(first("visibility"));
+  return {
+    location_id: locationId || null,
+    latitude: Number(lat),
+    longitude: Number(lon),
+    temp_c: num(c.temperature_2m),
+    humidity: num(c.relative_humidity_2m),
+    wind_kmh: num(c.wind_speed_10m),
+    precipitation_mm: num(c.precipitation),
+    weather_code: Number.isInteger(c.weather_code) ? c.weather_code : null,
+    apparent_temp_c: num(c.apparent_temperature),
+    uv_index: num(c.uv_index),
+    cloud_cover: num(c.cloud_cover),
+    pressure_hpa: num(c.pressure_msl) ?? num(c.surface_pressure),
+    dew_point_c: num(first("dew_point_2m")),
+    visibility_km: visibility == null ? null : visibility / 1000,
+    wind_gusts_kmh: num(c.wind_gusts_10m),
+    wind_direction_deg: num(c.wind_direction_10m),
+    soil_temp_c: num(first("soil_temperature_0cm")),
+    soil_moisture: num(first("soil_moisture_0_to_1cm")),
+    is_day: c.is_day == null ? null : c.is_day !== 0,
+  };
+}
 
 async function openMeteo(lat, lon, query) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundCoord(lat)}&longitude=${roundCoord(lon)}&${query}`;
@@ -348,20 +383,32 @@ export const webCommands = {
   },
 
   // --- locations -------------------------------------------------------------
-  // Coordinates are not stored server-side yet (weather per location needs them).
+  // The server rounds coordinates to ~1 km before storing them.
   list_locations: listOrEmpty(() => api("/locations")),
-  create_location: ({ name, locationType, description }) => {
+  create_location: ({ name, locationType, description, latitude, longitude }) => {
     requireSession();
     return api("/locations", {
       method: "POST",
-      body: { name, location_type: locationType ?? null, description: description ?? null },
+      body: {
+        name,
+        location_type: locationType ?? null,
+        description: description ?? null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+      },
     });
   },
-  update_location: ({ locationId, name, locationType, description }) => {
+  update_location: ({ locationId, name, locationType, description, latitude, longitude }) => {
     requireSession();
     return api(`/locations/${enc(locationId)}`, {
       method: "PATCH",
-      body: { name, location_type: locationType ?? null, description: description ?? null },
+      body: {
+        name,
+        location_type: locationType ?? null,
+        description: description ?? null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+      },
     });
   },
   delete_location: async ({ locationId }) => {
@@ -442,16 +489,52 @@ export const webCommands = {
 
   // --- weather & climate -----------------------------------------------------
   fetch_weather: ({ lat, lon }) => openMeteo(lat, lon, WEATHER_BASIC),
-  fetch_and_log_weather: ({ lat, lon }) => openMeteo(lat, lon, WEATHER_EXTENDED),
+  fetch_and_log_weather: async ({ locationId, lat, lon }) => {
+    const data = await openMeteo(lat, lon, WEATHER_EXTENDED);
+    // Logging is a side effect of viewing the forecast: a failure must not
+    // hide the forecast itself.
+    if (hasSession()) {
+      api("/weather/history", { method: "POST", body: readingFrom(data, locationId, lat, lon) })
+        .catch((err) => console.warn("weather history not stored", err));
+    }
+    return data;
+  },
   search_city: async ({ query }) => {
     const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${enc(query)}&count=5&language=de`);
     if (!r.ok) throw `Ortssuche nicht erreichbar (${r.status})`;
     return r.json();
   },
-  get_climate_config: async () => readJson(CLIMATE_KEY, null),
-  save_climate_config: async ({ config }) => { writeJson(CLIMATE_KEY, config); return null; },
-  list_weather_history: async () => [],
-  prune_weather_history_cmd: async () => 0,
+  get_climate_config: async () => {
+    if (!hasSession()) return readJson(CLIMATE_KEY, null);
+    const remote = await api("/me/climate");
+    if (remote) return remote;
+    // One-time hand-over: settings saved in this browser before they were
+    // stored per account move into the account instead of being lost.
+    const local = readJson(CLIMATE_KEY, null);
+    if (local?.latitude != null && local?.longitude != null) {
+      const saved = await api("/me/climate", { method: "PUT", body: local });
+      try { localStorage.removeItem(CLIMATE_KEY); } catch { /* storage unavailable */ }
+      return saved;
+    }
+    return null;
+  },
+  save_climate_config: async ({ config }) => {
+    if (!hasSession()) { writeJson(CLIMATE_KEY, config); return null; }
+    await api("/me/climate", { method: "PUT", body: config });
+    return null;
+  },
+  list_weather_history: listOrEmpty(({ locationId, hours, days } = {}) => {
+    const q = new URLSearchParams();
+    if (locationId) q.set("location_id", locationId);
+    if (hours != null) q.set("hours", String(hours));
+    else if (days != null) q.set("days", String(days));
+    return api(`/weather/history?${q}`);
+  }),
+  prune_weather_history_cmd: async ({ days } = {}) => {
+    if (!hasSession()) return 0;
+    const r = await api(`/weather/history?older_than_days=${enc(days ?? 365)}`, { method: "DELETE" });
+    return r?.deleted ?? 0;
+  },
 
   // --- files -----------------------------------------------------------------
   write_export_file: async ({ path, content }) => { triggerDownload(path, content); return null; },

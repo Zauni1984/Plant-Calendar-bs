@@ -211,8 +211,8 @@ pub fn location_from_row(row: LocationRow) -> Location {
         name: row.name,
         location_type: row.location_type,
         description: row.description,
-        latitude: None,
-        longitude: None,
+        latitude: row.latitude,
+        longitude: row.longitude,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -1554,7 +1554,7 @@ pub async fn verify_log_ownership(state: &AppState, user_id: Uuid, log_id: Uuid)
 
 pub async fn list_locations(state: &AppState, user_id: Uuid) -> anyhow::Result<Vec<Location>> {
     let rows = sqlx::query_as::<_, LocationRow>(
-        "SELECT location_id, user_id, name, location_type, description, created_at, updated_at FROM locations WHERE user_id = $1 ORDER BY name ASC",
+        "SELECT location_id, user_id, name, location_type, description, latitude, longitude, created_at, updated_at FROM locations WHERE user_id = $1 ORDER BY name ASC",
     )
     .bind(user_id)
     .fetch_all(&state.pg)
@@ -1562,7 +1562,37 @@ pub async fn list_locations(state: &AppState, user_id: Uuid) -> anyhow::Result<V
     Ok(rows.into_iter().map(location_from_row).collect())
 }
 
-pub async fn create_location(state: &AppState, user_id: Uuid, name: String, location_type: String, description: Option<String>) -> anyhow::Result<Location> {
+/// Round a coordinate to two decimals (~1 km). The coordinates of a location
+/// are often a home address; weather lookups need no more precision than this.
+pub fn round_coord(v: f64) -> f64 {
+    (v * 100.0).round() / 100.0
+}
+
+/// A validated, rounded coordinate pair. Both or neither must be present.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Coords {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+impl Coords {
+    pub fn parse(latitude: Option<f64>, longitude: Option<f64>) -> Result<Option<Coords>, &'static str> {
+        match (latitude, longitude) {
+            (None, None) => Ok(None),
+            (Some(lat), Some(lon)) => {
+                if !lat.is_finite() || !lon.is_finite()
+                    || !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon)
+                {
+                    return Err("latitude must be -90..90 and longitude -180..180");
+                }
+                Ok(Some(Coords { latitude: round_coord(lat), longitude: round_coord(lon) }))
+            }
+            _ => Err("latitude and longitude must be given together"),
+        }
+    }
+}
+
+pub async fn create_location(state: &AppState, user_id: Uuid, name: String, location_type: String, description: Option<String>, coords: Option<Coords>) -> anyhow::Result<Location> {
     let now = Utc::now();
     let loc = Location {
         location_id: Uuid::new_v4(),
@@ -1570,19 +1600,21 @@ pub async fn create_location(state: &AppState, user_id: Uuid, name: String, loca
         name,
         location_type,
         description,
-        latitude: None,
-        longitude: None,
+        latitude: coords.map(|c| c.latitude),
+        longitude: coords.map(|c| c.longitude),
         created_at: now,
         updated_at: now,
     };
     sqlx::query(
-        "INSERT INTO locations (location_id, user_id, name, location_type, description, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        "INSERT INTO locations (location_id, user_id, name, location_type, description, latitude, longitude, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     )
     .bind(loc.location_id)
     .bind(loc.user_id)
     .bind(&loc.name)
     .bind(&loc.location_type)
     .bind(&loc.description)
+    .bind(loc.latitude)
+    .bind(loc.longitude)
     .bind(loc.created_at)
     .bind(loc.updated_at)
     .execute(&state.pg)
@@ -1590,9 +1622,9 @@ pub async fn create_location(state: &AppState, user_id: Uuid, name: String, loca
     Ok(loc)
 }
 
-pub async fn update_location(state: &AppState, user_id: Uuid, location_id: Uuid, name: Option<String>, location_type: Option<String>, description: Option<String>) -> anyhow::Result<Location> {
+pub async fn update_location(state: &AppState, user_id: Uuid, location_id: Uuid, name: Option<String>, location_type: Option<String>, description: Option<String>, coords: Option<Coords>) -> anyhow::Result<Location> {
     let rows = sqlx::query_as::<_, LocationRow>(
-        "SELECT location_id, user_id, name, location_type, description, created_at, updated_at FROM locations WHERE location_id = $1 AND user_id = $2",
+        "SELECT location_id, user_id, name, location_type, description, latitude, longitude, created_at, updated_at FROM locations WHERE location_id = $1 AND user_id = $2",
     )
     .bind(location_id)
     .bind(user_id)
@@ -1602,13 +1634,18 @@ pub async fn update_location(state: &AppState, user_id: Uuid, location_id: Uuid,
     let next_name = name.unwrap_or(current.name);
     let next_type = location_type.unwrap_or(current.location_type);
     let next_desc = description.or(current.description);
+    // Coordinates are replaced as a pair or kept; never half-updated.
+    let next_lat = coords.map(|c| c.latitude).or(current.latitude);
+    let next_lon = coords.map(|c| c.longitude).or(current.longitude);
     let now = Utc::now();
-    sqlx::query("UPDATE locations SET name = $3, location_type = $4, description = $5, updated_at = $6 WHERE location_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE locations SET name = $3, location_type = $4, description = $5, latitude = $6, longitude = $7, updated_at = $8 WHERE location_id = $1 AND user_id = $2")
         .bind(location_id)
         .bind(user_id)
         .bind(&next_name)
         .bind(&next_type)
         .bind(&next_desc)
+        .bind(next_lat)
+        .bind(next_lon)
         .bind(now)
         .execute(&state.pg)
         .await?;
@@ -1618,8 +1655,8 @@ pub async fn update_location(state: &AppState, user_id: Uuid, location_id: Uuid,
         name: next_name,
         location_type: next_type,
         description: next_desc,
-        latitude: None,
-        longitude: None,
+        latitude: next_lat,
+        longitude: next_lon,
         created_at: current.created_at,
         updated_at: now,
     })
@@ -1648,6 +1685,7 @@ pub struct PruneReport {
     pub refresh_tokens: u64,
     pub deleted_records: u64,
     pub subscription_history: u64,
+    pub weather_history: u64,
 }
 
 /// Delete operational rows that are no longer needed.
@@ -1665,6 +1703,7 @@ pub async fn prune_operational_data(
     token_grace_days: i64,
     tombstone_days: i64,
     history_keep_per_user: i64,
+    weather_days: i64,
 ) -> anyhow::Result<PruneReport> {
     let now = Utc::now();
 
@@ -1697,9 +1736,47 @@ pub async fn prune_operational_data(
     .await?
     .rows_affected();
 
+    // Upper bound regardless of what a user set in their own retention
+    // setting; matches the period stated in the privacy policy.
+    let weather = sqlx::query("DELETE FROM weather_history WHERE recorded_at < $1")
+        .bind(now - chrono::Duration::days(weather_days))
+        .execute(&state.pg)
+        .await?
+        .rows_affected();
+
     Ok(PruneReport {
         refresh_tokens: tokens,
         deleted_records: tombstones,
         subscription_history: history,
+        weather_history: weather,
     })
+}
+
+
+#[cfg(test)]
+mod coords_tests {
+    use super::{round_coord, Coords};
+
+    #[test]
+    fn rounds_to_about_one_kilometre() {
+        assert_eq!(round_coord(52.520008), 52.52);
+        assert_eq!(round_coord(13.404954), 13.4);
+        assert_eq!(round_coord(-33.86785), -33.87);
+    }
+
+    #[test]
+    fn parse_accepts_pairs_and_rounds() {
+        let c = Coords::parse(Some(48.137154), Some(11.576124)).unwrap().unwrap();
+        assert_eq!(c, Coords { latitude: 48.14, longitude: 11.58 });
+        assert_eq!(Coords::parse(None, None).unwrap(), None);
+    }
+
+    #[test]
+    fn parse_rejects_half_pairs_and_out_of_range() {
+        assert!(Coords::parse(Some(1.0), None).is_err());
+        assert!(Coords::parse(None, Some(1.0)).is_err());
+        assert!(Coords::parse(Some(91.0), Some(0.0)).is_err());
+        assert!(Coords::parse(Some(0.0), Some(-180.5)).is_err());
+        assert!(Coords::parse(Some(f64::NAN), Some(0.0)).is_err());
+    }
 }
