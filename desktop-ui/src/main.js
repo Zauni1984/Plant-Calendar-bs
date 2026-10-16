@@ -2,17 +2,12 @@
 // forwards to the Rust process or to the HTTP backend depending on the build.
 import { invoke, convertFileSrc, openDialog as tauriOpenDialog, saveDialog as tauriSaveDialog, IS_TAURI, DESKTOP_ONLY } from "./api/transport.js";
 
-// ── i18n: locale JSON imports ──
+// ── i18n: locales ──
+// German is the fallback for every missing key, so it ships in the main
+// bundle. The other nine are separate chunks loaded on demand: bundling all
+// ten put ~660 KB of JSON into startup, of which a visitor needs one.
 import localeDe from './locales/de.json';
-import localeEn from './locales/en.json';
-import localeFr from './locales/fr.json';
-import localeLa from './locales/la.json';
-import localeEs from './locales/es.json';
-import localePt from './locales/pt.json';
-import localeIt from './locales/it.json';
-import localeNl from './locales/nl.json';
-import localePl from './locales/pl.json';
-import localeTr from './locales/tr.json';
+const LOCALE_LOADERS = import.meta.glob(['./locales/*.json', '!./locales/de.json'], { import: 'default' });
 
 // ── Theme system: restore saved theme before first paint ──
 const THEMES = [
@@ -39,10 +34,27 @@ const LANGUAGE_LABELS = {
   es: 'Espa\u00f1ol', pt: 'Portugu\u00eas', it: 'Italiano', nl: 'Nederlands',
   pl: 'Polski', tr: 'T\u00fcrk\u00e7e',
 };
-const LOCALE_MAP = { de: localeDe, en: localeEn, fr: localeFr, la: localeLa, es: localeEs, pt: localePt, it: localeIt, nl: localeNl, pl: localePl, tr: localeTr };
+const fallbackLocale = localeDe;
+
+/** Resolve a language's strings; German needs no request. */
+async function loadLocale(lang) {
+  if (lang === 'de') return localeDe;
+  const loader = LOCALE_LOADERS[`./locales/${lang}.json`];
+  if (!loader) return null;
+  try {
+    return await loader();
+  } catch (err) {
+    // A failed chunk load (offline, deploy in progress) must not break the
+    // app: German stays usable for every key.
+    console.warn(`locale ${lang} could not be loaded`, err);
+    return null;
+  }
+}
+
 let currentLang = localStorage.getItem('plants_calendar_lang') || 'de';
-let localeData = LOCALE_MAP[currentLang] || LOCALE_MAP['de'];
-const fallbackLocale = LOCALE_MAP['de'];
+if (!LANGUAGES.includes(currentLang)) currentLang = 'de';
+// Top-level await: the first render already needs the right strings.
+let localeData = (await loadLocale(currentLang)) || fallbackLocale;
 // index.html ships lang="de"; correct it before first paint for the saved language.
 try { document.documentElement.setAttribute('lang', currentLang); } catch (_) {}
 
@@ -65,11 +77,13 @@ function localeTag() {
   }
 }
 
-function setLanguage(lang) {
+async function setLanguage(lang) {
   if (!LANGUAGES.includes(lang)) return;
+  const data = await loadLocale(lang);
+  if (!data) return; // keep the current language rather than half-switching
   currentLang = lang;
   localStorage.setItem('plants_calendar_lang', lang);
-  localeData = LOCALE_MAP[lang] || LOCALE_MAP['de'];
+  localeData = data;
   // Keep the document language in sync for screen readers and hyphenation.
   document.documentElement.setAttribute('lang', lang);
   applyTheme(currentTheme);
@@ -1737,8 +1751,8 @@ function renderSettingsPanel() {
   });
 
   // Language selector (both in mood section and profile section)
-  const handleLangChange = (e) => {
-    setLanguage(e.target.value);
+  const handleLangChange = async (e) => {
+    await setLanguage(e.target.value);
     // Re-render every translated surface so the switch is visible immediately.
     try { renderAppNav(); } catch (_) {}
     try { renderFab(); } catch (_) {}
@@ -2817,6 +2831,20 @@ function renderSensorWidget() {
   renderSensorChart(device.device_id, 1440);
 }
 
+// Chart.js is bundled and loaded on first use. It used to come from a CDN,
+// which broke charts offline and sent every visitor's IP address to a third
+// party on each page load (the reasoning of LG Muenchen, 3 O 17493/20, on
+// externally loaded web fonts applies equally here).
+let chartModule = null;
+async function loadChart() {
+  if (!chartModule) chartModule = import('chart.js/auto').then((m) => m.default).catch((err) => {
+    chartModule = null;
+    console.warn('chart.js could not be loaded', err);
+    return null;
+  });
+  return chartModule;
+}
+
 async function renderSensorChart(deviceId, rangeMinutes) {
   const canvas = document.getElementById("sensorChart");
   if (!canvas) return;
@@ -2835,7 +2863,8 @@ async function renderSensorChart(deviceId, rangeMinutes) {
   readings = readings.filter(r => new Date(r.created_at) >= cutoff);
   readings.reverse(); // oldest first
 
-  if (typeof Chart === "undefined") {
+  const Chart = await loadChart();
+  if (!Chart) {
     canvas.parentElement.innerHTML = `<div style="color:${TC.textDim}; font-size:12px; padding:8px;">${t('chart.notLoaded')}</div>`;
     return;
   }
@@ -7264,7 +7293,8 @@ async function renderWeatherCharts(locationId, hours) {
   }
   weatherChartInstances = [];
 
-  if (typeof Chart === 'undefined') {
+  const Chart = await loadChart();
+  if (!Chart) {
     const tempCanvas = document.getElementById('weatherChartTemp');
     if (tempCanvas?.parentElement) tempCanvas.parentElement.innerHTML = `<div style="color:${TC.textDim}; font-size:12px; padding:8px;">${t('chart.notLoaded')}</div>`;
     return;
