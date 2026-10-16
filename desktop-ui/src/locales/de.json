@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Fotos hochladen ist Teil des Abos.",
   "photo.deletionBanner": "Dein Abo ist beendet. Deine Fotos werden am {0} gelöscht, außer du schließt vorher wieder ein Abo ab.",
   "photo.downloadAll": "Alle Fotos herunterladen",
-  "photo.downloadFailed": "Download fehlgeschlagen: {0}"
+  "photo.downloadFailed": "Download fehlgeschlagen: {0}",
+  "pwa.offline": "Du bist offline. Änderungen können gerade nicht gespeichert werden.",
+  "pwa.updateAvailable": "Eine neue Version ist verfügbar.",
+  "pwa.reload": "Neu laden"
 }

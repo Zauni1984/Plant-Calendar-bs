@@ -8,11 +8,17 @@
     "build": "vite build",
     "check": "node --check src/main.js",
     "test:smoke": "node scripts/smoke-status-tests.mjs",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "preview": "vite preview"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

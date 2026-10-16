@@ -1081,3 +1081,28 @@ img, video, canvas { max-width: 100%; height: auto; }
     }
   }
 }
+
+/* Small status banner (offline notice, update prompt). Sits above the content
+   but below modals, clear of the notch and of the FAB in the bottom corner. */
+.app-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 300; /* above modals and the loading overlay */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100% - 112px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--card-solid);
+  border: 1px solid var(--border-hover);
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.app-banner + .app-banner { bottom: calc(76px + env(safe-area-inset-bottom)); }
+@media (max-width: 420px) {
+  .app-banner { left: 12px; right: 84px; transform: none; max-width: none; }
+}

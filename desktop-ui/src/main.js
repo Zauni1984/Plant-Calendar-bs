@@ -8585,3 +8585,56 @@ if (!window.__retentionSweepDone) {
     }
   }, 5_000);
 }
+
+// ── Web app shell: service worker, update prompt, offline notice ──
+// Browser build only. Tauri serves the bundle from disk and needs neither.
+
+function showAppBanner(id, text, action) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.className = 'app-banner';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span>${escapeHtml(text)}</span>`;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn--sm btn--primary';
+    btn.textContent = action.label;
+    btn.addEventListener('click', action.run);
+    el.appendChild(btn);
+  }
+  el.hidden = false;
+}
+
+function hideAppBanner(id) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = true;
+}
+
+if (!IS_TAURI) {
+  const syncOnlineState = () => {
+    if (navigator.onLine) hideAppBanner('offlineBanner');
+    else showAppBanner('offlineBanner', t('pwa.offline'));
+  };
+  window.addEventListener('online', syncOnlineState);
+  window.addEventListener('offline', syncOnlineState);
+  syncOnlineState();
+
+  if ('serviceWorker' in navigator) {
+    import('virtual:pwa-register')
+      .then(({ registerSW }) => {
+        const updateSW = registerSW({
+          onNeedRefresh() {
+            showAppBanner('updateBanner', t('pwa.updateAvailable'), {
+              label: t('pwa.reload'),
+              run: () => updateSW(true),
+            });
+          },
+        });
+      })
+      .catch((err) => console.warn('service worker registration failed', err));
+  }
+}

@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Uploading photos is part of the subscription.",
   "photo.deletionBanner": "Your subscription has ended. Your photos will be deleted on {0} unless you subscribe again before then.",
   "photo.downloadAll": "Download all photos",
-  "photo.downloadFailed": "Download failed: {0}"
+  "photo.downloadFailed": "Download failed: {0}",
+  "pwa.offline": "You are offline. Changes cannot be saved right now.",
+  "pwa.updateAvailable": "A new version is available.",
+  "pwa.reload": "Reload"
 }

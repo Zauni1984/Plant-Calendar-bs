@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Il caricamento delle foto fa parte dell'abbonamento.",
   "photo.deletionBanner": "Il tuo abbonamento è terminato. Le tue foto verranno eliminate il {0}, a meno che tu non ti abboni di nuovo prima.",
   "photo.downloadAll": "Scarica tutte le foto",
-  "photo.downloadFailed": "Download non riuscito: {0}"
+  "photo.downloadFailed": "Download non riuscito: {0}",
+  "pwa.offline": "Sei offline. Al momento non è possibile salvare le modifiche.",
+  "pwa.updateAvailable": "È disponibile una nuova versione.",
+  "pwa.reload": "Ricarica"
 }

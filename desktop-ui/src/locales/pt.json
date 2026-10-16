@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Carregar fotos faz parte da subscrição.",
   "photo.deletionBanner": "A tua subscrição terminou. As tuas fotos serão eliminadas a {0}, a menos que voltes a subscrever antes disso.",
   "photo.downloadAll": "Transferir todas as fotos",
-  "photo.downloadFailed": "A transferência falhou: {0}"
+  "photo.downloadFailed": "A transferência falhou: {0}",
+  "pwa.offline": "Estás offline. Neste momento não é possível guardar alterações.",
+  "pwa.updateAvailable": "Está disponível uma nova versão.",
+  "pwa.reload": "Recarregar"
 }

@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Przesyłanie zdjęć jest częścią subskrypcji.",
   "photo.deletionBanner": "Twoja subskrypcja wygasła. Twoje zdjęcia zostaną usunięte {0}, chyba że wcześniej ponownie wykupisz subskrypcję.",
   "photo.downloadAll": "Pobierz wszystkie zdjęcia",
-  "photo.downloadFailed": "Pobieranie nie powiodło się: {0}"
+  "photo.downloadFailed": "Pobieranie nie powiodło się: {0}",
+  "pwa.offline": "Jesteś offline. Nie można teraz zapisać zmian.",
+  "pwa.updateAvailable": "Dostępna jest nowa wersja.",
+  "pwa.reload": "Odśwież"
 }

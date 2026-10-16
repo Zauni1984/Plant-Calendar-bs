@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Imagines immittere pars subscriptionis est.",
   "photo.deletionBanner": "Subscriptio tua finita est. Imagines tuae die {0} delebuntur, nisi antea iterum subscripseris.",
   "photo.downloadAll": "Omnes imagines depromere",
-  "photo.downloadFailed": "Depromptio defecit: {0}"
+  "photo.downloadFailed": "Depromptio defecit: {0}",
+  "pwa.offline": "Sine conexu es. Mutationes nunc servari non possunt.",
+  "pwa.updateAvailable": "Nova versio praesto est.",
+  "pwa.reload": "Renovare"
 }

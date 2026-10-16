@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Subir fotos forma parte de la suscripción.",
   "photo.deletionBanner": "Tu suscripción ha terminado. Tus fotos se eliminarán el {0}, salvo que vuelvas a suscribirte antes.",
   "photo.downloadAll": "Descargar todas las fotos",
-  "photo.downloadFailed": "Error en la descarga: {0}"
+  "photo.downloadFailed": "Error en la descarga: {0}",
+  "pwa.offline": "Estás sin conexión. Los cambios no se pueden guardar en este momento.",
+  "pwa.updateAvailable": "Hay una nueva versión disponible.",
+  "pwa.reload": "Recargar"
 }

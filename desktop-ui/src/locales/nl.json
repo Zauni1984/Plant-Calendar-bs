@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Foto’s uploaden hoort bij het abonnement.",
   "photo.deletionBanner": "Je abonnement is beëindigd. Je foto’s worden op {0} verwijderd, tenzij je daarvoor opnieuw een abonnement afsluit.",
   "photo.downloadAll": "Alle foto’s downloaden",
-  "photo.downloadFailed": "Downloaden mislukt: {0}"
+  "photo.downloadFailed": "Downloaden mislukt: {0}",
+  "pwa.offline": "Je bent offline. Wijzigingen kunnen nu niet worden opgeslagen.",
+  "pwa.updateAvailable": "Er is een nieuwe versie beschikbaar.",
+  "pwa.reload": "Opnieuw laden"
 }

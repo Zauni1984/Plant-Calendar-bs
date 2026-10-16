@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "L'ajout de photos fait partie de l'abonnement.",
   "photo.deletionBanner": "Ton abonnement a pris fin. Tes photos seront supprimées le {0}, sauf si tu te réabonnes d'ici là.",
   "photo.downloadAll": "Télécharger toutes les photos",
-  "photo.downloadFailed": "Échec du téléchargement : {0}"
+  "photo.downloadFailed": "Échec du téléchargement : {0}",
+  "pwa.offline": "Tu es hors ligne. Les modifications ne peuvent pas être enregistrées pour le moment.",
+  "pwa.updateAvailable": "Une nouvelle version est disponible.",
+  "pwa.reload": "Recharger"
 }

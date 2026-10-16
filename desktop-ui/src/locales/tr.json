@@ -1294,5 +1294,8 @@
   "photo.requiresSubscription": "Fotoğraf yükleme aboneliğe dahildir.",
   "photo.deletionBanner": "Aboneliğin sona erdi. Daha önce yeniden abone olmazsan fotoğrafların {0} tarihinde silinecek.",
   "photo.downloadAll": "Tüm fotoğrafları indir",
-  "photo.downloadFailed": "İndirme başarısız: {0}"
+  "photo.downloadFailed": "İndirme başarısız: {0}",
+  "pwa.offline": "Çevrimdışısın. Değişiklikler şu anda kaydedilemiyor.",
+  "pwa.updateAvailable": "Yeni bir sürüm mevcut.",
+  "pwa.reload": "Yeniden yükle"
 }
