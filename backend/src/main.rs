@@ -20,9 +20,29 @@ async fn main() -> anyhow::Result<()> {
     }
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new("info"))
+        // CLI subcommands print their own output; only warnings in between.
+        .with(tracing_subscriber::EnvFilter::new(if std::env::args().nth(1).is_some() { "warn" } else { "info" }))
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // `plants-backend gen-license-keys` / `plants-backend license ...`
+    match std::env::args().nth(1).as_deref() {
+        Some("gen-license-keys") => {
+            use rand_core::{OsRng, RngCore};
+            let mut seed = [0u8; 32];
+            OsRng.fill_bytes(&mut seed);
+            let (private, public) = shared::license::keypair_from_seed(seed);
+            println!("# backend env (keep secret):\nLICENSE_SIGNING_KEY={private}");
+            println!("# desktop release build env:\nPLANTS_LICENSE_PUBLIC_KEY={public}");
+            return Ok(());
+        }
+        Some("license") => {
+            let state = AppState::from_env().await?;
+            db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+            return services::license_cli::run(&state, std::env::args().skip(2).collect()).await;
+        }
+        _ => {}
+    }
 
     let state = AppState::from_env().await?;
 
@@ -52,6 +72,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/google", post(api::auth_google))
         .route("/auth/logout", post(api::auth_logout))
         .route("/auth/refresh", post(api::auth_refresh))
+        // Unauthenticated license calls share the auth rate limit (key guessing).
+        .route("/licenses/activate", post(api::licenses::activate))
+        .route("/licenses/refresh", post(api::licenses::refresh))
+        .route("/licenses/deactivate", post(api::licenses::deactivate))
         .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
         .layer(Extension(auth_rate_limiter.clone()));
 
@@ -98,6 +122,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/push/public-key", get(api::push::public_key))
         .route("/push/subscriptions", post(api::push::subscribe).delete(api::push::unsubscribe))
         .route("/push/test", post(api::push::send_test))
+        .route("/licenses/desktop-access", post(api::licenses::desktop_access))
+        .route("/licenses/me", get(api::licenses::my_license))
+        .route("/licenses/checkout", post(api::licenses::checkout))
         .route("/logs", get(api::list_my_logs))
         .route("/plants/{id}/tasks", get(api::list_tasks_for_plant).post(api::create_task_for_plant))
         .route("/tasks/{id}", patch(api::update_task).delete(api::delete_task))

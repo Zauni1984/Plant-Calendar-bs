@@ -2,6 +2,8 @@ pub mod catalog;
 pub mod domain;
 #[cfg(feature = "images")]
 pub mod images;
+#[cfg(feature = "license")]
+pub mod license;
 pub mod ggs;
 pub mod lc_controller;
 pub mod rules;

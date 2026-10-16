@@ -323,6 +323,7 @@ root.innerHTML = `
         </div>
       </div>
       ${IS_TAURI ? '' : '<div id="guestCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
+      <div id="${IS_TAURI ? 'licenseCard' : 'desktopAppCard'}" class="view-card" style="margin-top:14px;display:none;"></div>
       <!-- Hidden inputs for auth (used by handlers) -->
       <div style="display:none;">
         <input id="backendUrl" value="http://localhost:8080" />
@@ -1793,6 +1794,7 @@ function renderSettingsPanel() {
     try { renderInstallCard(); } catch (_) {}
     try { renderPushCard(); } catch (_) {}
     try { renderGuestCard(); } catch (_) {}
+    try { renderLicenseCard(); renderDesktopAppCard(); if (licenseGateOpen) showLicenseGate(licenseGateReason); } catch (_) {}
     if (!IS_TAURI) invoke('web_push_sync', { lang: currentLang }).catch(() => {});
     try { refreshAppBanners(); } catch (_) {}
     try { refreshStatus(); } catch (_) {}
@@ -5410,6 +5412,7 @@ async function refreshWebSessionState() {
   }
   await renderPushCard();
   await renderGuestCard();
+  await renderDesktopAppCard();
 }
 
 function updateOnboardingVisibility() {
@@ -8557,6 +8560,7 @@ bindPlantFilterControls();
 // so the initial load already sees the user's data.
 const startupSession = IS_TAURI ? Promise.resolve() : invoke("bootstrap_local_user").catch(() => {});
 startupSession
+  .then(() => (IS_TAURI ? checkDesktopLicense() : handleLicenseLinks()))
   .then(() => refreshWebSessionState())
   .then(() => refreshAll({ autoReminderReason: "app_start" }))
   .then(() => {
@@ -8564,6 +8568,7 @@ startupSession
     try { maybeShowConsentModal(); } catch (_) {}
     // The browser has no local database, so it needs an account to store anything.
     if (!IS_TAURI && !webSignedIn && !webGuest) openModal('auth');
+    if (!IS_TAURI) maybeJumpToDesktopCard();
   }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
@@ -8684,7 +8689,7 @@ function showAppBanner(id, text, action) {
     document.body.appendChild(el);
   }
   el.innerHTML = `<span>${escapeHtml(text)}</span>`;
-  if (action) {
+  if (action?.label) {
     const btn = document.createElement('button');
     btn.className = 'btn btn--sm btn--primary';
     btn.textContent = action.label;
@@ -8918,7 +8923,11 @@ async function afterSignIn() {
   await refreshWebSessionState();
   await refreshAll({ autoReminderReason: 'auth_change' });
   hideAppBanner('guestBanner');
-  if (IS_TAURI) return;
+  if (IS_TAURI) {
+    if (licenseGateOpen) await unlockWithAccount();
+    return;
+  }
+  await renderDesktopAppCard();
   try {
     const st = await invoke('web_guest_status');
     if (st.has_data) openModal('guestImport', { plants: st.plants });
@@ -8959,4 +8968,216 @@ async function renderGuestCard() {
     await refreshAll({ autoReminderReason: 'guest_discard' });
     if (wasGuest) openModal('auth');
   });
+}
+
+// ── Desktop license ─────────────────────────────────────────────────────────
+// Desktop: the app needs a license certificate (src-tauri/src/license.rs).
+// It comes from a key, or from the signed-in account (Basic/Pro/CSC
+// subscription, one-time purchase, or a grant to the account's e-mail).
+// Web: the account card shows whether the desktop app is included or bought,
+// offers the one-time purchase and the download.
+
+let desktopLicense = null;
+let licenseGateOpen = false;
+let licenseGateReason = null;
+
+function licenseErrorText(code) {
+  const key = `license.error.${code}`;
+  const text = t(key);
+  return text && text !== key ? text : t('license.error.generic', code);
+}
+
+async function checkDesktopLicense() {
+  try {
+    desktopLicense = await invoke('license_status');
+  } catch (err) {
+    desktopLicense = { licensed: false, reason: 'invalid' };
+  }
+  if (desktopLicense.licensed) hideLicenseGate();
+  else showLicenseGate(desktopLicense.reason);
+  renderLicenseCard();
+  return desktopLicense.licensed;
+}
+
+function showLicenseGate(reason) {
+  licenseGateOpen = true;
+  licenseGateReason = reason;
+  let gate = document.getElementById('licenseGate');
+  if (!gate) {
+    gate = document.createElement('div');
+    gate.id = 'licenseGate';
+    gate.className = 'license-gate';
+    gate.setAttribute('role', 'dialog');
+    gate.setAttribute('aria-modal', 'true');
+    document.body.appendChild(gate);
+  }
+  const reasonText = reason && reason !== 'missing' ? licenseErrorText(reason) : '';
+  gate.innerHTML = `
+    <div class="license-gate__card">
+      <h2>${escapeHtml(t('license.title'))}</h2>
+      <p class="license-gate__intro">${escapeHtml(t('license.intro'))}</p>
+      ${reasonText ? `<div class="form-error" style="display:block;">${escapeHtml(reasonText)}</div>` : ''}
+      <section class="license-gate__option">
+        <label class="form-label" for="licenseKeyInput">${escapeHtml(t('license.keyLabel'))}</label>
+        <div class="license-gate__row">
+          <input id="licenseKeyInput" class="form-input" autocomplete="off" spellcheck="false" placeholder="PLNT-XXXX-XXXX-XXXX-XXXX" />
+          <button type="button" id="licenseKeyBtn" class="btn btn--primary">${escapeHtml(t('license.activate'))}</button>
+        </div>
+      </section>
+      <section class="license-gate__option">
+        <div class="form-label">${escapeHtml(t('license.accountLabel'))}</div>
+        <button type="button" id="licenseAccountBtn" class="btn">${escapeHtml(t('license.useAccount'))}</button>
+      </section>
+      <section class="license-gate__option">
+        <div class="form-label">${escapeHtml(t('license.buyLabel'))}</div>
+        <button type="button" id="licenseBuyBtn" class="btn btn--ghost">${escapeHtml(t('license.buy'))}</button>
+      </section>
+      <div id="licenseGateMsg" class="form-hint" role="status"></div>
+    </div>`;
+  const msg = gate.querySelector('#licenseGateMsg');
+  const input = gate.querySelector('#licenseKeyInput');
+  const activate = async () => {
+    const key = input.value.trim();
+    if (!key) { input.focus(); return; }
+    msg.textContent = t('license.checking');
+    try {
+      desktopLicense = await invoke('license_activate_key', { key });
+      licenseUnlocked();
+    } catch (err) {
+      msg.textContent = licenseErrorText(String(err));
+    }
+  };
+  gate.querySelector('#licenseKeyBtn').addEventListener('click', activate);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') activate(); });
+  gate.querySelector('#licenseAccountBtn').addEventListener('click', () => unlockWithAccount());
+  gate.querySelector('#licenseBuyBtn').addEventListener('click', () => invoke('license_open_purchase_page').catch(() => {}));
+  input.focus();
+}
+
+function hideLicenseGate() {
+  licenseGateOpen = false;
+  licenseGateReason = null;
+  document.getElementById('licenseGate')?.remove();
+}
+
+function licenseUnlocked() {
+  hideLicenseGate();
+  renderLicenseCard();
+  showTranslatedBanner('licenseBanner', () => [t('license.unlocked'), { dismiss: { label: t('action.close') } }]);
+  setTimeout(() => hideAppBanner('licenseBanner'), 6000);
+}
+
+async function unlockWithAccount() {
+  const msg = document.getElementById('licenseGateMsg');
+  if (msg) msg.textContent = t('license.checking');
+  try {
+    desktopLicense = await invoke('license_activate_account');
+    licenseUnlocked();
+  } catch (err) {
+    const code = String(err);
+    if (code === 'not_signed_in' || code === 'session_expired') {
+      if (msg) msg.textContent = t('license.signInFirst');
+      openModal('auth');
+      return;
+    }
+    if (msg) msg.textContent = licenseErrorText(code);
+  }
+}
+
+function renderLicenseCard() {
+  const card = document.getElementById('licenseCard');
+  if (!card) return;
+  const lic = desktopLicense;
+  if (!lic?.licensed) { card.style.display = 'none'; card.innerHTML = ''; return; }
+  const muted = (text) => `<p style="margin:0 0 6px;font-size:12px;color:${TC.textMuted};">${escapeHtml(text)}</p>`;
+  const until = lic.expires_at ? new Date(lic.expires_at).toLocaleDateString(localeTag()) : null;
+  card.innerHTML = `<h3>${escapeHtml(t('license.cardTitle'))}</h3>
+    <p style="margin:0 0 6px;font-size:13px;"><strong>${escapeHtml(t(`license.source.${lic.source}`))}</strong>${lic.email ? ' · ' + escapeHtml(lic.email) : ''}</p>
+    ${until ? muted(t('license.renewInfo', until)) : ''}
+    ${lic.source === 'dev' ? '' : `<button type="button" id="licenseRemoveBtn" class="btn btn--sm btn--ghost">${escapeHtml(t('license.remove'))}</button>`}`;
+  card.style.display = '';
+  card.querySelector('#licenseRemoveBtn')?.addEventListener('click', async () => {
+    if (!confirm(t('license.removeConfirm'))) return;
+    await invoke('license_remove');
+    desktopLicense = { licensed: false, reason: 'missing' };
+    renderLicenseCard();
+    showLicenseGate('missing');
+  });
+}
+
+async function renderDesktopAppCard() {
+  const card = document.getElementById('desktopAppCard');
+  if (!card) return;
+  if (!webSignedIn) { card.style.display = 'none'; card.innerHTML = ''; return; }
+  let info;
+  try { info = await invoke('web_desktop_license'); } catch (_) { info = null; }
+  if (!info) { card.style.display = 'none'; return; }
+  const muted = (text) => `<p style="margin:0 0 8px;font-size:12px;color:${TC.textMuted};">${escapeHtml(text)}</p>`;
+  let status;
+  if (info.access) {
+    status = `<p style="margin:0 0 6px;font-size:13px;"><strong>${escapeHtml(t(`desktopApp.access.${info.access}`))}</strong></p>${muted(t('desktopApp.howToUnlock'))}`;
+  } else {
+    status = muted(t('desktopApp.offer'));
+  }
+  const devices = (info.devices || []).map((d) =>
+    `<li>${escapeHtml(d.device_name || t('desktopApp.unnamedDevice'))} · ${escapeHtml(t('desktopApp.lastSeen', new Date(d.last_seen_at).toLocaleDateString(localeTag())))}</li>`).join('');
+  const buttons = [];
+  if (info.download_url) buttons.push(`<a class="btn btn--primary btn--sm" href="${escapeHtml(info.download_url)}" rel="noopener">${escapeHtml(t('desktopApp.download'))}</a>`);
+  if (!info.access && info.purchase_available) buttons.push(`<button type="button" id="desktopBuyBtn" class="btn btn--primary btn--sm">${escapeHtml(t('desktopApp.buy'))}</button>`);
+  if (!info.access) buttons.push(`<button type="button" id="desktopPlansBtn" class="btn btn--sm btn--ghost">${escapeHtml(t('desktopApp.seePlans'))}</button>`);
+  card.innerHTML = `<h3>${escapeHtml(t('desktopApp.title'))}</h3>${status}
+    ${devices ? `${muted(t('desktopApp.devices', devices ? info.devices.length : 0, info.max_devices ?? '–'))}<ul style="margin:0 0 10px;padding-left:18px;font-size:12px;">${devices}</ul>` : ''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">${buttons.join('')}</div>
+    <div id="desktopAppMsg" class="form-hint" role="status"></div>`;
+  card.style.display = '';
+  card.querySelector('#desktopPlansBtn')?.addEventListener('click', () => switchPageView('billing'));
+  card.querySelector('#desktopBuyBtn')?.addEventListener('click', async (e) => {
+    const msg = card.querySelector('#desktopAppMsg');
+    e.currentTarget.disabled = true;
+    const button = e.currentTarget;
+    const buy = async () => {
+      const r = await invoke('web_desktop_checkout');
+      if (r?.granted) await renderDesktopAppCard();
+    };
+    try {
+      await buy();
+    } catch (err) {
+      // Payment goes through Stripe, which needs the billing consent (GDPR).
+      if (String(err?.message || err) === 'consent_required' && confirm(t('desktopApp.consentStripe'))) {
+        try {
+          await invoke('set_consent_smart', { consentType: 'billing_stripe', granted: true });
+          await buy();
+          return;
+        } catch (err2) {
+          err = err2;
+        }
+      }
+      msg.textContent = t('desktopApp.buyFailed', String(err?.message || err));
+      button.disabled = false;
+    }
+  });
+}
+
+/** Web: links into the app from Stripe (?desktop_purchase=) and the desktop lock screen (?desktop_license=1). */
+function handleLicenseLinks() {
+  const params = new URLSearchParams(window.location.search);
+  const purchase = params.get('desktop_purchase');
+  const fromDesktop = params.get('desktop_license');
+  if (!purchase && !fromDesktop) return;
+  if (purchase === 'success') {
+    showTranslatedBanner('desktopPurchaseBanner', () => [t('desktopApp.thanks'), { dismiss: { label: t('action.close') } }]);
+  }
+  // Shown once startup has rendered everything (see the startup chain).
+  jumpToDesktopCard = true;
+  history.replaceState(null, '', window.location.pathname);
+}
+
+let jumpToDesktopCard = false;
+
+async function maybeJumpToDesktopCard() {
+  if (!jumpToDesktopCard) return;
+  jumpToDesktopCard = false;
+  switchPageView('settings');
+  await renderDesktopAppCard();
+  document.getElementById(webSignedIn ? 'desktopAppCard' : 'openAuthModal')?.scrollIntoView({ block: 'center' });
 }

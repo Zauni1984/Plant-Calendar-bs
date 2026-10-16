@@ -400,6 +400,16 @@ export const webCommands = {
     pulled_plants: 0, pulled_tasks: 0, pulled_logs: 0, pulled_deleted: 0,
   }),
 
+  // --- desktop app license (web account card) ---------------------------------
+  web_desktop_license: async () => (hasSession() ? api("/licenses/me") : null),
+  web_desktop_checkout: async () => {
+    requireSession();
+    const r = await api("/licenses/checkout", { method: "POST", body: {} });
+    // Stripe hosts the payment page; development builds grant directly.
+    if (r?.checkout_url) window.location.assign(r.checkout_url);
+    return r;
+  },
+
   // --- guest mode --------------------------------------------------------------
   web_guest_start: async () => { setGuestFlag(true); return "guest mode"; },
   web_guest_status: async () => {

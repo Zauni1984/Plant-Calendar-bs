@@ -4,6 +4,7 @@ mod ble;
 mod tuya_local;
 mod local_db;
 mod secrets;
+mod license;
 
 use chrono::{Datelike, Duration, Utc};
 use local_db::{ConsentRecord, DirtyBreakdown, LocalStore, ReminderCandidate, StoredSession};
@@ -1479,6 +1480,83 @@ async fn auth_login(state: State<'_, AppLocalState>, payload: LoginPayload) -> R
 
     let auth: AuthResponse = response.json().await.map_err(|e| e.to_string())?;
     finalize_auth(state, auth, backend_url)
+}
+
+// ── Desktop license (see license.rs) ───────────────────────────
+
+fn license_api_url(state: &State<'_, AppLocalState>) -> String {
+    state
+        .store
+        .lock()
+        .ok()
+        .and_then(|store| store.load_session().ok().flatten())
+        .map(|s| s.backend_url)
+        .unwrap_or_else(|| license::DEFAULT_API_URL.to_string())
+}
+
+#[tauri::command]
+async fn license_status(state: State<'_, AppLocalState>) -> Result<license::LicenseStatus, String> {
+    let api = license_api_url(&state);
+    Ok(license::status(&api).await)
+}
+
+#[tauri::command]
+async fn license_activate_key(state: State<'_, AppLocalState>, key: String) -> Result<license::LicenseStatus, String> {
+    let api = license_api_url(&state);
+    license::activate_key(&api, &key).await
+}
+
+/// Unlock through the signed-in account. The desktop keeps its access token
+/// for an hour only, so an expired one is renewed once with the refresh token.
+#[tauri::command]
+async fn license_activate_account(state: State<'_, AppLocalState>) -> Result<license::LicenseStatus, String> {
+    let session = {
+        let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
+        store.load_session().map_err(|e| e.to_string())?.ok_or_else(|| "not_signed_in".to_string())?
+    };
+    match license::activate_account(&session).await {
+        Err(code) if code == "session_expired" && !session.refresh_token.is_empty() => {
+            let response = reqwest::Client::new()
+                .post(format!("{}/auth/refresh", session.backend_url))
+                .json(&serde_json::json!({ "refresh_token": session.refresh_token }))
+                .send()
+                .await
+                .map_err(|_| "network".to_string())?;
+            if !response.status().is_success() {
+                return Err("session_expired".into());
+            }
+            let auth: AuthResponse = response.json().await.map_err(|_| "session_expired".to_string())?;
+            let renewed = {
+                let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
+                store
+                    .save_session(auth.user_id, auth.auth_mode, auth.access_token, auth.refresh_token.unwrap_or(session.refresh_token.clone()), session.backend_url.clone())
+                    .map_err(|e| e.to_string())?
+            };
+            license::activate_account(&renewed).await
+        }
+        other => other,
+    }
+}
+
+/// Opens the web app's purchase section in the default browser. The URL is
+/// fixed at build time; the frontend cannot pass one in.
+#[tauri::command]
+fn license_open_purchase_page() -> Result<(), String> {
+    let url = format!("{}/?desktop_license=1", license::WEB_URL.trim_end_matches('/'));
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("explorer.exe").arg(&url).spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(&url).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(&url).spawn();
+    result.map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn license_remove(state: State<'_, AppLocalState>) -> Result<(), String> {
+    let api = license_api_url(&state);
+    license::remove(&api).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -3122,6 +3200,11 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            license_status,
+            license_activate_key,
+            license_activate_account,
+            license_remove,
+            license_open_purchase_page,
             get_plan_info,
             bootstrap_local_user,
             list_local_plants,

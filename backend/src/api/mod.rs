@@ -1,4 +1,5 @@
 pub mod guest_import;
+pub mod licenses;
 pub mod photos;
 pub mod push;
 pub mod weather;
@@ -1032,7 +1033,13 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
         }
     }
 
-    // Fallback: stub/dev mode (no STRIPE_SECRET_KEY)
+    // Fallback: stub/dev mode (no STRIPE_SECRET_KEY). It activates the plan
+    // without payment, so it must never answer in a release build: a missing
+    // env var would otherwise hand out paid plans (and the desktop app) free.
+    if cfg!(not(debug_assertions)) {
+        tracing::error!("subscription checkout requested but STRIPE_SECRET_KEY is not configured");
+        return api_error(StatusCode::SERVICE_UNAVAILABLE, "checkout is not configured");
+    }
     let checkout_url = build_checkout_url(std::env::var("CHECKOUT_BASE_URL").ok().as_deref(), session.user_id, payload.plan);
     let mode = checkout_mode_for(payload.plan).to_string();
     let message = if payload.plan == SubscriptionPlan::Free {
@@ -1093,6 +1100,10 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
         // Handle checkout.session.completed
         if event_type == "checkout.session.completed" {
             let session_obj = &event["data"]["object"];
+            // One-time desktop purchase: a license, not a subscription plan.
+            if session_obj["metadata"]["kind"].as_str() == Some("desktop_license") {
+                return licenses::handle_purchase_completed(&state, session_obj).await;
+            }
             let customer_email = session_obj["customer_email"].as_str().unwrap_or("");
             let customer_id = session_obj["customer"].as_str().unwrap_or("");
 
@@ -1341,6 +1352,21 @@ pub async fn delete_account(
     if let Err(err) = state.photos.delete_user(session.user_id).await {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
+    // Licenses: account-bound ones (no key) are useless without the account
+    // and go; keyed ones keep working for whoever holds the key but lose the
+    // link to this person.
+    let email = repos::get_user_email(&state, session.user_id).await.ok().flatten();
+    let licenses = async {
+        let mut tx = state.pg.begin().await?;
+        sqlx::query("DELETE FROM licenses WHERE key_hash IS NULL AND (user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)))")
+            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
+        sqlx::query("UPDATE licenses SET user_id = NULL, email = NULL WHERE user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2))")
+            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
+        tx.commit().await
+    }.await;
+    if let Err(err) = licenses {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
+    }
     if let Err(err) = repos::delete_user_cascade(&state, session.user_id).await {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
@@ -1398,6 +1424,11 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    let license_email = repos::get_user_email(&state, user_id).await.ok().flatten();
+    let license_export = match licenses::export_for_user(&state, user_id, license_email.as_deref()).await {
+        Ok(v) => v,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let weather_export = match weather::export_for_user(&state, user_id).await {
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -1422,6 +1453,7 @@ pub async fn export_me(
         "photos": photos_export,
         "photos_archive": "/photos/archive",
         "push_subscriptions": push_export,
+        "desktop_licenses": license_export,
     });
 
     let json = match serde_json::to_vec(&body) {

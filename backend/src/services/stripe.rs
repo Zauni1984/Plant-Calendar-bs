@@ -58,6 +58,43 @@ impl StripeClient {
             .ok_or_else(|| "no checkout URL in response".into())
     }
 
+    /// One-time payment (desktop license). The user id travels as
+    /// client_reference_id and the purpose in metadata, so the webhook can tell
+    /// it apart from a subscription checkout.
+    pub async fn create_payment_session(
+        &self,
+        customer_email: &str,
+        price_id: &str,
+        user_id: uuid::Uuid,
+        kind: &str,
+        success_url: &str,
+        cancel_url: &str,
+    ) -> Result<String, String> {
+        let user_id = user_id.to_string();
+        let resp = self
+            .client
+            .post("https://api.stripe.com/v1/checkout/sessions")
+            .basic_auth(&self.secret_key, None::<&str>)
+            .form(&[
+                ("mode", "payment"),
+                ("customer_email", customer_email),
+                ("client_reference_id", user_id.as_str()),
+                ("metadata[kind]", kind),
+                ("line_items[0][price]", price_id),
+                ("line_items[0][quantity]", "1"),
+                ("success_url", success_url),
+                ("cancel_url", cancel_url),
+            ])
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("Stripe error: {}", resp.text().await.unwrap_or_default()));
+        }
+        let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        body["url"].as_str().map(String::from).ok_or_else(|| "no checkout URL in response".into())
+    }
+
     pub fn verify_webhook_signature(
         payload: &[u8],
         sig_header: &str,

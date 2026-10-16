@@ -12,8 +12,13 @@ uuid.workspace = true
 validator.workspace = true
 # Photo pipeline (decode, EXIF orientation, fit 1000x1000, WebP). Opt-in, so
 # crates that only need the domain types do not build libwebp.
+# Desktop licensing (key format, Ed25519-signed certificates). Opt-in.
+ed25519-dalek = { version = "2", optional = true }
+sha2 = { workspace = true, optional = true }
+base64ct = { version = "1", features = ["alloc"], optional = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"], optional = true }
 webp = { version = "0.3", optional = true }
 
 [features]
 images = ["dep:image", "dep:webp"]
+license = ["dep:ed25519-dalek", "dep:sha2", "dep:base64ct"]

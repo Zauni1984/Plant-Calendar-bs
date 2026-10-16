@@ -15,7 +15,7 @@ rusqlite.workspace = true
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
-shared = { path = "../../shared", features = ["images"] }
+shared = { path = "../../shared", features = ["images", "license"] }
 
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 anyhow.workspace = true
