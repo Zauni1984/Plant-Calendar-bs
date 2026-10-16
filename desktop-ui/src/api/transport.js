@@ -5,13 +5,16 @@
 // backend instead. main.js imports invoke/convertFileSrc/dialogs from here,
 // so none of its call sites need to know which build they run in.
 
-import { invoke as tauriInvoke, convertFileSrc as tauriConvertFileSrc } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke, convertFileSrc as tauriConvertFileSrc, isTauri } from "@tauri-apps/api/core";
 import { open as tauriOpen, save as tauriSave } from "@tauri-apps/plugin-dialog";
 import { webCommands, DESKTOP_ONLY } from "./web-commands.js";
 import { webOpenDialog, webSaveDialog } from "./web-files.js";
 
 /** True inside the Tauri webview, false in an ordinary browser tab. */
-export const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+// isTauri() is the official check; __TAURI_INTERNALS__ is what Tauri's own
+// invoke() calls into, so its presence is exactly the precondition we need.
+export const IS_TAURI =
+  typeof window !== "undefined" && (isTauri() || "__TAURI_INTERNALS__" in window);
 
 export { DESKTOP_ONLY };
 
