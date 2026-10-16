@@ -73,6 +73,17 @@ async fn main() -> anyhow::Result<()> {
                 .post(api::weather::post_weather_reading)
                 .delete(api::weather::prune_weather_history),
         )
+        .route("/photos/status", get(api::photos::photo_status))
+        .route("/photos/archive", get(api::photos::photo_archive))
+        .route("/photos/{id}", get(api::photos::get_photo).delete(api::photos::delete_photo))
+        .route(
+            "/plants/{id}/photos",
+            get(api::photos::list_plant_photos)
+                .post(api::photos::upload_photo)
+                // axum caps bodies at 2 MB by default; phone photos are larger.
+                .layer(axum::extract::DefaultBodyLimit::max(api::photos::MAX_UPLOAD_BYTES)),
+        )
+        .route("/logs/{id}/photos", get(api::photos::list_log_photos))
         .route("/tasks", get(api::list_my_tasks))
         .route("/logs", get(api::list_my_logs))
         .route("/plants/{id}/tasks", get(api::list_tasks_for_plant).post(api::create_task_for_plant))
@@ -168,6 +179,11 @@ async fn main() -> anyhow::Result<()> {
                         "retention sweep complete"
                     ),
                     Err(err) => tracing::warn!("retention sweep failed: {err}"),
+                }
+                match api::photos::purge_expired(&prune_state).await {
+                    Ok((0, _)) => {}
+                    Ok((accounts, photos)) => tracing::info!(accounts, photos, "deleted photos after paid plan ended"),
+                    Err(err) => tracing::warn!("photo purge failed: {err}"),
                 }
             }
         });

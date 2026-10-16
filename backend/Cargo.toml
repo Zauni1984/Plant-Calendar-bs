@@ -25,3 +25,14 @@ argon2.workspace = true
 rand_core.workspace = true
 reqwest.workspace = true
 hmac.workspace = true
+
+# Photo pipeline: decode common formats (incl. EXIF orientation), resize, and
+# re-encode as lossy WebP. The image crate alone only encodes lossless WebP,
+# which for photos is larger than JPEG and would defeat the point.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
+webp = "0.3"
+# "Download all photos" before the post-subscription deletion: a ZIP built in a
+# temp file and streamed, so a large library does not have to fit in memory.
+zip = { version = "9", default-features = false }
+tempfile = "3"
+tokio-util = { version = "0.7", features = ["io"] }

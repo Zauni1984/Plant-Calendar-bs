@@ -1,3 +1,4 @@
+pub mod photos;
 pub mod weather;
 
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{HeaderMap, StatusCode}, response::{IntoResponse, Response}, Json};
@@ -538,7 +539,13 @@ pub async fn update_plant(
 
 pub async fn delete_plant(Path(id): Path<Uuid>, State(state): State<AppState>, session: SessionUser) -> impl IntoResponse {
     match repos::delete_plant(&state, session.user_id, id).await {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => {
+            // A deleted plant should not leave its photos behind.
+            if let Err(err) = photos::delete_photos_for_plant(&state, session.user_id, id).await {
+                return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
+            }
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
 }
@@ -1128,7 +1135,9 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
                     .await
                     .unwrap_or(None);
                 if let Some((user_id,)) = row {
-                    let _ = repos::upsert_user_plan(&state, user_id, SubscriptionPlan::Free).await;
+                    if let Err(err) = repos::upsert_user_plan(&state, user_id, SubscriptionPlan::Free).await {
+                        tracing::error!(%user_id, "cancellation: could not downgrade plan: {err}");
+                    }
                     let _ = repos::enforce_user_plan_limit(&state, user_id).await;
                     let _ = repos::record_subscription_history(&state, user_id, "stripe_subscription_cancelled", SubscriptionPlan::Free, None, None, Some("stripe"), Some("cancelled"), Some("Abo via Stripe Webhook gekuendigt.")).await;
                 }
@@ -1324,6 +1333,12 @@ pub async fn delete_account(
     State(state): State<AppState>,
     session: SessionUser,
 ) -> impl IntoResponse {
+    // Photo files first (GDPR Art. 17): the database cascade removes the rows,
+    // but nothing would ever remove the bytes on disk afterwards. If this
+    // fails, abort so the user can retry rather than leaving orphaned images.
+    if let Err(err) = state.photos.delete_user(session.user_id).await {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
+    }
     if let Err(err) = repos::delete_user_cascade(&state, session.user_id).await {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
@@ -1377,6 +1392,10 @@ pub async fn export_me(
     };
     let consents = repos::list_user_consents(&state, user_id).await.unwrap_or_default();
 
+    let photos_export = match photos::export_for_user(&state, user_id).await {
+        Ok(v) => v,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let weather_export = match weather::export_for_user(&state, user_id).await {
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -1394,6 +1413,8 @@ pub async fn export_me(
         "subscription_history": subscription_history,
         "consents": consents,
         "weather": weather_export,
+        "photos": photos_export,
+        "photos_archive": "/photos/archive",
     });
 
     let json = match serde_json::to_vec(&body) {

@@ -8,6 +8,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 pub struct AppState {
     pub pg: PgPool,
     pub jwt_secret: String,
+    pub photos: crate::services::photo_store::PhotoStore,
 }
 
 impl AppState {
@@ -26,6 +27,8 @@ impl AppState {
                 }
             })
             .map_err(|_| anyhow::anyhow!("JWT_SECRET must be set in production (release build)"))?;
-        Ok(Self { pg, jwt_secret })
+        let photos = crate::services::photo_store::PhotoStore::from_env();
+        tracing::info!(dir = %photos.root().display(), "photo storage");
+        Ok(Self { pg, jwt_secret, photos })
     }
 }

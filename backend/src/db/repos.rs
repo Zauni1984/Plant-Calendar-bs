@@ -303,7 +303,21 @@ pub async fn update_adult_confirmation(state: &AppState, user_id: Uuid, adult_co
 }
 
 pub async fn upsert_user_plan(state: &AppState, user_id: Uuid, plan: SubscriptionPlan) -> anyhow::Result<()> {
-    sqlx::query("UPDATE users SET plan = $2, updated_at = $3 WHERE user_id = $1")
+    // Every plan change goes through here, so this is where the photo
+    // retention clock is kept (see api::photos). In an UPDATE the right-hand
+    // `plan` is the OLD value:
+    //   paid -> free : start the clock
+    //   free -> free : keep whatever is there
+    //   -> any paid  : stop it
+    sqlx::query(
+        "UPDATE users SET \
+            paid_plan_ended_at = CASE \
+                WHEN $2 = 'free' AND plan <> 'free' THEN NOW() \
+                WHEN $2 = 'free' THEN paid_plan_ended_at \
+                ELSE NULL END, \
+            plan = $2, updated_at = $3 \
+         WHERE user_id = $1",
+    )
         .bind(user_id)
         .bind(plan_str(plan))
         .bind(Utc::now())
