@@ -17,6 +17,18 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let state = AppState::from_env().await?;
+
+    // Bring the schema up to date before serving. Failing here (database
+    // unreachable, broken migration) stops the process with a clear error
+    // instead of every request failing later.
+    let applied = db::migrate::run(&state.pg)
+        .await
+        .map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+    if applied.is_empty() {
+        tracing::info!("database schema up to date");
+    } else {
+        tracing::info!(count = applied.len(), migrations = ?applied, "applied database migrations");
+    }
     // Cloned up front: the router takes ownership of `state` below.
     let prune_state = state.clone();
 
