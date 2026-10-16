@@ -1700,6 +1700,7 @@ pub struct PruneReport {
     pub deleted_records: u64,
     pub subscription_history: u64,
     pub weather_history: u64,
+    pub push_reminders_sent: u64,
 }
 
 /// Delete operational rows that are no longer needed.
@@ -1758,11 +1759,20 @@ pub async fn prune_operational_data(
         .await?
         .rows_affected();
 
+    // Markers only need to outlive the 24 h window in which a task can still
+    // be pushed; 60 days leaves room for clock and outage oddities.
+    let push_sent = sqlx::query("DELETE FROM push_reminders_sent WHERE sent_at < $1")
+        .bind(now - chrono::Duration::days(60))
+        .execute(&state.pg)
+        .await?
+        .rows_affected();
+
     Ok(PruneReport {
         refresh_tokens: tokens,
         deleted_records: tombstones,
         subscription_history: history,
         weather_history: weather,
+        push_reminders_sent: push_sent,
     })
 }
 

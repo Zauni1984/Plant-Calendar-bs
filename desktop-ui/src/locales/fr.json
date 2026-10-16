@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Installer",
   "pwa.iosInstructions": "Dans Safari, touche « Partager » puis « Sur l’écran d’accueil » pour utiliser Plants Calendar comme une application.",
   "pwa.installBanner": "Installer Plants Calendar comme application sur cet appareil ?",
-  "pwa.notNow": "Plus tard"
+  "pwa.notNow": "Plus tard",
+  "push.title": "Rappels push",
+  "push.text": "Te rappelle les tâches à faire, même lorsque l’application est fermée.",
+  "push.enable": "Activer",
+  "push.disable": "Désactiver",
+  "push.test": "Envoyer un test",
+  "push.statusOn": "Activé sur cet appareil.",
+  "push.statusOff": "Désactivé sur cet appareil.",
+  "push.denied": "Les notifications sont bloquées dans le navigateur. Autorise-les dans les paramètres du site.",
+  "push.iosInstallFirst": "Sur iPhone et iPad, les rappels push fonctionnent une fois l’application ajoutée à l’écran d’accueil.",
+  "push.unsupported": "Ce navigateur ne prend pas en charge les notifications push.",
+  "push.testSent": "Notification de test envoyée.",
+  "push.failed": "Impossible de configurer le push : {0}",
+  "push.testBody": "Les notifications push fonctionnent. Tu seras averti des tâches à faire.",
+  "push.testFailed": "La notification de test n’est pas arrivée. Désactive puis réactive les rappels push."
 }

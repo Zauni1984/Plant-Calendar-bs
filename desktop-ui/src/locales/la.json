@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Installa",
   "pwa.iosInstructions": "In Safari tange „Communica“ deinde „Ad Paginam Domesticam“ ut Plants Calendar ut applicatione utaris.",
   "pwa.installBanner": "Plants Calendar ut applicationem in hoc instrumento installare?",
-  "pwa.notNow": "Non nunc"
+  "pwa.notNow": "Non nunc",
+  "push.title": "Monita push",
+  "push.text": "Te de officiis debitis monet, etiam cum applicatio clausa est.",
+  "push.enable": "Activa",
+  "push.disable": "Deactiva",
+  "push.test": "Probationem mitte",
+  "push.statusOn": "In hoc instrumento activum.",
+  "push.statusOff": "In hoc instrumento inactivum.",
+  "push.denied": "Nuntii in navigatro impediuntur. Eos in optionibus situs permitte.",
+  "push.iosInstallFirst": "In iPhone et iPad monita push operantur postquam applicatio ad paginam domesticam addita est.",
+  "push.unsupported": "Hic navigator nuntios push non sustinet.",
+  "push.testSent": "Nuntius probationis missus.",
+  "push.failed": "Push constitui non potuit: {0}",
+  "push.testBody": "Nuntii push operantur. De officiis debitis moneberis.",
+  "push.testFailed": "Nuntius probationis non advenit. Monita push deactiva et iterum activa."
 }

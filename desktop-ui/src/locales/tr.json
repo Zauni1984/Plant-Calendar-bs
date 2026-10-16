@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Yükle",
   "pwa.iosInstructions": "Plants Calendar’ı uygulama gibi kullanmak için Safari’de “Paylaş”a, ardından “Ana Ekrana Ekle”ye dokun.",
   "pwa.installBanner": "Plants Calendar bu cihaza uygulama olarak yüklensin mi?",
-  "pwa.notNow": "Şimdi değil"
+  "pwa.notNow": "Şimdi değil",
+  "push.title": "Anlık hatırlatıcılar",
+  "push.text": "Uygulama kapalıyken bile zamanı gelen görevleri hatırlatır.",
+  "push.enable": "Aç",
+  "push.disable": "Kapat",
+  "push.test": "Test gönder",
+  "push.statusOn": "Bu cihazda açık.",
+  "push.statusOff": "Bu cihazda kapalı.",
+  "push.denied": "Bildirimler tarayıcıda engellendi. Site ayarlarından izin ver.",
+  "push.iosInstallFirst": "iPhone ve iPad’de anlık hatırlatıcılar, uygulama Ana Ekrana eklendikten sonra çalışır.",
+  "push.unsupported": "Bu tarayıcı anlık bildirimleri desteklemiyor.",
+  "push.testSent": "Test bildirimi gönderildi.",
+  "push.failed": "Anlık bildirim ayarlanamadı: {0}",
+  "push.testBody": "Anlık bildirimler çalışıyor. Zamanı gelen görevler sana hatırlatılacak.",
+  "push.testFailed": "Test bildirimi ulaşmadı. Anlık hatırlatıcıları kapatıp yeniden aç."
 }

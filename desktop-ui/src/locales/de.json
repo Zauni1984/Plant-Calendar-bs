@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Installieren",
   "pwa.iosInstructions": "Tippe in Safari auf „Teilen“ und dann auf „Zum Home-Bildschirm“, um Plants Calendar wie eine App zu nutzen.",
   "pwa.installBanner": "Plants Calendar als App auf diesem Gerät installieren?",
-  "pwa.notNow": "Nicht jetzt"
+  "pwa.notNow": "Nicht jetzt",
+  "push.title": "Push-Erinnerungen",
+  "push.text": "Erinnert dich an fällige Aufgaben, auch wenn die App geschlossen ist.",
+  "push.enable": "Aktivieren",
+  "push.disable": "Deaktivieren",
+  "push.test": "Test senden",
+  "push.statusOn": "Auf diesem Gerät aktiv.",
+  "push.statusOff": "Auf diesem Gerät aus.",
+  "push.denied": "Benachrichtigungen sind im Browser blockiert. Erlaube sie in den Website-Einstellungen.",
+  "push.iosInstallFirst": "Auf iPhone und iPad gibt es Push-Erinnerungen, sobald die App zum Home-Bildschirm hinzugefügt wurde.",
+  "push.unsupported": "Dieser Browser unterstützt keine Push-Benachrichtigungen.",
+  "push.testSent": "Testbenachrichtigung gesendet.",
+  "push.failed": "Push konnte nicht eingerichtet werden: {0}",
+  "push.testBody": "Push-Benachrichtigungen funktionieren. Du wirst an fällige Aufgaben erinnert.",
+  "push.testFailed": "Die Testbenachrichtigung kam nicht an. Schalte Push-Erinnerungen aus und wieder ein."
 }

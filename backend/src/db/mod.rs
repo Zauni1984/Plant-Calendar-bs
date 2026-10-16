@@ -9,6 +9,8 @@ pub struct AppState {
     pub pg: PgPool,
     pub jwt_secret: String,
     pub photos: crate::services::photo_store::PhotoStore,
+    /// None when VAPID keys are not configured (push reminders off).
+    pub push: Option<std::sync::Arc<crate::services::push::PushConfig>>,
 }
 
 impl AppState {
@@ -29,6 +31,7 @@ impl AppState {
             .map_err(|_| anyhow::anyhow!("JWT_SECRET must be set in production (release build)"))?;
         let photos = crate::services::photo_store::PhotoStore::from_env();
         tracing::info!(dir = %photos.root().display(), "photo storage");
-        Ok(Self { pg, jwt_secret, photos })
+        let push = crate::services::push::PushConfig::from_env()?;
+        Ok(Self { pg, jwt_secret, photos, push })
     }
 }

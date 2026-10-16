@@ -4,3 +4,4 @@ pub mod rate_limit;
 pub mod stripe;
 pub mod images;
 pub mod photo_store;
+pub mod push;

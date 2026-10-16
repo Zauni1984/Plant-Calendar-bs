@@ -36,3 +36,7 @@ webp = "0.3"
 zip = { version = "9", default-features = false }
 tempfile = "3"
 tokio-util = { version = "0.7", features = ["io"] }
+# Web Push reminders (RFC 8030/8291/8292): payload encryption and VAPID
+# signing in pure Rust, so the server build needs no OpenSSL.
+web-push-native = "0.5"
+base64ct = { version = "1", features = ["alloc"] }

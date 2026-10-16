@@ -11,6 +11,14 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // `plants-backend gen-vapid-keys`: one-off helper for setting up push.
+    if std::env::args().nth(1).as_deref() == Some("gen-vapid-keys") {
+        let (private, public) = services::push::generate_vapid_keys();
+        println!("VAPID_PRIVATE_KEY={private}
+# public key (served at /push/public-key): {public}");
+        return Ok(());
+    }
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new("info"))
         .with(tracing_subscriber::fmt::layer())
@@ -31,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
     }
     // Cloned up front: the router takes ownership of `state` below.
     let prune_state = state.clone();
+    let push_state = state.clone();
 
     // Rate limiter: 10 requests per 60 seconds per IP for auth endpoints
     let auth_rate_limiter = RateLimiter::new(10, 60);
@@ -85,6 +94,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/logs/{id}/photos", get(api::photos::list_log_photos))
         .route("/tasks", get(api::list_my_tasks))
+        .route("/push/public-key", get(api::push::public_key))
+        .route("/push/subscriptions", post(api::push::subscribe).delete(api::push::unsubscribe))
+        .route("/push/test", post(api::push::send_test))
         .route("/logs", get(api::list_my_logs))
         .route("/plants/{id}/tasks", get(api::list_tasks_for_plant).post(api::create_task_for_plant))
         .route("/tasks/{id}", patch(api::update_task).delete(api::delete_task))
@@ -176,6 +188,7 @@ async fn main() -> anyhow::Result<()> {
                         deleted_records = report.deleted_records,
                         subscription_history = report.subscription_history,
                         weather_history = report.weather_history,
+                        push_reminders_sent = report.push_reminders_sent,
                         "retention sweep complete"
                     ),
                     Err(err) => tracing::warn!("retention sweep failed: {err}"),
@@ -184,6 +197,22 @@ async fn main() -> anyhow::Result<()> {
                     Ok((0, _)) => {}
                     Ok((accounts, photos)) => tracing::info!(accounts, photos, "deleted photos after paid plan ended"),
                     Err(err) => tracing::warn!("photo purge failed: {err}"),
+                }
+            }
+        });
+    }
+
+    // Push reminders: check for due tasks every few minutes.
+    if let Some(config) = push_state.push.clone() {
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(services::push::interval_from_env());
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                ticker.tick().await;
+                match services::push::run_due_reminders(&push_state, &config).await {
+                    Ok(r) if r.reminders == 0 => {}
+                    Ok(r) => tracing::info!(reminders = r.reminders, delivered = r.delivered, failed = r.failed, removed = r.removed, "push reminders sent"),
+                    Err(err) => tracing::warn!("push reminder run failed: {err}"),
                 }
             }
         });

@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Installeren",
   "pwa.iosInstructions": "Tik in Safari op ‘Deel’ en daarna op ‘Zet op beginscherm’ om Plants Calendar als app te gebruiken.",
   "pwa.installBanner": "Plants Calendar als app op dit apparaat installeren?",
-  "pwa.notNow": "Niet nu"
+  "pwa.notNow": "Niet nu",
+  "push.title": "Pushherinneringen",
+  "push.text": "Herinnert je aan taken die eraan komen, ook als de app gesloten is.",
+  "push.enable": "Inschakelen",
+  "push.disable": "Uitschakelen",
+  "push.test": "Test versturen",
+  "push.statusOn": "Aan op dit apparaat.",
+  "push.statusOff": "Uit op dit apparaat.",
+  "push.denied": "Meldingen zijn geblokkeerd in de browser. Sta ze toe in de site-instellingen.",
+  "push.iosInstallFirst": "Op iPhone en iPad werken pushherinneringen zodra de app op het beginscherm is gezet.",
+  "push.unsupported": "Deze browser ondersteunt geen pushmeldingen.",
+  "push.testSent": "Testmelding verstuurd.",
+  "push.failed": "Push kon niet worden ingesteld: {0}",
+  "push.testBody": "Pushmeldingen werken. Je wordt herinnerd aan taken die eraan komen.",
+  "push.testFailed": "De testmelding is niet aangekomen. Schakel pushherinneringen uit en weer in."
 }

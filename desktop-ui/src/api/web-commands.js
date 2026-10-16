@@ -269,6 +269,87 @@ async function dueReminders(withinMinutes = 30) {
   return { count: reminders.length, reminders };
 }
 
+// --- web push: reminders from the server while the app is closed -------------
+//
+// The browser subscribes at its push service with our VAPID public key and
+// hands the subscription to the server, which then sends an encrypted message
+// when a task falls due. src/sw.js shows it. Permission must already be
+// granted (main.js asks from the click handler, which Safari requires).
+
+let pushPublicKey; // undefined = not asked yet, null = push off on the server
+
+async function serverPushKey() {
+  if (pushPublicKey !== undefined) return pushPublicKey;
+  try {
+    pushPublicKey = (await api("/push/public-key", { auth: false })).public_key || null;
+  } catch (_) {
+    // 404 when the server has no VAPID keys. Network errors are retried next time.
+    return null;
+  }
+  return pushPublicKey;
+}
+
+function pushSupportedHere() {
+  return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+async function currentPushSubscription() {
+  if (!pushSupportedHere()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+function base64UrlToBytes(b64) {
+  const padded = (b64 + "===".slice((b64.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+}
+
+async function registerPushSubscription(sub, lang) {
+  await api("/push/subscriptions", {
+    method: "POST",
+    body: { ...sub.toJSON(), lang, utc_offset_minutes: -new Date().getTimezoneOffset() },
+  });
+}
+
+async function forgetPushSubscription() {
+  const sub = await currentPushSubscription();
+  if (!sub) return;
+  try { await api("/push/subscriptions", { method: "DELETE", body: { endpoint: sub.endpoint } }); } catch (_) {}
+  try { await sub.unsubscribe(); } catch (_) {}
+}
+
+async function pushStatus() {
+  const supported = pushSupportedHere() && !!(await navigator.serviceWorker.getRegistration());
+  const serverEnabled = !!(await serverPushKey());
+  const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+  const sub = supported ? await currentPushSubscription() : null;
+  return { supported, server_enabled: serverEnabled, permission, subscribed: !!sub && permission === "granted" };
+}
+
+async function enablePush(lang) {
+  if (!pushSupportedHere()) throw "push not supported";
+  if (Notification.permission !== "granted") throw "notification permission not granted";
+  const key = await serverPushKey();
+  if (!key) throw "push is not available on this server";
+  const reg = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, reject) => setTimeout(() => reject("service worker not ready"), 10000)),
+  ]);
+  const options = { userVisibleOnly: true, applicationServerKey: base64UrlToBytes(key) };
+  let sub;
+  try {
+    sub = await reg.pushManager.subscribe(options);
+  } catch (err) {
+    // An old subscription made with a different server key blocks a new one.
+    const old = await reg.pushManager.getSubscription();
+    if (!old) throw err;
+    await old.unsubscribe();
+    sub = await reg.pushManager.subscribe(options);
+  }
+  await registerPushSubscription(sub, lang);
+  return "subscribed";
+}
+
 export const webCommands = {
   // --- session ---------------------------------------------------------------
   bootstrap_local_user: async () => ((await refreshSession()) ? "web session restored" : "no web session"),
@@ -287,7 +368,8 @@ export const webCommands = {
   auth_login: ({ payload }) => signIn("login", payload),
   auth_register: ({ payload }) => signIn("register", payload),
   auth_fetch_me: () => api("/me"),
-  web_logout: async () => { await logout(); return "logged out"; },
+  // A shared browser must not keep receiving the previous user's reminders.
+  web_logout: async () => { await forgetPushSubscription(); await logout(); return "logged out"; },
   // The server is the source of truth in the browser; there is nothing to sync.
   sync_now: async () => ({
     pushed_plants: 0, pushed_tasks: 0, pushed_logs: 0, pushed_deleted: 0,
@@ -539,6 +621,21 @@ export const webCommands = {
   },
   // The desktop fires OS notifications from Rust; the browser does it from main.js.
   check_and_send_notifications: async () => 0,
+  web_push_status: () => pushStatus(),
+  web_push_enable: ({ lang } = {}) => enablePush(lang),
+  web_push_disable: async () => { await forgetPushSubscription(); return "unsubscribed"; },
+  // Refreshes language/UTC offset (and the owning account) of an existing subscription.
+  web_push_sync: async ({ lang } = {}) => {
+    if (!hasSession() || typeof Notification === "undefined" || Notification.permission !== "granted") return "skipped";
+    const sub = await currentPushSubscription();
+    if (!sub || !(await serverPushKey())) return "skipped";
+    await registerPushSubscription(sub, lang);
+    return "synced";
+  },
+  web_push_test: async () => {
+    const sub = await currentPushSubscription();
+    return api("/push/test", { method: "POST", body: { endpoint: sub?.endpoint ?? null } });
+  },
 
   // --- weather & climate -----------------------------------------------------
   fetch_weather: ({ lat, lon }) => openMeteo(lat, lon, WEATHER_BASIC),

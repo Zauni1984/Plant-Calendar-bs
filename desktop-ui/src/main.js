@@ -330,6 +330,7 @@ root.innerHTML = `
       <div id="settingsPanel" class="view-card" style="margin-top:14px;"></div>
       <div id="climateSettingsPanel" class="view-card" style="margin-top:14px;"></div>
       ${IS_TAURI ? '' : '<div id="installAppCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
+      ${IS_TAURI ? '' : '<div id="pushCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
       <div id="liveStatusCard" class="view-card" style="margin-top:14px;">
         <h3>${t('account.liveStatus')}</h3>
         <div id="status"></div>
@@ -981,6 +982,10 @@ let timelineFocusKey = new Date().toISOString().slice(0, 10);
 let calendarMode = localStorage.getItem('plants_calendar_mode') || 'standard';
 // 'standard', 'moon', 'chinese', 'persian', 'julian', 'islamic', 'jewish', 'bauern'
 let reminderPermissionState = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+// Web only: this browser receives push reminders from the server, so the
+// in-tab reminder check must not show the same task a second time.
+let webPushActive = false;
+let pushCardMessage = ''; // last result shown in the settings push card
 let homeTaskFilter = "all";
 let homeTaskGrouping = "flat";
 let homeTaskSort = "due";
@@ -1785,6 +1790,8 @@ function renderSettingsPanel() {
     try { renderSensorWidget && renderSensorWidget(); } catch (_) {}
     try { renderClimateSettings && renderClimateSettings(); } catch (_) {}
     try { renderInstallCard(); } catch (_) {}
+    try { renderPushCard(); } catch (_) {}
+    if (!IS_TAURI) invoke('web_push_sync', { lang: currentLang }).catch(() => {});
     try { refreshAppBanners(); } catch (_) {}
     try { refreshStatus(); } catch (_) {}
     try { rerenderConsentModal(); } catch (_) {}
@@ -4087,6 +4094,9 @@ async function requestReminderPermission() {
   }
   reminderPermissionState = await Notification.requestPermission();
   renderReminderPanel();
+  // In the browser, allowing notifications also turns on push reminders, so
+  // they arrive while the app is closed. Quietly skipped where unsupported.
+  if (!IS_TAURI && reminderPermissionState === "granted") await enableWebPush({ quiet: true });
 }
 
 let autoReminderCheckInFlight = false;
@@ -4140,6 +4150,7 @@ async function autoCheckDueNotifications(reason = "auto") {
   reminderPermissionState = Notification.permission;
   renderReminderPanel();
   if (Notification.permission !== "granted") return { skipped: true, reason, permission: Notification.permission };
+  if (webPushActive) return { skipped: true, reason, push: true };
   autoReminderCheckInFlight = true;
   try {
     return await checkDueNotifications({ silent: true, withinMinutes: 30, reason });
@@ -5344,6 +5355,12 @@ async function refreshWebSessionState() {
   if (signIn) signIn.style.display = webSignedIn ? 'none' : '';
   if (signOut) signOut.style.display = webSignedIn ? '' : 'none';
   updateOnboardingVisibility();
+  if (webSignedIn) {
+    // Keeps the server's copy of this device's language/time zone current and
+    // moves the subscription to this account if someone else used it before.
+    try { await invoke('web_push_sync', { lang: currentLang }); } catch (_) {}
+  }
+  await renderPushCard();
 }
 
 function updateOnboardingVisibility() {
@@ -8715,10 +8732,10 @@ function renderInstallCard() {
   let body = '';
   if (!isStandaloneApp()) {
     if (deferredInstallPrompt) {
-      body = `<p class="muted" style="margin:0 0 10px;">${escapeHtml(t('pwa.installText'))}</p>
+      body = `<p style="margin:0 0 10px;font-size:12px;color:${TC.textMuted};">${escapeHtml(t('pwa.installText'))}</p>
         <button type="button" id="installAppBtn" class="btn btn--primary btn--sm">${escapeHtml(t('pwa.installButton'))}</button>`;
     } else if (isIosSafari()) {
-      body = `<p class="muted" style="margin:0;">${escapeHtml(t('pwa.iosInstructions'))}</p>`;
+      body = `<p style="margin:0;font-size:12px;color:${TC.textMuted};">${escapeHtml(t('pwa.iosInstructions'))}</p>`;
     }
   }
   if (!body) { card.style.display = 'none'; card.innerHTML = ''; return; }
@@ -8756,4 +8773,77 @@ if (!IS_TAURI) {
     renderInstallCard();
   });
   renderInstallCard();
+}
+
+// ── Push reminders (web) ────────────────────────────────────────────────────
+// See web-commands.js (subscription) and src/sw.js (display). On iOS/iPadOS
+// push only exists for apps added to the Home Screen.
+
+async function renderPushCard() {
+  const card = document.getElementById('pushCard');
+  if (!card) return;
+  let st;
+  try { st = await invoke('web_push_status'); } catch (_) { st = null; }
+  webPushActive = !!st?.subscribed;
+  if (!webSignedIn || !st || !st.server_enabled) {
+    card.style.display = 'none';
+    card.innerHTML = '';
+    return;
+  }
+  let body;
+  if (!st.supported) {
+    body = `<p style="margin:0;font-size:12px;color:${TC.textMuted};">${escapeHtml(isIosSafari() && !isStandaloneApp() ? t('push.iosInstallFirst') : t('push.unsupported'))}</p>`;
+  } else if (st.permission === 'denied') {
+    body = `<p style="margin:0;font-size:12px;color:${TC.textMuted};">${escapeHtml(t('push.denied'))}</p>`;
+  } else {
+    body = `<p style="margin:0 0 6px;font-size:12px;color:${TC.textMuted};">${escapeHtml(t('push.text'))}</p>
+      <p style="margin:0 0 10px;font-size:13px;"><strong>${escapeHtml(st.subscribed ? t('push.statusOn') : t('push.statusOff'))}</strong></p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${st.subscribed
+          ? `<button type="button" id="pushDisableBtn" class="btn btn--sm">${escapeHtml(t('push.disable'))}</button>
+             <button type="button" id="pushTestBtn" class="btn btn--sm btn--ghost">${escapeHtml(t('push.test'))}</button>`
+          : `<button type="button" id="pushEnableBtn" class="btn btn--primary btn--sm">${escapeHtml(t('push.enable'))}</button>`}
+      </div>`;
+  }
+  const message = pushCardMessage ? `<p class="muted" style="margin:10px 0 0;" role="status">${escapeHtml(pushCardMessage)}</p>` : '';
+  card.innerHTML = `<h3>${escapeHtml(t('push.title'))}</h3>${body}${message}`;
+  card.style.display = '';
+  card.querySelector('#pushEnableBtn')?.addEventListener('click', () => enableWebPush());
+  card.querySelector('#pushDisableBtn')?.addEventListener('click', disableWebPush);
+  card.querySelector('#pushTestBtn')?.addEventListener('click', sendWebPushTest);
+}
+
+async function enableWebPush({ quiet = false } = {}) {
+  if (typeof Notification === 'undefined') return;
+  pushCardMessage = '';
+  // Asked first thing in the click handler: Safari only shows the prompt
+  // during a user gesture.
+  if (Notification.permission !== 'granted') {
+    reminderPermissionState = await Notification.requestPermission();
+    try { renderReminderPanel(); } catch (_) {}
+  }
+  if (Notification.permission === 'granted') {
+    try {
+      await invoke('web_push_enable', { lang: currentLang });
+    } catch (err) {
+      if (!quiet) pushCardMessage = t('push.failed', String(err));
+    }
+  }
+  await renderPushCard();
+}
+
+async function disableWebPush() {
+  pushCardMessage = '';
+  try { await invoke('web_push_disable'); } catch (err) { pushCardMessage = t('push.failed', String(err)); }
+  await renderPushCard();
+}
+
+async function sendWebPushTest() {
+  try {
+    const result = await invoke('web_push_test');
+    pushCardMessage = result?.delivered ? t('push.testSent') : t('push.testFailed');
+  } catch (err) {
+    pushCardMessage = t('push.failed', String(err));
+  }
+  await renderPushCard();
 }

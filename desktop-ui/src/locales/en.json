@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Install",
   "pwa.iosInstructions": "In Safari, tap “Share” and then “Add to Home Screen” to use Plants Calendar like an app.",
   "pwa.installBanner": "Install Plants Calendar as an app on this device?",
-  "pwa.notNow": "Not now"
+  "pwa.notNow": "Not now",
+  "push.title": "Push reminders",
+  "push.text": "Reminds you of due tasks, even when the app is closed.",
+  "push.enable": "Turn on",
+  "push.disable": "Turn off",
+  "push.test": "Send test",
+  "push.statusOn": "On for this device.",
+  "push.statusOff": "Off for this device.",
+  "push.denied": "Notifications are blocked in the browser. Allow them in the site settings.",
+  "push.iosInstallFirst": "On iPhone and iPad, push reminders work once the app has been added to the Home Screen.",
+  "push.unsupported": "This browser does not support push notifications.",
+  "push.testSent": "Test notification sent.",
+  "push.failed": "Push could not be set up: {0}",
+  "push.testBody": "Push notifications work. You will be reminded of due tasks.",
+  "push.testFailed": "The test notification did not arrive. Turn push reminders off and on again."
 }

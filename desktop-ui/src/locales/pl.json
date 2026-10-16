@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Zainstaluj",
   "pwa.iosInstructions": "W Safari stuknij „Udostępnij”, a potem „Do ekranu początkowego”, aby używać Plants Calendar jak aplikacji.",
   "pwa.installBanner": "Zainstalować Plants Calendar jako aplikację na tym urządzeniu?",
-  "pwa.notNow": "Nie teraz"
+  "pwa.notNow": "Nie teraz",
+  "push.title": "Przypomnienia push",
+  "push.text": "Przypomina o zadaniach do wykonania, nawet gdy aplikacja jest zamknięta.",
+  "push.enable": "Włącz",
+  "push.disable": "Wyłącz",
+  "push.test": "Wyślij test",
+  "push.statusOn": "Włączone na tym urządzeniu.",
+  "push.statusOff": "Wyłączone na tym urządzeniu.",
+  "push.denied": "Powiadomienia są zablokowane w przeglądarce. Zezwól na nie w ustawieniach witryny.",
+  "push.iosInstallFirst": "Na iPhonie i iPadzie przypomnienia push działają po dodaniu aplikacji do ekranu początkowego.",
+  "push.unsupported": "Ta przeglądarka nie obsługuje powiadomień push.",
+  "push.testSent": "Wysłano powiadomienie testowe.",
+  "push.failed": "Nie udało się skonfigurować push: {0}",
+  "push.testBody": "Powiadomienia push działają. Przypomnimy Ci o zadaniach do wykonania.",
+  "push.testFailed": "Powiadomienie testowe nie dotarło. Wyłącz i ponownie włącz przypomnienia push."
 }

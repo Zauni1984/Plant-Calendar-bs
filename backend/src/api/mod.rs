@@ -1,4 +1,5 @@
 pub mod photos;
+pub mod push;
 pub mod weather;
 
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{HeaderMap, StatusCode}, response::{IntoResponse, Response}, Json};
@@ -1400,6 +1401,10 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    let push_export = match push::export_for_user(&state, user_id).await {
+        Ok(v) => v,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let body = serde_json::json!({
         "schema_version": 1,
         "exported_at": Utc::now().to_rfc3339(),
@@ -1415,6 +1420,7 @@ pub async fn export_me(
         "weather": weather_export,
         "photos": photos_export,
         "photos_archive": "/photos/archive",
+        "push_subscriptions": push_export,
     });
 
     let json = match serde_json::to_vec(&body) {

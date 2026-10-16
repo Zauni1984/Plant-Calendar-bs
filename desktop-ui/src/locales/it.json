@@ -1303,5 +1303,19 @@
   "pwa.installButton": "Installa",
   "pwa.iosInstructions": "In Safari tocca «Condividi» e poi «Aggiungi alla schermata Home» per usare Plants Calendar come un’app.",
   "pwa.installBanner": "Installare Plants Calendar come app su questo dispositivo?",
-  "pwa.notNow": "Non ora"
+  "pwa.notNow": "Non ora",
+  "push.title": "Promemoria push",
+  "push.text": "Ti ricorda le attività in scadenza, anche quando l’app è chiusa.",
+  "push.enable": "Attiva",
+  "push.disable": "Disattiva",
+  "push.test": "Invia test",
+  "push.statusOn": "Attivo su questo dispositivo.",
+  "push.statusOff": "Disattivato su questo dispositivo.",
+  "push.denied": "Le notifiche sono bloccate nel browser. Consentile nelle impostazioni del sito.",
+  "push.iosInstallFirst": "Su iPhone e iPad i promemoria push funzionano dopo aver aggiunto l’app alla schermata Home.",
+  "push.unsupported": "Questo browser non supporta le notifiche push.",
+  "push.testSent": "Notifica di prova inviata.",
+  "push.failed": "Impossibile configurare il push: {0}",
+  "push.testBody": "Le notifiche push funzionano. Ti ricorderemo le attività in scadenza.",
+  "push.testFailed": "La notifica di prova non è arrivata. Disattiva e riattiva i promemoria push."
 }
