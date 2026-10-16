@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Voir les abonnements",
   "desktopApp.devices": "Utilisée sur {0} appareil(s) sur {1} :",
   "desktopApp.buyFailed": "Impossible de lancer l’achat : {0}",
-  "desktopApp.thanks": "Merci pour ton achat ! Connecte-toi à l’application de bureau avec ce compte.",
-  "desktopApp.consentStripe": "Le paiement est traité par Stripe. Ton adresse e-mail et tes données de paiement sont transmises à Stripe. D’accord ?"
+  "desktopApp.thanks": "Merci pour ton achat ! Ta clé de licence se trouve ici, sous Application de bureau.",
+  "desktopApp.consentStripe": "Le paiement est traité par Stripe. Ton adresse e-mail et tes données de paiement sont transmises à Stripe. D’accord ?",
+  "desktopApp.yourKey": "Ta clé de licence",
+  "desktopApp.keyHint": "Saisis-la dans l’application de bureau, ou connecte-toi avec ce compte. Elle fonctionne sur {0} ordinateurs maximum.",
+  "desktopApp.copy": "Copier",
+  "desktopApp.copied": "Copiée"
 }

@@ -395,6 +395,15 @@ pub async fn my_license(State(state): State<AppState>, session: SessionUser) -> 
         .unwrap_or_default(),
         None => vec![],
     };
+    // The buyer's own key (purchases of this account only, never keys an
+    // operator handed out by e-mail).
+    let key = match &row {
+        Some(r) if r.kind == "purchase" && r.user_id == Some(session.user_id) => match buyer_key(&state, r).await {
+            Ok(k) => k,
+            Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+        },
+        _ => None,
+    };
     let access = if let Some(r) = &row {
         Some(source_of(r))
     } else if is_paid(user.plan) {
@@ -406,11 +415,40 @@ pub async fn my_license(State(state): State<AppState>, session: SessionUser) -> 
         "access": access,
         "subscription_included": is_paid(user.plan),
         "max_devices": row.as_ref().map(|r| r.max_devices),
+        "license_key": key,
         "devices": devices,
         "purchase_available": purchase_available(),
         "download_url": std::env::var("DESKTOP_DOWNLOAD_URL").ok().filter(|u| !u.trim().is_empty()),
     }))
     .into_response()
+}
+
+/// The derived key of a purchase, if it is the one on record. Purchases from
+/// before keys existed get theirs now.
+async fn buyer_key(state: &AppState, row: &LicenseRow) -> anyhow::Result<Option<String>> {
+    let key = purchase_key(&state.license_key, row.license_id);
+    let normalized = license::normalize_key(&key).expect("generated keys are valid");
+    let hash = license::key_hash(&normalized);
+    let stored: Option<String> = sqlx::query_scalar("SELECT key_hash FROM licenses WHERE license_id = $1")
+        .bind(row.license_id)
+        .fetch_one(&state.pg)
+        .await?;
+    match stored {
+        Some(h) if h == hash => Ok(Some(key)),
+        Some(_) => {
+            tracing::warn!(license = %row.license_id, "purchase key does not match (LICENSE_SIGNING_KEY rotated?)");
+            Ok(None)
+        }
+        None => {
+            sqlx::query("UPDATE licenses SET key_hash = $2, key_hint = $3 WHERE license_id = $1 AND key_hash IS NULL")
+                .bind(row.license_id)
+                .bind(&hash)
+                .bind(license::key_hint(&normalized))
+                .execute(&state.pg)
+                .await?;
+            Ok(Some(key))
+        }
+    }
 }
 
 fn purchase_available() -> bool {
@@ -448,7 +486,7 @@ pub async fn checkout(State(state): State<AppState>, session: SessionUser) -> Re
             }
         }
         // Development without Stripe: grant directly so the flow can be tried.
-        _ if cfg!(debug_assertions) => match create_license(&state, "purchase", Some(&email), Some(session.user_id), Some("dev purchase (no Stripe)"), DEFAULT_MAX_DEVICES, false, None).await {
+        _ if cfg!(debug_assertions) => match create_license(&state, "purchase", Some(&email), Some(session.user_id), Some("dev purchase (no Stripe)"), DEFAULT_MAX_DEVICES, KeyMode::Derived, None).await {
             Ok(_) => Json(serde_json::json!({ "checkout_url": null, "granted": true })).into_response(),
             Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
         },
@@ -456,8 +494,33 @@ pub async fn checkout(State(state): State<AppState>, session: SessionUser) -> Re
     }
 }
 
-/// Inserts a license; returns its id and, when `with_key`, the plain key
-/// (shown once, never stored).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum KeyMode {
+    /// Account or e-mail only.
+    None,
+    /// Random; shown once to the operator, never recoverable.
+    Random,
+    /// Derived from the license id (see `purchase_key`), so the buyer can see
+    /// it in the account at any time without the key being stored.
+    Derived,
+}
+
+/// The key of a purchased license: HMAC-SHA256 over the license id, keyed
+/// with the license signing key. Recomputed on demand; the database holds
+/// only its hash like for any other key. (Rotating LICENSE_SIGNING_KEY would
+/// change these keys; `my_license` notices the mismatch and shows none.)
+pub fn purchase_key(signing_key: &license::SigningKey, license_id: Uuid) -> String {
+    use hmac::{Hmac, Mac};
+    let mut mac = <Hmac<sha2::Sha256> as Mac>::new_from_slice(&signing_key.to_bytes()).expect("any key length");
+    mac.update(b"plants-calendar purchase license key v1:");
+    mac.update(license_id.as_bytes());
+    let digest = mac.finalize().into_bytes();
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    license::generate_key(bytes)
+}
+
+/// Inserts a license; returns its id and the plain key (when one was made).
 #[allow(clippy::too_many_arguments)]
 pub async fn create_license(
     state: &AppState,
@@ -466,17 +529,21 @@ pub async fn create_license(
     user_id: Option<Uuid>,
     note: Option<&str>,
     max_devices: i32,
-    with_key: bool,
+    key_mode: KeyMode,
     stripe_session_id: Option<&str>,
 ) -> anyhow::Result<(Uuid, Option<String>)> {
     use rand_core::{OsRng, RngCore};
-    let key = with_key.then(|| {
-        let mut random = [0u8; 16];
-        OsRng.fill_bytes(&mut random);
-        license::generate_key(random)
-    });
-    let normalized = key.as_deref().and_then(license::normalize_key);
     let id = Uuid::new_v4();
+    let key = match key_mode {
+        KeyMode::None => None,
+        KeyMode::Random => {
+            let mut random = [0u8; 16];
+            OsRng.fill_bytes(&mut random);
+            Some(license::generate_key(random))
+        }
+        KeyMode::Derived => Some(purchase_key(&state.license_key, id)),
+    };
+    let normalized = key.as_deref().and_then(license::normalize_key);
     let inserted = sqlx::query(
         "INSERT INTO licenses (license_id, kind, key_hash, key_hint, email, user_id, note, max_devices, stripe_session_id) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (stripe_session_id) DO NOTHING",
@@ -509,7 +576,7 @@ pub async fn handle_purchase_completed(state: &AppState, session: &serde_json::V
         return Json(serde_json::json!({ "status": "ignored", "reason": "no user" })).into_response();
     };
     let email = session["customer_details"]["email"].as_str().or(session["customer_email"].as_str());
-    match create_license(state, "purchase", email, Some(user_id), Some("Stripe one-time purchase"), DEFAULT_MAX_DEVICES, false, session["id"].as_str()).await {
+    match create_license(state, "purchase", email, Some(user_id), Some("Stripe one-time purchase"), DEFAULT_MAX_DEVICES, KeyMode::Derived, session["id"].as_str()).await {
         Ok((id, _)) => {
             tracing::info!(%user_id, license = %id, "desktop license purchased");
             Json(serde_json::json!({ "status": "processed", "kind": "desktop_license" })).into_response()
@@ -544,4 +611,21 @@ pub async fn export_for_user(state: &AppState, user_id: Uuid, email: Option<&str
         }));
     }
     Ok(serde_json::Value::Array(out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn purchase_keys_are_stable_valid_and_secret_dependent() {
+        let sk = license::SigningKey::from_bytes(&[3; 32]);
+        let id = Uuid::new_v4();
+        let key = purchase_key(&sk, id);
+        assert_eq!(key, purchase_key(&sk, id), "must be recomputable");
+        assert!(license::normalize_key(&key).is_some(), "{key}");
+        assert_ne!(key, purchase_key(&sk, Uuid::new_v4()));
+        // Without the server secret the key cannot be derived from the id.
+        assert_ne!(key, purchase_key(&license::SigningKey::from_bytes(&[4; 32]), id));
+    }
 }

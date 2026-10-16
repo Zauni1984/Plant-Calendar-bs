@@ -5,7 +5,7 @@ Die Desktop-App läuft nur mit Lizenz. Freigeschaltet wird sie auf drei Wegen:
 | Weg | Wie | Gültigkeit offline |
 |---|---|---|
 | Abo Basic, Pro oder CSC | in der App „Mit Konto anmelden“ | 14 Tage, dann Online-Erneuerung |
-| Einmalkauf (Stripe) | im Web unter Konto → Desktop-App kaufen, dann in der App mit dem Konto anmelden | 60 Tage |
+| Einmalkauf (Stripe) | im Web unter Konto → Desktop-App kaufen; dann den angezeigten Lizenzschlüssel eingeben **oder** in der App mit dem Konto anmelden | 60 Tage |
 | Eigene Lizenz (Test, Betatester, treue Kunden) | Lizenzschlüssel eingeben **oder** mit der hinterlegten E-Mail anmelden | 60 Tage |
 
 Online erneuert die App ihr Zertifikat einmal täglich. Widerrufene Lizenzen und beendete Abos wirken spätestens nach Ablauf des Zertifikats.
@@ -29,7 +29,9 @@ plants-backend license revoke PLNT-XXXX-XXXX-XXXX-XXXX   # oder Lizenz-ID oder E
 plants-backend license reset-devices <lizenz-id>
 ```
 
-Schlüssel werden nur als Hash gespeichert. Wer einen Schlüssel verliert, bekommt einen neuen; den alten widerrufen.
+Schlüssel werden nur als Hash gespeichert. Wer einen selbst ausgestellten Schlüssel verliert, bekommt einen neuen; den alten widerrufen.
+
+**Käufer-Schlüssel** stehen dauerhaft im Web-Konto (Konto → Desktop-App). Sie werden nicht gespeichert, sondern aus `LICENSE_SIGNING_KEY` und der Lizenz-ID berechnet. Nach einer Kontolöschung funktioniert der Schlüssel weiter; die Lizenz verliert nur den Bezug zur Person. **Deshalb `LICENSE_SIGNING_KEY` nie wechseln** – sonst passen die angezeigten Käufer-Schlüssel nicht mehr (die App zeigt dann keinen an; bestehende Aktivierungen laufen per Erneuerung weiter, sobald die Geräte online sind).
 
 ## Einmalig einrichten (Produktion)
 

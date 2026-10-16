@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Vedi i piani",
   "desktopApp.devices": "In uso su {0} di {1} dispositivi:",
   "desktopApp.buyFailed": "Impossibile avviare l’acquisto: {0}",
-  "desktopApp.thanks": "Grazie per l’acquisto! Accedi all’app desktop con questo account.",
-  "desktopApp.consentStripe": "Il pagamento è gestito da Stripe. A tal fine il tuo indirizzo e-mail e i dati di pagamento vengono trasmessi a Stripe. Sei d’accordo?"
+  "desktopApp.thanks": "Grazie per l’acquisto! La tua chiave di licenza è qui, sotto App desktop.",
+  "desktopApp.consentStripe": "Il pagamento è gestito da Stripe. A tal fine il tuo indirizzo e-mail e i dati di pagamento vengono trasmessi a Stripe. Sei d’accordo?",
+  "desktopApp.yourKey": "La tua chiave di licenza",
+  "desktopApp.keyHint": "Inseriscila nell’app desktop oppure accedi lì con questo account. Vale per massimo {0} computer.",
+  "desktopApp.copy": "Copia",
+  "desktopApp.copied": "Copiata"
 }

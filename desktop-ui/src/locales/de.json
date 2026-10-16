@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Abos ansehen",
   "desktopApp.devices": "Genutzt auf {0} von {1} Geräten:",
   "desktopApp.buyFailed": "Kauf konnte nicht gestartet werden: {0}",
-  "desktopApp.thanks": "Danke für deinen Kauf! Melde dich in der Desktop-App mit diesem Konto an.",
-  "desktopApp.consentStripe": "Die Zahlung wird über Stripe abgewickelt. Dafür werden deine E-Mail-Adresse und die Zahlungsdaten an Stripe übermittelt. Einverstanden?"
+  "desktopApp.thanks": "Danke für deinen Kauf! Deinen Lizenzschlüssel findest du hier unter Desktop-App.",
+  "desktopApp.consentStripe": "Die Zahlung wird über Stripe abgewickelt. Dafür werden deine E-Mail-Adresse und die Zahlungsdaten an Stripe übermittelt. Einverstanden?",
+  "desktopApp.yourKey": "Dein Lizenzschlüssel",
+  "desktopApp.keyHint": "Gib ihn in der Desktop-App ein, oder melde dich dort mit diesem Konto an. Er gilt für bis zu {0} Computer.",
+  "desktopApp.copy": "Kopieren",
+  "desktopApp.copied": "Kopiert"
 }

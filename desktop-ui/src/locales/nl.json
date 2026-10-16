@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Abonnementen bekijken",
   "desktopApp.devices": "In gebruik op {0} van {1} apparaten:",
   "desktopApp.buyFailed": "Aankoop kon niet worden gestart: {0}",
-  "desktopApp.thanks": "Bedankt voor je aankoop! Log in de desktop-app in met dit account.",
-  "desktopApp.consentStripe": "De betaling loopt via Stripe. Daarvoor worden je e-mailadres en betaalgegevens aan Stripe doorgegeven. Akkoord?"
+  "desktopApp.thanks": "Bedankt voor je aankoop! Je licentiesleutel staat hier onder Desktop-app.",
+  "desktopApp.consentStripe": "De betaling loopt via Stripe. Daarvoor worden je e-mailadres en betaalgegevens aan Stripe doorgegeven. Akkoord?",
+  "desktopApp.yourKey": "Je licentiesleutel",
+  "desktopApp.keyHint": "Voer hem in de desktop-app in, of log daar in met dit account. Hij werkt op maximaal {0} computers.",
+  "desktopApp.copy": "Kopiëren",
+  "desktopApp.copied": "Gekopieerd"
 }

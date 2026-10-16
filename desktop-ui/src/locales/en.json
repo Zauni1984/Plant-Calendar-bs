@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "See plans",
   "desktopApp.devices": "Used on {0} of {1} devices:",
   "desktopApp.buyFailed": "Purchase could not be started: {0}",
-  "desktopApp.thanks": "Thank you for your purchase! Sign in to the desktop app with this account.",
-  "desktopApp.consentStripe": "Payment is handled by Stripe. Your e-mail address and payment details are passed to Stripe for this. Do you agree?"
+  "desktopApp.thanks": "Thank you for your purchase! Your license key is shown here under Desktop app.",
+  "desktopApp.consentStripe": "Payment is handled by Stripe. Your e-mail address and payment details are passed to Stripe for this. Do you agree?",
+  "desktopApp.yourKey": "Your license key",
+  "desktopApp.keyHint": "Enter it in the desktop app, or sign in there with this account. It works on up to {0} computers.",
+  "desktopApp.copy": "Copy",
+  "desktopApp.copied": "Copied"
 }

@@ -313,13 +313,13 @@ root.innerHTML = `
     <!-- Settings View -->
     <div id="settingsView" class="app-view">
       <div class="view-card">
-        <h3>${t('account.title')}</h3>
+        <h3 data-i18n="account.title">${t('account.title')}</h3>
         <div id="authStatusDisplay" style="margin-bottom:10px;"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button id="openAuthModal" class="btn btn--primary btn--sm">${t('account.signInOrRegister')}</button>
-          ${IS_TAURI ? `<button id="bootstrap" class="btn btn--sm">${t('account.startGuest')}</button>
-          <button id="syncNow" class="btn btn--sm">${t('account.syncNow')}</button>` : `<button id="webLogout" class="btn btn--sm" style="display:none;">${t('account.signOut')}</button>`}
-          <button id="me" class="btn btn--sm">${t('account.fetchProfile')}</button>
+          <button id="openAuthModal" class="btn btn--primary btn--sm" data-i18n="account.signInOrRegister">${t('account.signInOrRegister')}</button>
+          ${IS_TAURI ? `<button id="bootstrap" class="btn btn--sm" data-i18n="account.startGuest">${t('account.startGuest')}</button>
+          <button id="syncNow" class="btn btn--sm" data-i18n="account.syncNow">${t('account.syncNow')}</button>` : `<button id="webLogout" class="btn btn--sm" style="display:none;" data-i18n="account.signOut">${t('account.signOut')}</button>`}
+          <button id="me" class="btn btn--sm" data-i18n="account.fetchProfile">${t('account.fetchProfile')}</button>
         </div>
       </div>
       ${IS_TAURI ? '' : '<div id="guestCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
@@ -334,7 +334,7 @@ root.innerHTML = `
       ${IS_TAURI ? '' : '<div id="installAppCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
       ${IS_TAURI ? '' : '<div id="pushCard" class="view-card" style="margin-top:14px;display:none;"></div>'}
       <div id="liveStatusCard" class="view-card" style="margin-top:14px;">
-        <h3>${t('account.liveStatus')}</h3>
+        <h3 data-i18n="account.liveStatus">${t('account.liveStatus')}</h3>
         <div id="status"></div>
       </div>
       <div id="onboardingInfoPanel" class="view-card" style="margin-top:14px;"></div>
@@ -1794,6 +1794,8 @@ function renderSettingsPanel() {
     try { renderInstallCard(); } catch (_) {}
     try { renderPushCard(); } catch (_) {}
     try { renderGuestCard(); } catch (_) {}
+    // Static labels rendered once at startup carry their key in data-i18n.
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
     try { renderLicenseCard(); renderDesktopAppCard(); if (licenseGateOpen) showLicenseGate(licenseGateReason); } catch (_) {}
     if (!IS_TAURI) invoke('web_push_sync', { lang: currentLang }).catch(() => {});
     try { refreshAppBanners(); } catch (_) {}
@@ -9125,12 +9127,28 @@ async function renderDesktopAppCard() {
   if (info.download_url) buttons.push(`<a class="btn btn--primary btn--sm" href="${escapeHtml(info.download_url)}" rel="noopener">${escapeHtml(t('desktopApp.download'))}</a>`);
   if (!info.access && info.purchase_available) buttons.push(`<button type="button" id="desktopBuyBtn" class="btn btn--primary btn--sm">${escapeHtml(t('desktopApp.buy'))}</button>`);
   if (!info.access) buttons.push(`<button type="button" id="desktopPlansBtn" class="btn btn--sm btn--ghost">${escapeHtml(t('desktopApp.seePlans'))}</button>`);
-  card.innerHTML = `<h3>${escapeHtml(t('desktopApp.title'))}</h3>${status}
+  const keyBlock = info.license_key ? `
+    <div class="form-label" style="margin-top:4px;">${escapeHtml(t('desktopApp.yourKey'))}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 6px;">
+      <code id="desktopLicenseKey" style="font-size:14px;letter-spacing:0.05em;padding:6px 10px;border-radius:8px;background:rgba(${TC.accentRgb},0.08);user-select:all;">${escapeHtml(info.license_key)}</code>
+      <button type="button" id="desktopKeyCopy" class="btn btn--sm btn--ghost">${escapeHtml(t('desktopApp.copy'))}</button>
+    </div>
+    ${muted(t('desktopApp.keyHint', info.max_devices ?? 3))}` : '';
+  card.innerHTML = `<h3>${escapeHtml(t('desktopApp.title'))}</h3>${status}${keyBlock}
     ${devices ? `${muted(t('desktopApp.devices', devices ? info.devices.length : 0, info.max_devices ?? '–'))}<ul style="margin:0 0 10px;padding-left:18px;font-size:12px;">${devices}</ul>` : ''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${buttons.join('')}</div>
     <div id="desktopAppMsg" class="form-hint" role="status"></div>`;
   card.style.display = '';
   card.querySelector('#desktopPlansBtn')?.addEventListener('click', () => switchPageView('billing'));
+  card.querySelector('#desktopKeyCopy')?.addEventListener('click', async (e) => {
+    try {
+      await navigator.clipboard.writeText(info.license_key);
+      e.currentTarget.textContent = t('desktopApp.copied');
+    } catch (_) {
+      // Clipboard blocked: select the key so it can be copied by hand.
+      window.getSelection()?.selectAllChildren(card.querySelector('#desktopLicenseKey'));
+    }
+  });
   card.querySelector('#desktopBuyBtn')?.addEventListener('click', async (e) => {
     const msg = card.querySelector('#desktopAppMsg');
     e.currentTarget.disabled = true;

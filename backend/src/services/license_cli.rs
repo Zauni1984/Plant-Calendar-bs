@@ -12,7 +12,7 @@
 use shared::license;
 use uuid::Uuid;
 
-use crate::{api::licenses::{create_license, LicenseRow, DEFAULT_MAX_DEVICES, LICENSE_COLUMNS}, db::AppState};
+use crate::{api::licenses::{create_license, KeyMode, LicenseRow, DEFAULT_MAX_DEVICES, LICENSE_COLUMNS}, db::AppState};
 
 const USAGE: &str = "usage:
   license create [--email ADDRESS] [--note TEXT] [--devices N] [--no-key]
@@ -53,7 +53,7 @@ async fn create(state: &AppState, args: &[String]) -> anyhow::Result<()> {
             anyhow::bail!("--email is not an e-mail address");
         }
     }
-    let (id, key) = create_license(state, "complimentary", email.as_deref(), None, note.as_deref(), devices, with_key, None).await?;
+    let (id, key) = create_license(state, "complimentary", email.as_deref(), None, note.as_deref(), devices, if with_key { KeyMode::Random } else { KeyMode::None }, None).await?;
     println!("license {id} created ({devices} devices)");
     if let Some(e) = &email {
         println!("unlocks the desktop app for the account {e} after sign-in");

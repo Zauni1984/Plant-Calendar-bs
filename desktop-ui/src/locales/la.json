@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Consilia vide",
   "desktopApp.devices": "In {0} ex {1} instrumentis adhibita:",
   "desktopApp.buyFailed": "Emptio incipi non potuit: {0}",
-  "desktopApp.thanks": "Gratias pro emptione! In applicatione mensali hac ratione inscribe.",
-  "desktopApp.consentStripe": "Solutio per Stripe fit. Ad hoc inscriptio electronica et data solutionis Stripe traduntur. Consentisne?"
+  "desktopApp.thanks": "Gratias pro emptione! Clavem licentiae tuam hic sub Applicatio mensalis invenis.",
+  "desktopApp.consentStripe": "Solutio per Stripe fit. Ad hoc inscriptio electronica et data solutionis Stripe traduntur. Consentisne?",
+  "desktopApp.yourKey": "Clavis licentiae tua",
+  "desktopApp.keyHint": "Eam in applicatione mensali insere, aut ibi hac ratione inscribe. In {0} computatris adhiberi potest.",
+  "desktopApp.copy": "Exscribe",
+  "desktopApp.copied": "Exscripta"
 }

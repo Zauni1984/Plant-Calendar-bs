@@ -1387,6 +1387,10 @@
   "desktopApp.seePlans": "Planları gör",
   "desktopApp.devices": "{1} cihazdan {0} tanesinde kullanılıyor:",
   "desktopApp.buyFailed": "Satın alma başlatılamadı: {0}",
-  "desktopApp.thanks": "Satın aldığın için teşekkürler! Masaüstü uygulamasında bu hesapla giriş yap.",
-  "desktopApp.consentStripe": "Ödeme Stripe üzerinden yapılır. Bunun için e-posta adresin ve ödeme bilgilerin Stripe'a iletilir. Kabul ediyor musun?"
+  "desktopApp.thanks": "Satın aldığın için teşekkürler! Lisans anahtarını burada, Masaüstü uygulaması bölümünde bulabilirsin.",
+  "desktopApp.consentStripe": "Ödeme Stripe üzerinden yapılır. Bunun için e-posta adresin ve ödeme bilgilerin Stripe'a iletilir. Kabul ediyor musun?",
+  "desktopApp.yourKey": "Lisans anahtarın",
+  "desktopApp.keyHint": "Masaüstü uygulamasına gir veya orada bu hesapla giriş yap. En fazla {0} bilgisayarda çalışır.",
+  "desktopApp.copy": "Kopyala",
+  "desktopApp.copied": "Kopyalandı"
 }
