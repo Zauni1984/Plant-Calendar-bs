@@ -6729,7 +6729,16 @@ async function loadLogs() {
   renderLogs();
 }
 
+// Browser build only: whether this account may upload photos and, after a
+// paid plan ended, when its photos will be deleted. The desktop keeps photos
+// locally and has no such rule.
+let webPhotoStatus = null;
+
 async function loadPlantPhotos() {
+  if (!IS_TAURI) {
+    try { webPhotoStatus = await invoke("web_photo_status"); }
+    catch (_) { webPhotoStatus = null; }
+  }
   if (!selectedPlantId) { plantPhotos = []; return; }
   try { plantPhotos = await invoke("list_plant_photos", { plantId: selectedPlantId }); }
   catch (_) { plantPhotos = []; }
@@ -7995,11 +8004,25 @@ function renderPhotoGallery() {
   const startDate = plant ? new Date(plant.start_date) : null;
   const daysSinceStart = startDate ? Math.floor((Date.now() - startDate.getTime()) / 86400000) : null;
 
+  // Web: uploading is a paid feature, and after a paid plan ends the photos
+  // are deleted on a fixed date \u2014 say so, and offer everything as a download.
+  const uploadLocked = !IS_TAURI && webPhotoStatus && !webPhotoStatus.can_upload;
+  const deletionAt = !IS_TAURI && webPhotoStatus?.deletion_scheduled_at
+    ? new Date(webPhotoStatus.deletion_scheduled_at)
+    : null;
+
   container.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       <div class="section-title" style="margin:0;">${t('timeline.title')} (${t('timeline.photos', photos.length)}${daysSinceStart != null ? ' \u00b7 ' + t('photo.dayLabel', daysSinceStart) : ''})</div>
-      <button class="btn btn--sm btn--primary" id="addPhotoBtn">${t('photo.add')}</button>
+      ${uploadLocked
+        ? `<span style="font-size:12px;color:${TC.textMuted};">${t('photo.requiresSubscription')}</span>`
+        : `<button class="btn btn--sm btn--primary" id="addPhotoBtn">${t('photo.add')}</button>`}
     </div>
+    ${deletionAt ? `
+      <div role="alert" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;border-radius:12px;background:${TC.warningBg};border:1px solid ${TC.warning};color:${TC.text};font-size:13px;">
+        <span>${t('photo.deletionBanner', deletionAt.toLocaleDateString(localeTag(), { day: 'numeric', month: 'long', year: 'numeric' }))}</span>
+        <button class="btn btn--sm" id="downloadAllPhotos">${t('photo.downloadAll')}</button>
+      </div>` : ''}
     ${photos.length >= 2 ? `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px;border-radius:12px;background:rgba(${TC.accentRgb},0.06);border:1px solid rgba(${TC.accentRgb},0.1);">
         <span style="font-size:14px;">📈</span>
@@ -8052,6 +8075,18 @@ function renderPhotoGallery() {
       img.src = convertFileSrc(fullPath);
     } catch (_) {
       img.alt = t('photo.notFoundAlt');
+    }
+  });
+
+  document.getElementById('downloadAllPhotos')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      await invoke("web_photo_archive");
+    } catch (err) {
+      alert(t('photo.downloadFailed', err?.message || err));
+    } finally {
+      btn.disabled = false;
     }
   });
 

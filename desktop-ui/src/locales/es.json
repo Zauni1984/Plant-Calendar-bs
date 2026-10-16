@@ -1290,5 +1290,9 @@
   "task.repeatHoursPlaceholder": "p. ej. 48",
   "account.signOut": "Cerrar sesión",
   "devices.desktopOnlyHint": "Los sensores Bluetooth y los dispositivos Tuya solo se pueden conectar en la aplicación de escritorio: los navegadores no pueden acceder a dispositivos de la red local, y el iPhone y el iPad no tienen Web Bluetooth. Las mediciones guardadas por la aplicación de escritorio se muestran aquí de todos modos.",
-  "auth.webModalHint": "Inicia sesión o crea una cuenta. Tus plantas, tareas y registros se guardan en tu cuenta y están disponibles en todos tus dispositivos."
+  "auth.webModalHint": "Inicia sesión o crea una cuenta. Tus plantas, tareas y registros se guardan en tu cuenta y están disponibles en todos tus dispositivos.",
+  "photo.requiresSubscription": "Subir fotos forma parte de la suscripción.",
+  "photo.deletionBanner": "Tu suscripción ha terminado. Tus fotos se eliminarán el {0}, salvo que vuelvas a suscribirte antes.",
+  "photo.downloadAll": "Descargar todas las fotos",
+  "photo.downloadFailed": "Error en la descarga: {0}"
 }

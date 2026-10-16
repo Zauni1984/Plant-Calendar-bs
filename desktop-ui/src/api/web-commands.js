@@ -9,17 +9,18 @@
 // Coverage
 //   server-backed .......... account, plants, tasks, logs, locations (with
 //                            coordinates), seasons, consents, subscription,
-//                            export, climate settings, weather history
+//                            export, climate settings, weather history,
+//                            photos (paid plans; converted to WebP server-side)
 //   browser-side ........... forecasts (Open-Meteo is called directly; the
 //                            current reading is then posted to the history),
 //                            reminders, file import/export (download/upload)
 //   desktop-only ........... Bluetooth, Tuya, device management — browsers
 //                            cannot reach LAN devices, and iOS has no Web
 //                            Bluetooth at all
-//   not yet on the server .. photos, local profiles
+//   not on the web ......... local profiles (a desktop multi-user feature)
 
-import { api, authenticate, logout, refreshSession, getSession, hasSession, API_BASE_URL } from "./http.js";
-import { takeUpload, triggerDownload } from "./web-files.js";
+import { api, apiBlob, apiUpload, authenticate, logout, refreshSession, getSession, hasSession, API_BASE_URL } from "./http.js";
+import { takeUpload, takeUploadFile, triggerDownload } from "./web-files.js";
 
 export const DESKTOP_ONLY = "desktop-only";
 
@@ -187,6 +188,58 @@ async function openMeteo(lat, lon, query) {
   const r = await fetch(url);
   if (!r.ok) throw `Wetterdienst nicht erreichbar (${r.status})`;
   return r.json();
+}
+
+// --- photos -------------------------------------------------------------------
+
+/** Longest edge sent from the browser; the server caps stored photos at 2048. */
+const UPLOAD_MAX_EDGE = 2048;
+
+/**
+ * Shrink camera JPEGs before upload to spare mobile data. Purely a bandwidth
+ * saving: the server decodes and re-encodes every upload to WebP regardless.
+ * Only JPEGs are touched — re-encoding a PNG as JPEG would flatten
+ * transparency. Any failure falls back to the original file.
+ */
+async function shrinkForUpload(file) {
+  try {
+    if (file.type !== "image/jpeg" || typeof createImageBitmap !== "function") return file;
+    // "from-image" applies the EXIF rotation, so the pixels come out upright
+    // and the server receives no orientation tag to apply twice.
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, UPLOAD_MAX_EDGE / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close?.();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
+const photoUrls = new Map();
+
+async function photoObjectUrl(photoPath) {
+  if (!photoUrls.has(photoPath)) {
+    // Cache the promise, not the result, so a gallery rendering the same photo
+    // twice does not download it twice.
+    photoUrls.set(photoPath, apiBlob(photoPath).then((blob) => URL.createObjectURL(blob)));
+  }
+  try {
+    return await photoUrls.get(photoPath);
+  } catch (err) {
+    photoUrls.delete(photoPath);
+    throw err;
+  }
+}
+
+function forgetPhotoUrl(photoPath) {
+  const pending = photoUrls.get(photoPath);
+  photoUrls.delete(photoPath);
+  pending?.then((url) => URL.revokeObjectURL(url)).catch(() => {});
 }
 
 // --- reminders: computed from the user's tasks while the tab is open ----------
@@ -544,12 +597,35 @@ export const webCommands = {
   resolve_doc_path: async ({ filename }) => `/docs/${enc(filename)}`,
   open_external_path: async ({ path }) => { window.open(path, "_blank", "noopener"); return null; },
 
-  // --- photos (need object storage on the server) ---------------------------
-  list_plant_photos: async () => [],
-  list_log_photos: async () => [],
-  add_photo: notYet("Das Hochladen von Fotos"),
-  delete_photo: notYet("Das Löschen von Fotos"),
-  get_photo_path: async ({ photoPath }) => photoPath,
+  // --- photos (paid plans; the server converts every upload to WebP) --------
+  list_plant_photos: listOrEmpty(({ plantId }) => api(`/plants/${enc(plantId)}/photos`)),
+  list_log_photos: listOrEmpty(({ logId }) => api(`/logs/${enc(logId)}/photos`)),
+  add_photo: async ({ plantId, logId, seasonId, sourcePath, caption }) => {
+    requireSession();
+    const file = await shrinkForUpload(takeUploadFile(sourcePath));
+    const q = new URLSearchParams();
+    if (logId) q.set("log_id", logId);
+    if (seasonId) q.set("season_id", seasonId);
+    if (caption) q.set("caption", caption);
+    const query = q.toString();
+    return apiUpload(`/plants/${enc(plantId)}/photos${query ? `?${query}` : ""}`, file, file.type || "application/octet-stream");
+  },
+  delete_photo: async ({ photoId }) => {
+    requireSession();
+    await api(`/photos/${enc(photoId)}`, { method: "DELETE" });
+    forgetPhotoUrl(`/photos/${photoId}`);
+    return "photo deleted";
+  },
+  // The gallery sets <img src> from this. Photos need the Authorization header,
+  // which an <img> tag cannot send, so the bytes are fetched here and handed
+  // over as an object URL.
+  get_photo_path: async ({ photoPath }) => photoObjectUrl(photoPath),
+  web_photo_status: async () => (hasSession() ? api("/photos/status") : null),
+  web_photo_archive: async () => {
+    requireSession();
+    triggerDownload("pflanzenkalender-fotos.zip", await apiBlob("/photos/archive"));
+    return null;
+  },
 
   // --- local profiles (a desktop multi-user feature) -------------------------
   list_profiles: async () => [],

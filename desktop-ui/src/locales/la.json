@@ -1290,5 +1290,9 @@
   "task.repeatHoursPlaceholder": "exempli gratia 48",
   "account.signOut": "Exire",
   "devices.desktopOnlyHint": "Sensoria Bluetooth et instrumenta Tuya in applicatione mensali tantum coniungi possunt: navigatris instrumenta retis localis attingere non licet, et iPhone atque iPad Web Bluetooth carent. Mensurae ab applicatione mensali servatae tamen hic apparent.",
-  "auth.webModalHint": "Inscribe te aut rationem crea. Plantae, munera et diaria tua in ratione tua servantur et in omnibus instrumentis tuis praesto sunt."
+  "auth.webModalHint": "Inscribe te aut rationem crea. Plantae, munera et diaria tua in ratione tua servantur et in omnibus instrumentis tuis praesto sunt.",
+  "photo.requiresSubscription": "Imagines immittere pars subscriptionis est.",
+  "photo.deletionBanner": "Subscriptio tua finita est. Imagines tuae die {0} delebuntur, nisi antea iterum subscripseris.",
+  "photo.downloadAll": "Omnes imagines depromere",
+  "photo.downloadFailed": "Depromptio defecit: {0}"
 }

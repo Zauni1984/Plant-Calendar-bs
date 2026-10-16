@@ -1290,5 +1290,9 @@
   "task.repeatHoursPlaceholder": "örn. 48",
   "account.signOut": "Çıkış yap",
   "devices.desktopOnlyHint": "Bluetooth sensörleri ve Tuya cihazları yalnızca masaüstü uygulamasında bağlanabilir: tarayıcıların yerel ağdaki cihazlara erişmesine izin verilmez ve iPhone ile iPad Web Bluetooth desteklemez. Masaüstü uygulamasının kaydettiği ölçümler yine de burada görünür.",
-  "auth.webModalHint": "Giriş yap veya bir hesap oluştur. Bitkilerin, görevlerin ve kayıtların hesabında saklanır ve tüm cihazlarında kullanılabilir."
+  "auth.webModalHint": "Giriş yap veya bir hesap oluştur. Bitkilerin, görevlerin ve kayıtların hesabında saklanır ve tüm cihazlarında kullanılabilir.",
+  "photo.requiresSubscription": "Fotoğraf yükleme aboneliğe dahildir.",
+  "photo.deletionBanner": "Aboneliğin sona erdi. Daha önce yeniden abone olmazsan fotoğrafların {0} tarihinde silinecek.",
+  "photo.downloadAll": "Tüm fotoğrafları indir",
+  "photo.downloadFailed": "İndirme başarısız: {0}"
 }

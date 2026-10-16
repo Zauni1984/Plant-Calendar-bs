@@ -24,7 +24,8 @@ export function triggerDownload(path, content, mime = "text/plain;charset=utf-8"
   const name = String(path).startsWith(DOWNLOAD_PREFIX)
     ? String(path).slice(DOWNLOAD_PREFIX.length)
     : baseName(path);
-  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
@@ -65,6 +66,14 @@ export function webOpenDialog(options = {}) {
     document.body.appendChild(input);
     input.click();
   });
+}
+
+/** The chosen File itself (for binary uploads such as photos). */
+export function takeUploadFile(token) {
+  const file = uploads.get(token);
+  if (!file) throw "Die ausgewählte Datei ist nicht mehr verfügbar. Bitte erneut auswählen.";
+  uploads.delete(token);
+  return file;
 }
 
 export async function takeUpload(token) {

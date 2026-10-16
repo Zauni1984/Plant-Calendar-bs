@@ -1290,5 +1290,9 @@
   "task.repeatHoursPlaceholder": "np. 48",
   "account.signOut": "Wyloguj się",
   "devices.desktopOnlyHint": "Czujniki Bluetooth i urządzenia Tuya można połączyć tylko w aplikacji desktopowej: przeglądarki nie mogą łączyć się z urządzeniami w sieci lokalnej, a iPhone i iPad nie obsługują Web Bluetooth. Pomiary zapisane przez aplikację desktopową i tak są tu widoczne.",
-  "auth.webModalHint": "Zaloguj się lub załóż konto. Twoje rośliny, zadania i wpisy są zapisywane na Twoim koncie i dostępne na wszystkich Twoich urządzeniach."
+  "auth.webModalHint": "Zaloguj się lub załóż konto. Twoje rośliny, zadania i wpisy są zapisywane na Twoim koncie i dostępne na wszystkich Twoich urządzeniach.",
+  "photo.requiresSubscription": "Przesyłanie zdjęć jest częścią subskrypcji.",
+  "photo.deletionBanner": "Twoja subskrypcja wygasła. Twoje zdjęcia zostaną usunięte {0}, chyba że wcześniej ponownie wykupisz subskrypcję.",
+  "photo.downloadAll": "Pobierz wszystkie zdjęcia",
+  "photo.downloadFailed": "Pobieranie nie powiodło się: {0}"
 }

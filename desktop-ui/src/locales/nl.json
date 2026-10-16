@@ -1290,5 +1290,9 @@
   "task.repeatHoursPlaceholder": "bijv. 48",
   "account.signOut": "Afmelden",
   "devices.desktopOnlyHint": "Bluetooth-sensoren en Tuya-apparaten kun je alleen in de desktop-app koppelen: browsers mogen geen apparaten in het lokale netwerk benaderen, en iPhone en iPad hebben geen Web Bluetooth. Metingen die de desktop-app opslaat, zie je hier wel.",
-  "auth.webModalHint": "Meld je aan of maak een account aan. Je planten, taken en logs worden in je account opgeslagen en zijn op al je apparaten beschikbaar."
+  "auth.webModalHint": "Meld je aan of maak een account aan. Je planten, taken en logs worden in je account opgeslagen en zijn op al je apparaten beschikbaar.",
+  "photo.requiresSubscription": "Foto’s uploaden hoort bij het abonnement.",
+  "photo.deletionBanner": "Je abonnement is beëindigd. Je foto’s worden op {0} verwijderd, tenzij je daarvoor opnieuw een abonnement afsluit.",
+  "photo.downloadAll": "Alle foto’s downloaden",
+  "photo.downloadFailed": "Downloaden mislukt: {0}"
 }

@@ -22,16 +22,43 @@ export class ApiError extends Error {
   }
 }
 
-function rawFetch(path, { method = "GET", body, auth = true } = {}) {
+function rawFetch(path, { method = "GET", body, binary, contentType, auth = true } = {}) {
   const headers = { "X-Client": "web" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  let payload;
+  if (binary !== undefined) {
+    payload = binary;
+    headers["Content-Type"] = contentType || "application/octet-stream";
+  } else if (body !== undefined) {
+    payload = JSON.stringify(body);
+    headers["Content-Type"] = "application/json";
+  }
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  return fetch(API_BASE + path, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: "include",
-  });
+  return fetch(API_BASE + path, { method, headers, body: payload, credentials: "include" });
+}
+
+/** Fetch with one transparent refresh-and-retry on 401; throws ApiError on failure. */
+async function authedFetch(path, opts = {}) {
+  const hadSession = !!accessToken;
+  let r = await rawFetch(path, opts);
+  // Only an expired token is worth refreshing. Signed out, the cookie is gone
+  // too, and a refresh attempt would just be a second guaranteed 401.
+  if (r.status === 401 && opts.auth !== false && hadSession && (await refreshSession())) {
+    r = await rawFetch(path, opts);
+  }
+  if (!r.ok) throw await readError(r);
+  return r;
+}
+
+/** Upload a Blob/File as the request body; resolves with the parsed JSON reply. */
+export async function apiUpload(path, blob, contentType) {
+  const r = await authedFetch(path, { method: "POST", binary: blob, contentType });
+  return r.json();
+}
+
+/** GET binary content (photos, archives) as a Blob. */
+export async function apiBlob(path) {
+  const r = await authedFetch(path);
+  return r.blob();
 }
 
 function adoptAuthResponse(data) {
@@ -74,14 +101,7 @@ async function readError(r) {
 
 /** Authenticated JSON request with one transparent refresh-and-retry on 401. */
 export async function api(path, opts = {}) {
-  const hadSession = !!accessToken;
-  let r = await rawFetch(path, opts);
-  // Only an expired token is worth refreshing. Signed out, the cookie is gone
-  // too, and a refresh attempt would just be a second guaranteed 401.
-  if (r.status === 401 && opts.auth !== false && hadSession) {
-    if (await refreshSession()) r = await rawFetch(path, opts);
-  }
-  if (!r.ok) throw await readError(r);
+  const r = await authedFetch(path, opts);
   if (r.status === 204) return null;
   const type = r.headers.get("content-type") || "";
   return type.includes("application/json") ? r.json() : r.text();
