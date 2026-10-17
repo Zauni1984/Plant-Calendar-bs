@@ -305,8 +305,10 @@ async function serverPushKey() {
   if (pushPublicKey !== undefined) return pushPublicKey;
   try {
     pushPublicKey = (await api("/push/public-key", { auth: false })).public_key || null;
-  } catch (_) {
-    // 404 when the server has no VAPID keys. Network errors are retried next time.
+  } catch (err) {
+    // 404: push is not configured on this server; remember that instead of
+    // asking again on every check. Network errors are retried next time.
+    if (err?.status === 404) pushPublicKey = null;
     return null;
   }
   return pushPublicKey;

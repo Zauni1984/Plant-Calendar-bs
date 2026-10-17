@@ -1,0 +1,56 @@
+# Caddy obtains and renews Let's Encrypt certificates for both names
+# automatically (ports 80 and 443 must be reachable).
+#
+# Two hostnames on purpose: the login cookie is scoped to the API's /auth path,
+# and app + API on sibling subdomains are "same-site", so the cookie works with
+# SameSite=Strict. Serving the API under /api on the app domain would break it.
+{
+	email {$ACME_EMAIL}
+}
+
+# --- web app ------------------------------------------------------------------
+{$APP_DOMAIN} {
+	root * /srv/app
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Inline styles are used throughout the UI; scripts are self-hosted only.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://{$API_DOMAIN} https://api.open-meteo.com https://geocoding-api.open-meteo.com; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# Content-hashed build output: cache for a year.
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+
+	# The service worker and the page shell must always be revalidated, or
+	# updates would not reach installed apps.
+	@fresh path /sw.js /index.html /manifest.webmanifest /
+	header @fresh Cache-Control "no-cache"
+
+	# Legal texts (Markdown) as readable text.
+	@docs path /docs/*.md
+	header @docs Content-Type "text/plain; charset=utf-8"
+
+	# Single-page app: unknown paths load the app shell.
+	try_files {path} /index.html
+	file_server
+}
+
+# --- API ----------------------------------------------------------------------
+{$API_DOMAIN} {
+	encode zstd gzip
+	header -Server
+	# Photo uploads are capped at 15 MB by the backend; allow a little headroom.
+	request_body {
+		max_size 16MB
+	}
+	# Caddy replaces any client-supplied X-Forwarded-For with the real client
+	# address, so the backend's rate limiter (TRUST_PROXY_HEADERS=1) cannot be
+	# fooled.
+	reverse_proxy backend:8080
+}

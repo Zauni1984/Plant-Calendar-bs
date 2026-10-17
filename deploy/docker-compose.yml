@@ -1,0 +1,115 @@
+# Production stack: web app + HTTPS proxy (Caddy), backend, PostgreSQL, backups.
+#
+#   cd deploy
+#   cp .env.example .env      # fill in, see docs/SERVER_SETUP.md
+#   docker compose up -d --build
+#
+# Only Caddy is reachable from outside (80/443). Database and backend live on
+# an internal network.
+
+name: plants
+
+x-logging: &logging
+  # Logs are overwritten in rotation (privacy policy: at most 30 days).
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+      args:
+        VITE_API_BASE_URL: https://${API_DOMAIN:?set API_DOMAIN in .env}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - caddy_data:/data          # certificates
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [edge, internal]
+    logging: *logging
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://plants:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/plants
+      CORS_ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      CHECKOUT_BASE_URL: https://${APP_DOMAIN}
+      PHOTO_STORAGE_DIR: /data/photos
+      TRUST_PROXY_HEADERS: "1"
+    volumes:
+      - photos:/data/photos
+    depends_on:
+      db:
+        condition: service_healthy
+    # internal: database and Caddy; egress: Stripe and the browsers' push services.
+    networks: [internal, egress]
+    logging: *logging
+
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: plants
+      POSTGRES_DB: plants
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plants -d plants"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    logging: *logging
+
+  backup:
+    build:
+      context: backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: plants
+      PGDATABASE: plants
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?set BACKUP_AGE_RECIPIENT in .env (age public key)}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - photos:/data/photos:ro
+      - ./backups:/backups        # on the host: deploy/backups/
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+    logging: *logging
+
+networks:
+  edge:
+  egress:
+  # No route to the internet: the database is only reachable from inside.
+  internal:
+    internal: true
+
+volumes:
+  pgdata:
+  photos:
+  caddy_data:
+  caddy_config:

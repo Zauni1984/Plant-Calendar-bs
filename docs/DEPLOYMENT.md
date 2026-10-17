@@ -1,5 +1,8 @@
 # Deployment Security Checklist
 
+Step-by-step server setup (Docker, HTTPS, backups): [SERVER_SETUP.md](SERVER_SETUP.md).
+All environment variables with explanations: [`deploy/.env.example`](../deploy/.env.example).
+
 This checklist must be completed before every production launch and after
 each major infrastructure change.
 
@@ -24,6 +27,12 @@ each major infrastructure change.
 | `STRIPE_WEBHOOK_SECRET` | Used to verify `Stripe-Signature` headers. |
 | `DATABASE_URL` | `postgres://…` connection string. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list of permitted front-end origins. |
+| `LICENSE_SIGNING_KEY` | Signs desktop license certificates. **Release builds refuse to start without it. Never rotate.** |
+| `TRUST_PROXY_HEADERS` | `1` behind Caddy, so rate limits see client IPs. Only with a proxy that overwrites `X-Forwarded-For`. |
+| `PHOTO_STORAGE_DIR` | Photo store (a backed-up volume). |
+| `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push reminders (optional; push is off without them). |
+| `STRIPE_PRICE_*` | Price IDs for Basic, Pro, CSC and the desktop one-time purchase. |
+| `CHECKOUT_BASE_URL`, `DESKTOP_DOWNLOAD_URL` | Web app URL for Stripe return links; installer link. |
 
 Optional:
 
@@ -40,10 +49,11 @@ Optional:
 
 ## Backups (GDPR-aware retention)
 
-- [ ] Nightly full backup, encrypted at rest.
-- [ ] **Retention**: 30 days rolling (operational) + 1 monthly snapshot
-      for up to 12 months. Longer retention requires a documented
-      legal basis.
+- [ ] Nightly full backup (database **and photo store**), encrypted with
+      `age` (`deploy/backup/backup.sh`); private key kept offline.
+- [ ] **Retention**: 30 days rolling, as stated in the privacy policy.
+      Longer retention requires a documented legal basis and a policy update.
+- [ ] Off-server copy of the encrypted backups (see SERVER_SETUP.md, step 7).
 - [ ] Restoration tested at least quarterly.
 - [ ] On user account deletion: backups older than the operational
       window are **not** selectively purged; the retention schedule

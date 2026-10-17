@@ -1,0 +1,12 @@
+# Keep the Docker build context small and free of secrets.
+.git
+target
+**/target
+desktop-ui/node_modules
+desktop-ui/dist
+desktop-ui/src-tauri
+deploy/.env
+deploy/backups
+**/*.log
+.claude
+docs/INTERNAL
