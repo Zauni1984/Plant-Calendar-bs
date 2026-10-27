@@ -53,3 +53,7 @@ coverage/
 
 # --- SQLx offline cache (optional, if generated later) ---
 .sqlx/
+
+# --- Private local data (never commit) ---
+desktop-ui/src-tauri/photos/
+.claude/settings.local.json
