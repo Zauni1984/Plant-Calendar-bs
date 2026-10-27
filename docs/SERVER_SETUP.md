@@ -5,8 +5,8 @@ Alles läuft in Docker: Caddy (HTTPS + Web-App), Backend, PostgreSQL und ein
 Backup-Dienst. Die Dateien liegen in [`deploy/`](../deploy).
 
 ```
-Internet ──443──▶ Caddy ──┬── app.deine-domain.de  → Web-App (statische Dateien)
-                          └── api.deine-domain.de  → Backend :8080 ──▶ PostgreSQL
+Internet ──443──▶ Caddy ──┬── app.sowling.com  → Web-App (statische Dateien)
+                          └── api.sowling.com  → Backend :8080 ──▶ PostgreSQL
                                                       Backup (nachts, verschlüsselt)
 ```
 
@@ -102,8 +102,8 @@ docker compose logs -f backend
 Beim ersten Start legt das Backend die Datenbanktabellen an, und Caddy holt die
 HTTPS-Zertifikate. Danach:
 
-- `https://app.deine-domain.de` → Web-App
-- `https://api.deine-domain.de/health` → `{"message":"ok"}`
+- `https://app.sowling.com` → Web-App
+- `https://api.sowling.com/health` → `{"message":"ok"}`
 
 ## 7. Backups prüfen
 
@@ -136,7 +136,7 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
 1. Im Stripe-Dashboard (Live-Modus) Produkte anlegen: Basic, Pro, CSC als
    **Abo**, „Desktop-App“ als **einmalige Zahlung**. Die Preis-IDs (`price_…`)
    in `.env` eintragen.
-2. Webhook anlegen: URL `https://api.deine-domain.de/subscription/webhook`,
+2. Webhook anlegen: URL `https://api.sowling.com/subscription/webhook`,
    Ereignisse `checkout.session.completed` und
    `customer.subscription.deleted`. Das Signing-Secret (`whsec_…`) als
    `STRIPE_WEBHOOK_SECRET`.

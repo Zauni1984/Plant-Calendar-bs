@@ -1,4 +1,4 @@
-# Datenschutzerklärung – Plants Calendar
+# Datenschutzerklärung – Sowling
 
 **Stand: 16.10.2026**
 
@@ -8,7 +8,7 @@
      anwaltliche Prüfung vor dem Livegang wird empfohlen. -->
 
 Diese Datenschutzerklärung informiert Sie nach Art. 12–14 DSGVO darüber, welche
-personenbezogenen Daten wir verarbeiten, wenn Sie **Plants Calendar** nutzen –
+personenbezogenen Daten wir verarbeiten, wenn Sie **Sowling** nutzen –
 als **Web-App** im Browser (auch installiert auf Smartphone oder Tablet) oder als
 **Desktop-App** für Windows.
 

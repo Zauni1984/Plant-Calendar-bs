@@ -1939,7 +1939,7 @@ fn check_and_send_notifications(app: tauri::AppHandle, state: State<AppLocalStat
         };
         let _ = app.notification()
             .builder()
-            .title("Plants Calendar")
+            .title("Sowling")
             .body(&body)
             .show();
         store.mark_notification_sent(candidate.task_id, candidate.due_at).map_err(|e| e.to_string())?;
@@ -3190,7 +3190,7 @@ fn main() {
                         app.dialog()
                             .message(&msg)
                             .kind(MessageDialogKind::Error)
-                            .title("Plants Calendar — database error")
+                            .title("Sowling — database error")
                             .blocking_show()
                     });
                     return Err(err.into());

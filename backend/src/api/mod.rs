@@ -1460,7 +1460,7 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
-    let filename = format!("plants-calendar-export-{}.json", user_id);
+    let filename = format!("sowling-export-{}.json", user_id);
     let mut headers = HeaderMap::new();
     headers.insert(
         axum::http::header::CONTENT_TYPE,

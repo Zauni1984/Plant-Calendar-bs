@@ -1,4 +1,4 @@
-# Privacy Policy – Plants Calendar
+# Privacy Policy – Sowling
 
 **Last updated: 16 October 2026**
 
@@ -8,7 +8,7 @@
      is authoritative; a legal review before launch is recommended. -->
 
 This policy explains, in line with Art. 12–14 GDPR, which personal data we
-process when you use **Plants Calendar** – as a **web app** in your browser
+process when you use **Sowling** – as a **web app** in your browser
 (also installed on a phone or tablet) or as a **desktop app** for Windows.
 In case of doubt, the German version applies.
 

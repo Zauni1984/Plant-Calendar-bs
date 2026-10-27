@@ -230,7 +230,7 @@ const root = document.querySelector("#app");
 root.innerHTML = `
 <div class="app-shell">
   <header class="app-toolbar" id="appToolbar">
-    <div class="app-brand">Plants Calendar<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
+    <div class="app-brand">Sowling<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
     <nav class="app-nav" id="appNav"></nav>
     <div class="plant-context-bar" id="plantContextBar"></div>
   </header>
@@ -637,7 +637,7 @@ async function setRetentionDays(days) {
 async function handleExportJson() {
   try {
     const path = await tauriSaveDialog({
-      defaultPath: `plants-calendar-export-${new Date().toISOString().slice(0, 10)}.json`,
+      defaultPath: `sowling-export-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (!path) return;
@@ -1957,7 +1957,7 @@ async function handleCsvExport(type) {
 
     if (type === 'all') {
       csvContent = '### PFLANZEN ###\n' + data.plants + '\n### TASKS ###\n' + data.tasks + '\n### LOGS ###\n' + data.logs;
-      filename = 'plants_calendar_export_' + dateStr + '.csv';
+      filename = 'sowling_export_' + dateStr + '.csv';
     } else if (type === 'plants') {
       csvContent = data.plants;
       filename = 'pflanzen_' + dateStr + '.csv';

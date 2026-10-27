@@ -1,6 +1,6 @@
-# BlockSocial Plants Calendar
+# Sowling
 
-**Der intelligenteste Pflanzenkalender fuer Desktop — von Hobbygartnern bis zu kommerziellen Anbauern.**
+**Der intelligenteste Pflanzenkalender fuer Desktop und Web — von Hobbygartnern bis zu kommerziellen Anbauern.**
 
 Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 

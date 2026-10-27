@@ -1,4 +1,13 @@
-# Developer Guide — BlockSocial Plants Calendar
+# Developer Guide — Sowling
+
+> **Naming:** The app was renamed from "Plants Calendar" to **Sowling**. Internal
+> identifiers keep the old name on purpose, because changing them would break
+> existing installs, data or issued licenses: the Tauri `identifier`
+> (`eu.blocksocial.plantscalendar`, decides the app data folder), the keychain
+> service `blocksocial-plants-calendar` (holds the local DB key),
+> `plants_calendar_local.sqlite`, the `plants_calendar_*` localStorage keys, the
+> guest IndexedDB `plants-calendar-guest`, the license-key HMAC prefix and
+> `DEV_SIGNING_SEED`, plus crate, package and database names.
 
 ## 1. Architecture Overview
 
