@@ -5,7 +5,7 @@
 // account (POST /me/import-guest); otherwise it stays until the user discards
 // it or clears the site data.
 
-const DB_NAME = "plants-calendar-guest";
+const DB_NAME = "sowling-guest";
 const DB_VERSION = 1;
 export const STORES = {
   plants: "plant_id",

@@ -11,7 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // `plants-backend gen-vapid-keys`: one-off helper for setting up push.
+    // `sowling-backend gen-vapid-keys`: one-off helper for setting up push.
     if std::env::args().nth(1).as_deref() == Some("gen-vapid-keys") {
         let (private, public) = services::push::generate_vapid_keys();
         println!("VAPID_PRIVATE_KEY={private}
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // `plants-backend gen-license-keys` / `plants-backend license ...`
+    // `sowling-backend gen-license-keys` / `sowling-backend license ...`
     match std::env::args().nth(1).as_deref() {
         Some("gen-license-keys") => {
             use rand_core::{OsRng, RngCore};
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
             OsRng.fill_bytes(&mut seed);
             let (private, public) = shared::license::keypair_from_seed(seed);
             println!("# backend env (keep secret):\nLICENSE_SIGNING_KEY={private}");
-            println!("# desktop release build env:\nPLANTS_LICENSE_PUBLIC_KEY={public}");
+            println!("# desktop release build env:\nSOWLING_LICENSE_PUBLIC_KEY={public}");
             return Ok(());
         }
         Some("license") => {

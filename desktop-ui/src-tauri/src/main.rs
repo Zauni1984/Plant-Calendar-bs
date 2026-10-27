@@ -3151,13 +3151,13 @@ fn main() {
             std::fs::create_dir_all(&base).ok();
             std::fs::create_dir_all(base.join("photos")).ok();
 
-            let db_path = base.join("plants_calendar_local.sqlite");
+            let db_path = base.join("sowling_local.sqlite");
 
             // One-time migration: if the user has a DB in the legacy current_dir()
             // location and none in the new app_local_data_dir, copy it over.
             if !db_path.exists() {
                 if let Ok(cwd) = std::env::current_dir() {
-                    let legacy = cwd.join("plants_calendar_local.sqlite");
+                    let legacy = cwd.join("sowling_local.sqlite");
                     if legacy.exists() {
                         let _ = std::fs::copy(&legacy, &db_path);
                         // Also migrate photos dir if present

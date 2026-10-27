@@ -8,7 +8,7 @@
 
 ## Quick start
 1. Copy `.env.example` to `.env` and adjust values if needed.
-2. Create the local database named `plants_calendar`.
+2. Create the local database named `sowling`.
 3. Run the automated checks:
    - macOS/Linux: `./scripts/run-local-checks.sh`
    - Windows PowerShell: `./scripts/run-local-checks.ps1`

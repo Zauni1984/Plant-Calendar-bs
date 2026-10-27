@@ -18,19 +18,19 @@ use shared::license::{self, LicenseClaims, LicenseError, VerifyingKey};
 use crate::local_db::StoredSession;
 
 /// Release builds must be given the production public key at compile time:
-///   PLANTS_LICENSE_PUBLIC_KEY=... npm run tauri build
+///   SOWLING_LICENSE_PUBLIC_KEY=... npm run tauri build
 #[cfg(not(debug_assertions))]
-const PUBLIC_KEY: &str = env!("PLANTS_LICENSE_PUBLIC_KEY", "set PLANTS_LICENSE_PUBLIC_KEY (from `plants-backend gen-license-keys`) for release builds");
+const PUBLIC_KEY: &str = env!("SOWLING_LICENSE_PUBLIC_KEY", "set SOWLING_LICENSE_PUBLIC_KEY (from `sowling-backend gen-license-keys`) for release builds");
 
-/// Server used for key activation when not signed in. Set PLANTS_API_URL for
+/// Server used for key activation when not signed in. Set SOWLING_API_URL for
 /// release builds; the development backend otherwise.
-pub const DEFAULT_API_URL: &str = match option_env!("PLANTS_API_URL") {
+pub const DEFAULT_API_URL: &str = match option_env!("SOWLING_API_URL") {
     Some(url) => url,
     None => "http://127.0.0.1:8080",
 };
 
-/// The web app, where the desktop license is bought (PLANTS_WEB_URL).
-pub const WEB_URL: &str = match option_env!("PLANTS_WEB_URL") {
+/// The web app, where the desktop license is bought (SOWLING_WEB_URL).
+pub const WEB_URL: &str = match option_env!("SOWLING_WEB_URL") {
     Some(url) => url,
     None => "http://localhost:4173",
 };
@@ -41,11 +41,11 @@ const RENEW_AFTER_HOURS: i64 = 24;
 fn verifying_key() -> VerifyingKey {
     #[cfg(not(debug_assertions))]
     {
-        license::verifying_key_from_b64(PUBLIC_KEY).expect("PLANTS_LICENSE_PUBLIC_KEY is not a valid key")
+        license::verifying_key_from_b64(PUBLIC_KEY).expect("SOWLING_LICENSE_PUBLIC_KEY is not a valid key")
     }
     #[cfg(debug_assertions)]
     {
-        option_env!("PLANTS_LICENSE_PUBLIC_KEY")
+        option_env!("SOWLING_LICENSE_PUBLIC_KEY")
             .and_then(license::verifying_key_from_b64)
             .unwrap_or_else(|| license::SigningKey::from_bytes(&license::DEV_SIGNING_SEED).verifying_key())
     }
@@ -148,7 +148,7 @@ async fn post_for_certificate(url: String, body: serde_json::Value, bearer: Opti
 /// Checks the stored certificate; renews it when due and possible.
 pub async fn status(api_url: &str) -> LicenseStatus {
     #[cfg(debug_assertions)]
-    if std::env::var("PLANTS_LICENSE_DEV_BYPASS").as_deref() == Ok("1") {
+    if std::env::var("SOWLING_LICENSE_DEV_BYPASS").as_deref() == Ok("1") {
         return LicenseStatus { licensed: true, source: Some("dev".into()), email: None, expires_at: None, reason: None };
     }
 
@@ -247,16 +247,16 @@ mod tests {
     use super::*;
 
     /// End-to-end against a local debug backend (development signing key):
-    ///   plants-backend license create --devices 1     -> PLANTS_TEST_LICENSE_KEY
-    ///   cargo test -p plants_calendar_desktop -- --ignored license
+    ///   sowling-backend license create --devices 1     -> SOWLING_TEST_LICENSE_KEY
+    ///   cargo test -p sowling_desktop -- --ignored license
     #[test]
-    #[ignore = "needs a running debug backend and PLANTS_TEST_LICENSE_KEY"]
+    #[ignore = "needs a running debug backend and SOWLING_TEST_LICENSE_KEY"]
     fn key_activation_against_local_backend() {
         let dir = std::env::temp_dir().join(format!("plants-license-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         crate::APP_DATA_DIR.set(dir.clone()).ok();
-        let key = std::env::var("PLANTS_TEST_LICENSE_KEY").expect("PLANTS_TEST_LICENSE_KEY");
-        let api = std::env::var("PLANTS_TEST_API").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
+        let key = std::env::var("SOWLING_TEST_LICENSE_KEY").expect("SOWLING_TEST_LICENSE_KEY");
+        let api = std::env::var("SOWLING_TEST_API").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
 
         tauri::async_runtime::block_on(async {
             let st = status(&api).await;
@@ -264,7 +264,7 @@ mod tests {
             assert_eq!(st.reason.as_deref(), Some("missing"));
 
             assert_eq!(activate_key(&api, "garbage").await.unwrap_err(), "invalid_key");
-            assert_eq!(activate_key(&api, "PLNT-0000-0000-0000-0000").await.unwrap_err(), "invalid_key");
+            assert_eq!(activate_key(&api, "SOWL-0000-0000-0000-0000").await.unwrap_err(), "invalid_key");
 
             let st = activate_key(&api, &key).await.expect("activation");
             assert!(st.licensed);

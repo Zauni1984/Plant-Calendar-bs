@@ -93,7 +93,7 @@ cargo tauri dev
 
 ### Backend starten (optional, fuer Login/Sync)
 ```bash
-export DATABASE_URL=postgres://user:pass@localhost/plants_calendar
+export DATABASE_URL=postgres://user:pass@localhost/sowling
 cargo run -p backend
 ```
 

@@ -17,16 +17,16 @@ Auf dem Server, mit gesetzter `DATABASE_URL`:
 
 ```bash
 # Schlüssel für dich selbst / einen Betatester (wird nur jetzt angezeigt!)
-plants-backend license create --note "Betatester Max" --devices 2
+sowling-backend license create --note "Betatester Max" --devices 2
 
 # An eine E-Mail-Adresse gebunden: Die Person meldet sich in der App mit
 # dieser Adresse an, ein Schlüssel ist nicht nötig. Mit Schlüssel geht es zusätzlich.
-plants-backend license create --email kunde@example.com --note "Treuer Kunde" --no-key
+sowling-backend license create --email kunde@example.com --note "Treuer Kunde" --no-key
 
 # Übersicht, Widerruf, Geräte zurücksetzen
-plants-backend license list            # --all zeigt auch widerrufene
-plants-backend license revoke PLNT-XXXX-XXXX-XXXX-XXXX   # oder Lizenz-ID oder E-Mail
-plants-backend license reset-devices <lizenz-id>
+sowling-backend license list            # --all zeigt auch widerrufene
+sowling-backend license revoke SOWL-XXXX-XXXX-XXXX-XXXX   # oder Lizenz-ID oder E-Mail
+sowling-backend license reset-devices <lizenz-id>
 ```
 
 Schlüssel werden nur als Hash gespeichert. Wer einen selbst ausgestellten Schlüssel verliert, bekommt einen neuen; den alten widerrufen.
@@ -35,15 +35,15 @@ Schlüssel werden nur als Hash gespeichert. Wer einen selbst ausgestellten Schl�
 
 ## Einmalig einrichten (Produktion)
 
-1. Schlüsselpaar erzeugen: `plants-backend gen-license-keys`
+1. Schlüsselpaar erzeugen: `sowling-backend gen-license-keys`
    - `LICENSE_SIGNING_KEY` → Server-Umgebung (**geheim**, sicher aufbewahren, **nie wechseln**). Ein Wechsel bräuchte eine neue App-Version mit dem neuen öffentlichen Schlüssel, alle Geräte müssten neu freigeschaltet werden, und Käufer-Schlüssel änderten sich. Nur bei einem Leck des Schlüssels.
-   - `PLANTS_LICENSE_PUBLIC_KEY` → beim Bauen der Desktop-App setzen. Release-Builds brechen ohne ihn ab.
-2. Desktop-Build-Variablen: `PLANTS_LICENSE_PUBLIC_KEY`, `PLANTS_API_URL` (z. B. `https://api.sowling.com`), `PLANTS_WEB_URL` (Web-App, für „Kaufen“).
+   - `SOWLING_LICENSE_PUBLIC_KEY` → beim Bauen der Desktop-App setzen. Release-Builds brechen ohne ihn ab.
+2. Desktop-Build-Variablen: `SOWLING_LICENSE_PUBLIC_KEY`, `SOWLING_API_URL` (z. B. `https://api.sowling.com`), `SOWLING_WEB_URL` (Web-App, für „Kaufen“).
 3. Stripe: Produkt „Desktop-App“ als **einmalige Zahlung** anlegen, Preis-ID als `STRIPE_PRICE_DESKTOP`. Webhook `checkout.session.completed` ist bereits eingerichtet (`STRIPE_WEBHOOK_SECRET`).
 4. `DESKTOP_DOWNLOAD_URL` = Link zum Installer. Der Download selbst darf öffentlich sein; ohne Lizenz startet die App nicht.
 
 ## Entwicklung
 
 Debug-Builds von Server und App nutzen einen öffentlich bekannten Entwicklungsschlüssel und funktionieren ohne Einrichtung.
-`PLANTS_LICENSE_DEV_BYPASS=1` überspringt die Lizenzprüfung in Debug-Builds der App.
+`SOWLING_LICENSE_DEV_BYPASS=1` überspringt die Lizenzprüfung in Debug-Builds der App.
 Ohne Stripe schaltet „Einmalig kaufen“ in Debug-Builds direkt frei; Release-Builds verweigern Käufe und Abos ohne Stripe-Konfiguration.

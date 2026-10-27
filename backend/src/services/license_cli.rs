@@ -1,9 +1,9 @@
 //! Operator tool for desktop licenses: tests, beta testers, loyal customers.
 //!
-//!   plants-backend license create [--email ADDRESS] [--note TEXT] [--devices N] [--no-key]
-//!   plants-backend license list [--all]
-//!   plants-backend license revoke <license-id | key | email>
-//!   plants-backend license reset-devices <license-id>
+//!   sowling-backend license create [--email ADDRESS] [--note TEXT] [--devices N] [--no-key]
+//!   sowling-backend license list [--all]
+//!   sowling-backend license revoke <license-id | key | email>
+//!   sowling-backend license reset-devices <license-id>
 //!
 //! `create` prints the key once; only its hash is stored. With --email the
 //! license also unlocks the desktop app for whoever signs in with that

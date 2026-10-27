@@ -23,8 +23,8 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*"; }
 # Explicit `|| return 1` throughout: `set -e` does not apply inside `if run_backup`.
 run_backup() {
 	ts=$(date +%Y-%m-%d_%H%M)
-	db_file="$DIR/plants-db-$ts.dump.age"
-	photo_file="$DIR/plants-photos-$ts.tar.age"
+	db_file="$DIR/sowling-db-$ts.dump.age"
+	photo_file="$DIR/sowling-photos-$ts.tar.age"
 
 	log "backup $ts: database"
 	if ! pg_dump --format=custom --no-owner --no-privileges \
@@ -44,7 +44,7 @@ run_backup() {
 	fi
 	mv "$photo_file.part" "$photo_file" || return 1
 
-	find "$DIR" -name 'plants-*.age' -type f -mtime +"$KEEP_DAYS" -print -delete | sed 's/^/deleted old backup: /'
+	find "$DIR" -name 'sowling-*.age' -type f -mtime +"$KEEP_DAYS" -print -delete | sed 's/^/deleted old backup: /'
 	find "$DIR" -name '*.part' -type f -mmin +120 -delete
 	log "backup $ts done: $(du -h "$db_file" | cut -f1) database, $(du -h "$photo_file" | cut -f1) photos"
 }

@@ -45,8 +45,8 @@ apt install -y age git
 ## 3. Code holen
 
 ```bash
-git clone <REPO-URL> /opt/plants
-cd /opt/plants/deploy
+git clone <REPO-URL> /opt/sowling
+cd /opt/sowling/deploy
 cp .env.example .env
 chmod 600 .env
 ```
@@ -85,7 +85,7 @@ nano .env
    docker compose run --rm --no-deps backend gen-vapid-keys
    ```
    - `LICENSE_SIGNING_KEY` und `VAPID_PRIVATE_KEY` in `.env` eintragen.
-   - `PLANTS_LICENSE_PUBLIC_KEY` aufbewahren: Den brauchst du beim Bauen der
+   - `SOWLING_LICENSE_PUBLIC_KEY` aufbewahren: Den brauchst du beim Bauen der
      Desktop-App (siehe [LIZENZEN.md](LIZENZEN.md)).
    - Beide geheimen Schlüssel zusätzlich im Passwort-Manager sichern.
 4. Stripe-Werte (Live-Schlüssel, Webhook-Secret, Preis-IDs), siehe Abschnitt 8.
@@ -145,8 +145,8 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
 ## 9. Eigene Lizenzen ausstellen
 
 ```bash
-docker compose exec backend plants-backend license create --note "Betatester" --devices 2
-docker compose exec backend plants-backend license list
+docker compose exec backend sowling-backend license create --note "Betatester" --devices 2
+docker compose exec backend sowling-backend license list
 ```
 
 Mehr dazu in [LIZENZEN.md](LIZENZEN.md).
@@ -154,7 +154,7 @@ Mehr dazu in [LIZENZEN.md](LIZENZEN.md).
 ## 10. Updates einspielen
 
 ```bash
-cd /opt/plants && git pull
+cd /opt/sowling && git pull
 cd deploy && docker compose up -d --build
 ```
 

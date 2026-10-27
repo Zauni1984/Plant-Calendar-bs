@@ -7,7 +7,7 @@
 # Only Caddy is reachable from outside (80/443). Database and backend live on
 # an internal network.
 
-name: plants
+name: sowling
 
 x-logging: &logging
   # Logs are overwritten in rotation (privacy policy: at most 30 days).
@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgres://plants:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/plants
+      DATABASE_URL: postgres://sowling:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/sowling
       CORS_ALLOWED_ORIGINS: https://${APP_DOMAIN}
       CHECKOUT_BASE_URL: https://${APP_DOMAIN}
       PHOTO_STORAGE_DIR: /data/photos
@@ -66,13 +66,13 @@ services:
     image: postgres:17-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_USER: plants
-      POSTGRES_DB: plants
+      POSTGRES_USER: sowling
+      POSTGRES_DB: sowling
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U plants -d plants"]
+      test: ["CMD-SHELL", "pg_isready -U sowling -d sowling"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -85,8 +85,8 @@ services:
     restart: unless-stopped
     environment:
       PGHOST: db
-      PGUSER: plants
-      PGDATABASE: plants
+      PGUSER: sowling
+      PGDATABASE: sowling
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?set BACKUP_AGE_RECIPIENT in .env (age public key)}
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}

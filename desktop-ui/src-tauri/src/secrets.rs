@@ -5,7 +5,7 @@
 
 use anyhow::Context;
 
-const SERVICE: &str = "blocksocial-plants-calendar";
+const SERVICE: &str = "sowling";
 
 /// Store a secret in the OS keychain under the given name.
 pub fn set(name: &str, value: &str) -> anyhow::Result<()> {

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Sowling",
   "version": "0.1.0",
-  "identifier": "eu.blocksocial.plantscalendar",
+  "identifier": "com.sowling.desktop",
   "build": {
     "beforeDevCommand": "npm run dev -- --host",
     "beforeBuildCommand": "npm run build",
