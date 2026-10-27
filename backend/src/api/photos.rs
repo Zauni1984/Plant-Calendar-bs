@@ -376,7 +376,7 @@ pub async fn photo_archive(State(state): State<AppState>, session: SessionUser) 
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/zip"));
     h.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_static("attachment; filename=\"pflanzenkalender-fotos.zip\""),
+        HeaderValue::from_static("attachment; filename=\"sowling-fotos.zip\""),
     );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     resp

@@ -57,7 +57,7 @@ Mindestens IC + Technical Lead müssen erreichbar sein.
 
 Bei hohem Risiko:
 
-> **Betreff:** Wichtige Information zum Schutz Ihrer Daten bei Plants Calendar
+> **Betreff:** Wichtige Information zum Schutz Ihrer Daten bei Sowling
 >
 > Sehr geehrte/r Nutzer/in,
 >

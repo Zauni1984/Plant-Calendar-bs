@@ -21,9 +21,9 @@ const THEMES = [
   { id: 'arctic', label: 'Arctic', preview: ['#f0f4f8','#2d6a4f','#1b7a4a'] },
   { id: 'mono', label: 'Mono', preview: ['#000000','#ffffff','#ffffff'] },
 ];
-let currentTheme = localStorage.getItem('plants_calendar_theme') || 'forest';
+let currentTheme = localStorage.getItem('sowling_theme') || 'forest';
 {
-  const saved = localStorage.getItem('plants_calendar_theme');
+  const saved = localStorage.getItem('sowling_theme');
   if (saved) document.documentElement.setAttribute('data-theme', saved);
 }
 
@@ -51,7 +51,7 @@ async function loadLocale(lang) {
   }
 }
 
-let currentLang = localStorage.getItem('plants_calendar_lang') || 'de';
+let currentLang = localStorage.getItem('sowling_lang') || 'de';
 if (!LANGUAGES.includes(currentLang)) currentLang = 'de';
 // Top-level await: the first render already needs the right strings.
 let localeData = (await loadLocale(currentLang)) || fallbackLocale;
@@ -82,7 +82,7 @@ async function setLanguage(lang) {
   const data = await loadLocale(lang);
   if (!data) return; // keep the current language rather than half-switching
   currentLang = lang;
-  localStorage.setItem('plants_calendar_lang', lang);
+  localStorage.setItem('sowling_lang', lang);
   localeData = data;
   // Keep the document language in sync for screen readers and hyphenation.
   document.documentElement.setAttribute('lang', lang);
@@ -196,7 +196,7 @@ function plantExtraFields(plant) {
 function applyTheme(themeId) {
   currentTheme = themeId;
   document.documentElement.setAttribute('data-theme', themeId);
-  localStorage.setItem('plants_calendar_theme', themeId);
+  localStorage.setItem('sowling_theme', themeId);
   TC = getThemeColors();
   // Browser chrome / phone status bar follows the mood (Arctic is light).
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', TC.bg || '#091310');
@@ -230,7 +230,7 @@ const root = document.querySelector("#app");
 root.innerHTML = `
 <div class="app-shell">
   <header class="app-toolbar" id="appToolbar">
-    <div class="app-brand">Plants Calendar<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
+    <div class="app-brand">Sowling<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
     <nav class="app-nav" id="appNav"></nav>
     <div class="plant-context-bar" id="plantContextBar"></div>
   </header>
@@ -621,12 +621,12 @@ const RETENTION_OPTIONS = [
 ];
 
 function getStoredRetentionDays() {
-  const raw = parseInt(localStorage.getItem('plants_calendar_retention_days') || '365', 10);
+  const raw = parseInt(localStorage.getItem('sowling_retention_days') || '365', 10);
   return Number.isFinite(raw) && raw > 0 ? raw : 365;
 }
 
 async function setRetentionDays(days) {
-  localStorage.setItem('plants_calendar_retention_days', String(days));
+  localStorage.setItem('sowling_retention_days', String(days));
   try {
     await invoke("prune_weather_history_cmd", { days });
   } catch (err) {
@@ -637,7 +637,7 @@ async function setRetentionDays(days) {
 async function handleExportJson() {
   try {
     const path = await tauriSaveDialog({
-      defaultPath: `plants-calendar-export-${new Date().toISOString().slice(0, 10)}.json`,
+      defaultPath: `sowling-export-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (!path) return;
@@ -687,7 +687,7 @@ function hexToRgb(hex) {
 
 // ── Notification Sounds ─────────────────────────────────────
 // Short tones generated via Web Audio API — no external files needed.
-let notifSoundEnabled = localStorage.getItem('plants_calendar_sound') !== 'off';
+let notifSoundEnabled = localStorage.getItem('sowling_sound') !== 'off';
 
 // Shared AudioContext — created once, reused for all sounds.
 // Needs to be resumed after first user gesture (browser policy).
@@ -981,7 +981,7 @@ let editingTaskId = null;
 let editingLogId = null;
 let timelineMode = "month";
 let timelineFocusKey = new Date().toISOString().slice(0, 10);
-let calendarMode = localStorage.getItem('plants_calendar_mode') || 'standard';
+let calendarMode = localStorage.getItem('sowling_mode') || 'standard';
 // 'standard', 'moon', 'chinese', 'persian', 'julian', 'islamic', 'jewish', 'bauern'
 let reminderPermissionState = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 // Web only: this browser receives push reminders from the server, so the
@@ -1018,7 +1018,7 @@ let plantPhotos = [];
 let sensorChartInstance = null;
 
 // --- Vacation Mode ---
-let vacationMode = JSON.parse(localStorage.getItem('plants_calendar_vacation') || 'null');
+let vacationMode = JSON.parse(localStorage.getItem('sowling_vacation') || 'null');
 // { active: true, returnDate: "2026-05-01", multiplier: 1.5 }
 
 // --- Local Profiles (multi-user) ---
@@ -1026,7 +1026,7 @@ let profiles = [];
 let activeProfile = null; // LocalProfile or null
 
 function saveVacationMode() {
-  localStorage.setItem('plants_calendar_vacation', JSON.stringify(vacationMode));
+  localStorage.setItem('sowling_vacation', JSON.stringify(vacationMode));
 }
 function disableVacationMode() {
   vacationMode = null;
@@ -1768,7 +1768,7 @@ function renderSettingsPanel() {
   // Sound toggle
   document.getElementById('soundToggle')?.addEventListener('change', (e) => {
     notifSoundEnabled = e.target.checked;
-    localStorage.setItem('plants_calendar_sound', notifSoundEnabled ? 'on' : 'off');
+    localStorage.setItem('sowling_sound', notifSoundEnabled ? 'on' : 'off');
   });
   document.getElementById('testSoundBtn')?.addEventListener('click', () => {
     playNotificationSound('reminder');
@@ -1957,7 +1957,7 @@ async function handleCsvExport(type) {
 
     if (type === 'all') {
       csvContent = '### PFLANZEN ###\n' + data.plants + '\n### TASKS ###\n' + data.tasks + '\n### LOGS ###\n' + data.logs;
-      filename = 'plants_calendar_export_' + dateStr + '.csv';
+      filename = 'sowling_export_' + dateStr + '.csv';
     } else if (type === 'plants') {
       csvContent = data.plants;
       filename = 'pflanzen_' + dateStr + '.csv';
@@ -3269,10 +3269,10 @@ function renderSubscriptionPanel() {
 }
 
 const PLANT_FILTER_STORAGE_KEYS = {
-  search: 'bs_plants_search_query',
-  phase: 'bs_plants_phase_filter',
-  state: 'bs_plants_state_filter',
-  sort: 'bs_plants_sort',
+  search: 'sowling_plants_search_query',
+  phase: 'sowling_plants_phase_filter',
+  state: 'sowling_plants_state_filter',
+  sort: 'sowling_plants_sort',
 };
 
 function loadPlantFilterPrefs() {
@@ -4334,7 +4334,7 @@ function renderCalendarToolbar() {
   `;
   document.getElementById('calendarModeSelect')?.addEventListener('change', (e) => {
     calendarMode = e.target.value;
-    localStorage.setItem('plants_calendar_mode', calendarMode);
+    localStorage.setItem('sowling_mode', calendarMode);
     renderTimelinePanel();
   });
   document.getElementById('timelineModeDay')?.addEventListener('click', () => { timelineMode = 'day'; renderCalendarToolbar(); renderTimelinePanel(); });
@@ -9022,7 +9022,7 @@ function showLicenseGate(reason) {
       <section class="license-gate__option">
         <label class="form-label" for="licenseKeyInput">${escapeHtml(t('license.keyLabel'))}</label>
         <div class="license-gate__row">
-          <input id="licenseKeyInput" class="form-input" autocomplete="off" spellcheck="false" placeholder="PLNT-XXXX-XXXX-XXXX-XXXX" />
+          <input id="licenseKeyInput" class="form-input" autocomplete="off" spellcheck="false" placeholder="SOWL-XXXX-XXXX-XXXX-XXXX" />
           <button type="button" id="licenseKeyBtn" class="btn btn--primary">${escapeHtml(t('license.activate'))}</button>
         </div>
       </section>

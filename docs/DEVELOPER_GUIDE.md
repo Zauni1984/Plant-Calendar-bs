@@ -1,4 +1,7 @@
-# Developer Guide — BlockSocial Plants Calendar
+# Developer Guide — Sowling
+
+> **Naming:** The app was called "Plants Calendar" before it was renamed to
+> **Sowling**. Code, identifiers and the database now use the new name throughout.
 
 ## 1. Architecture Overview
 
@@ -40,7 +43,7 @@ cargo tauri dev                # Build + run with hot-reload
 
 ### Backend
 ```bash
-export DATABASE_URL=postgres://user:pass@localhost/plants_calendar
+export DATABASE_URL=postgres://user:pass@localhost/sowling
 export JWT_SECRET=your-secret-key
 export CORS_ALLOWED_ORIGINS=http://localhost:1420
 # Optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET

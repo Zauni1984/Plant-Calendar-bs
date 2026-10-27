@@ -777,7 +777,7 @@ export const webCommands = {
   web_photo_status: async () => (hasSession() ? api("/photos/status") : null),
   web_photo_archive: async () => {
     requireSession();
-    triggerDownload("pflanzenkalender-fotos.zip", await apiBlob("/photos/archive"));
+    triggerDownload("sowling-fotos.zip", await apiBlob("/photos/archive"));
     return null;
   },
 

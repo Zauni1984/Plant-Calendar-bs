@@ -7,7 +7,7 @@
 //! the notification even when the app is closed.
 //!
 //! Configuration (push is disabled when the key is missing):
-//!   VAPID_PRIVATE_KEY  base64url P-256 private key (`plants-backend gen-vapid-keys`)
+//!   VAPID_PRIVATE_KEY  base64url P-256 private key (`sowling-backend gen-vapid-keys`)
 //!   VAPID_SUBJECT      contact for push services, `mailto:` or `https:` URL
 //!   PUSH_INTERVAL_SECONDS  how often due tasks are checked (default 300)
 //!
@@ -87,7 +87,7 @@ impl PushConfig {
     }
 }
 
-/// `plants-backend gen-vapid-keys`: prints a fresh key pair for the env file.
+/// `sowling-backend gen-vapid-keys`: prints a fresh key pair for the env file.
 pub fn generate_vapid_keys() -> (String, String) {
     let kp = ES256KeyPair::generate();
     let private = Base64UrlUnpadded::encode_string(&kp.to_bytes());

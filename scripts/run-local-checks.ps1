@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $RootDir = Split-Path -Parent $PSScriptRoot
 Set-Location $RootDir
 
-Write-Host '==> BlockSocial Plants Calendar local checks'
+Write-Host '==> Sowling local checks'
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
   throw 'cargo not found. Install Rust via rustup first.'

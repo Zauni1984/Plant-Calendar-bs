@@ -1,4 +1,4 @@
-# API Reference — BlockSocial Plants Calendar Backend
+# API Reference — Sowling Backend
 
 Base URL: `http://localhost:8080`
 

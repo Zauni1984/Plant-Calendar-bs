@@ -2,7 +2,7 @@
 //! app (verifies). Enabled with the `license` feature.
 //!
 //! Two artefacts:
-//! - **License keys** (`PLNT-XXXX-XXXX-XXXX-XXXX`): what a person types in.
+//! - **License keys** (`SOWL-XXXX-XXXX-XXXX-XXXX`): what a person types in.
 //!   80 random bits, Crockford base32 (no I/L/O/U, so nothing to misread).
 //!   The server only stores a SHA-256 hash.
 //! - **License certificates**: what the server hands a device after checking
@@ -22,9 +22,9 @@ pub use ed25519_dalek::{SigningKey, VerifyingKey};
 
 /// Development only. Everyone can read it, so only debug builds of the backend
 /// sign with it and only debug builds of the desktop app accept it.
-pub const DEV_SIGNING_SEED: [u8; 32] = *b"plants-calendar-DEV-ONLY-key-32b";
+pub const DEV_SIGNING_SEED: [u8; 32] = *b"sowling-DEV-ONLY-signing-key-32b";
 
-const KEY_PREFIX: &str = "PLNT";
+const KEY_PREFIX: &str = "SOWL";
 const KEY_GROUPS: usize = 4;
 const GROUP_LEN: usize = 4;
 const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -80,7 +80,7 @@ impl std::fmt::Display for LicenseError {
 
 // --- keys ---------------------------------------------------------------------------
 
-/// A new random key, e.g. `PLNT-7K2M-QX9D-4HRT-B6WN`.
+/// A new random key, e.g. `SOWL-7K2M-QX9D-4HRT-B6WN`.
 pub fn generate_key(random: [u8; 16]) -> String {
     // 16 characters x 5 bits = 80 bits of entropy: far beyond guessing for a
     // key that is only ever checked online, rate-limited, against a hash.
@@ -214,10 +214,10 @@ mod tests {
     #[test]
     fn keys_round_trip_through_normalization() {
         let key = generate_key([0xA5; 16]);
-        assert!(key.starts_with("PLNT-") && key.len() == 24, "{key}");
+        assert!(key.starts_with("SOWL-") && key.len() == 24, "{key}");
         let n = normalize_key(&key).unwrap();
         // Typed sloppily: lower case, spaces, no prefix, O for 0.
-        let sloppy = key.to_lowercase().replace('-', " ").replace("plnt", "").replace('0', "o");
+        let sloppy = key.to_lowercase().replace('-', " ").replace("sowl", "").replace('0', "o");
         assert_eq!(normalize_key(&sloppy).as_deref(), Some(n.as_str()));
         assert_eq!(key_hash(&n).len(), 64);
         assert_eq!(key_hint(&n).len(), 4);
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn garbage_is_not_a_key() {
-        for bad in ["", "PLNT-1234", "hello world", "PLNT-UUUU-UUUU-UUUU-UUUU", "PLNT-1234-5678-9ABC-DEFG-HJKM"] {
+        for bad in ["", "SOWL-1234", "hello world", "SOWL-UUUU-UUUU-UUUU-UUUU", "SOWL-1234-5678-9ABC-DEFG-HJKM"] {
             assert_eq!(normalize_key(bad), None, "{bad}");
         }
     }

@@ -5,8 +5,8 @@ Alles läuft in Docker: Caddy (HTTPS + Web-App), Backend, PostgreSQL und ein
 Backup-Dienst. Die Dateien liegen in [`deploy/`](../deploy).
 
 ```
-Internet ──443──▶ Caddy ──┬── app.deine-domain.de  → Web-App (statische Dateien)
-                          └── api.deine-domain.de  → Backend :8080 ──▶ PostgreSQL
+Internet ──443──▶ Caddy ──┬── app.sowling.com  → Web-App (statische Dateien)
+                          └── api.sowling.com  → Backend :8080 ──▶ PostgreSQL
                                                       Backup (nachts, verschlüsselt)
 ```
 
@@ -45,8 +45,8 @@ apt install -y age git
 ## 3. Code holen
 
 ```bash
-git clone <REPO-URL> /opt/plants
-cd /opt/plants/deploy
+git clone <REPO-URL> /opt/sowling
+cd /opt/sowling/deploy
 cp .env.example .env
 chmod 600 .env
 ```
@@ -85,7 +85,7 @@ nano .env
    docker compose run --rm --no-deps backend gen-vapid-keys
    ```
    - `LICENSE_SIGNING_KEY` und `VAPID_PRIVATE_KEY` in `.env` eintragen.
-   - `PLANTS_LICENSE_PUBLIC_KEY` aufbewahren: Den brauchst du beim Bauen der
+   - `SOWLING_LICENSE_PUBLIC_KEY` aufbewahren: Den brauchst du beim Bauen der
      Desktop-App (siehe [LIZENZEN.md](LIZENZEN.md)).
    - Beide geheimen Schlüssel zusätzlich im Passwort-Manager sichern.
 4. Stripe-Werte (Live-Schlüssel, Webhook-Secret, Preis-IDs), siehe Abschnitt 8.
@@ -102,8 +102,8 @@ docker compose logs -f backend
 Beim ersten Start legt das Backend die Datenbanktabellen an, und Caddy holt die
 HTTPS-Zertifikate. Danach:
 
-- `https://app.deine-domain.de` → Web-App
-- `https://api.deine-domain.de/health` → `{"message":"ok"}`
+- `https://app.sowling.com` → Web-App
+- `https://api.sowling.com/health` → `{"message":"ok"}`
 
 ## 7. Backups prüfen
 
@@ -136,7 +136,7 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
 1. Im Stripe-Dashboard (Live-Modus) Produkte anlegen: Basic, Pro, CSC als
    **Abo**, „Desktop-App“ als **einmalige Zahlung**. Die Preis-IDs (`price_…`)
    in `.env` eintragen.
-2. Webhook anlegen: URL `https://api.deine-domain.de/subscription/webhook`,
+2. Webhook anlegen: URL `https://api.sowling.com/subscription/webhook`,
    Ereignisse `checkout.session.completed` und
    `customer.subscription.deleted`. Das Signing-Secret (`whsec_…`) als
    `STRIPE_WEBHOOK_SECRET`.
@@ -145,8 +145,8 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
 ## 9. Eigene Lizenzen ausstellen
 
 ```bash
-docker compose exec backend plants-backend license create --note "Betatester" --devices 2
-docker compose exec backend plants-backend license list
+docker compose exec backend sowling-backend license create --note "Betatester" --devices 2
+docker compose exec backend sowling-backend license list
 ```
 
 Mehr dazu in [LIZENZEN.md](LIZENZEN.md).
@@ -154,7 +154,7 @@ Mehr dazu in [LIZENZEN.md](LIZENZEN.md).
 ## 10. Updates einspielen
 
 ```bash
-cd /opt/plants && git pull
+cd /opt/sowling && git pull
 cd deploy && docker compose up -d --build
 ```
 

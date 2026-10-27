@@ -1,6 +1,6 @@
-# BlockSocial Plants Calendar
+# Sowling
 
-**Der intelligenteste Pflanzenkalender fuer Desktop — von Hobbygartnern bis zu kommerziellen Anbauern.**
+**Der intelligenteste Pflanzenkalender fuer Desktop und Web — von Hobbygartnern bis zu kommerziellen Anbauern.**
 
 Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 
@@ -93,7 +93,7 @@ cargo tauri dev
 
 ### Backend starten (optional, fuer Login/Sync)
 ```bash
-export DATABASE_URL=postgres://user:pass@localhost/plants_calendar
+export DATABASE_URL=postgres://user:pass@localhost/sowling
 cargo run -p backend
 ```
 

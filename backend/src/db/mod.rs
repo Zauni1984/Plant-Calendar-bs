@@ -18,7 +18,7 @@ pub struct AppState {
 impl AppState {
     pub async fn from_env() -> anyhow::Result<Self> {
         let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/plants_calendar".to_string());
+            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/sowling".to_string());
         let pg = PgPoolOptions::new().max_connections(5).connect_lazy(&database_url)?;
         // Accept fallback only in debug builds. In release, require explicit env var.
         let jwt_secret = std::env::var("JWT_SECRET")
@@ -39,7 +39,7 @@ impl AppState {
     }
 }
 
-/// LICENSE_SIGNING_KEY (base64url Ed25519 seed, `plants-backend gen-license-keys`).
+/// LICENSE_SIGNING_KEY (base64url Ed25519 seed, `sowling-backend gen-license-keys`).
 /// Debug builds fall back to the public development key, like JWT_SECRET.
 fn license_signing_key() -> anyhow::Result<shared::license::SigningKey> {
     match std::env::var("LICENSE_SIGNING_KEY") {

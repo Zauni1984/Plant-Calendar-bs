@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "==> BlockSocial Plants Calendar local checks"
+echo "==> Sowling local checks"
 
 if ! command -v cargo >/dev/null 2>&1; then
   echo "[ERROR] cargo not found. Install Rust via https://rustup.rs first."

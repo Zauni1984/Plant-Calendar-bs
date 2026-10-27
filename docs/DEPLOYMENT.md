@@ -92,16 +92,16 @@ Optional:
 
 ## Local database encryption (SQLCipher)
 
-The desktop app encrypts its local SQLite database (`plants_calendar_local.sqlite`)
+The desktop app encrypts its local SQLite database (`sowling_local.sqlite`)
 at rest using **SQLCipher** (AES-256). This satisfies GDPR Art. 32 (security of
 processing) for personal data stored on the user's device.
 
 - The 32-byte master key is generated on first launch and stored in the OS
-  keychain (`db_master_key` under service `blocksocial-plants-calendar`):
+  keychain (`db_master_key` under service `sowling`):
   Windows Credential Manager, macOS Keychain, libsecret/KWallet on Linux.
 - On upgrade from a pre-SQLCipher build, the plaintext DB is migrated
   automatically on first launch via `sqlcipher_export`. The original plaintext
-  file is renamed to `plants_calendar_local.sqlite.bak` and kept indefinitely
+  file is renamed to `sowling_local.sqlite.bak` and kept indefinitely
   as a safety net. Operators may delete it after confirming successful runs.
 - Tuya `local_key` values and other device secrets are also stored in the OS
   keychain (`tuya_<device_id>`); the SQLite row holds only a `keyring:` pointer.

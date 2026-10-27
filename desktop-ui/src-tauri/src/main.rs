@@ -1939,7 +1939,7 @@ fn check_and_send_notifications(app: tauri::AppHandle, state: State<AppLocalStat
         };
         let _ = app.notification()
             .builder()
-            .title("Plants Calendar")
+            .title("Sowling")
             .body(&body)
             .show();
         store.mark_notification_sent(candidate.task_id, candidate.due_at).map_err(|e| e.to_string())?;
@@ -3151,13 +3151,13 @@ fn main() {
             std::fs::create_dir_all(&base).ok();
             std::fs::create_dir_all(base.join("photos")).ok();
 
-            let db_path = base.join("plants_calendar_local.sqlite");
+            let db_path = base.join("sowling_local.sqlite");
 
             // One-time migration: if the user has a DB in the legacy current_dir()
             // location and none in the new app_local_data_dir, copy it over.
             if !db_path.exists() {
                 if let Ok(cwd) = std::env::current_dir() {
-                    let legacy = cwd.join("plants_calendar_local.sqlite");
+                    let legacy = cwd.join("sowling_local.sqlite");
                     if legacy.exists() {
                         let _ = std::fs::copy(&legacy, &db_path);
                         // Also migrate photos dir if present
@@ -3190,7 +3190,7 @@ fn main() {
                         app.dialog()
                             .message(&msg)
                             .kind(MessageDialogKind::Error)
-                            .title("Plants Calendar — database error")
+                            .title("Sowling — database error")
                             .blocking_show()
                     });
                     return Err(err.into());

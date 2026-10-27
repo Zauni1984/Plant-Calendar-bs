@@ -512,7 +512,7 @@ pub enum KeyMode {
 pub fn purchase_key(signing_key: &license::SigningKey, license_id: Uuid) -> String {
     use hmac::{Hmac, Mac};
     let mut mac = <Hmac<sha2::Sha256> as Mac>::new_from_slice(&signing_key.to_bytes()).expect("any key length");
-    mac.update(b"plants-calendar purchase license key v1:");
+    mac.update(b"sowling purchase license key v1:");
     mac.update(license_id.as_bytes());
     let digest = mac.finalize().into_bytes();
     let mut bytes = [0u8; 16];

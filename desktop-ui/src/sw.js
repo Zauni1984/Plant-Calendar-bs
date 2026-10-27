@@ -56,7 +56,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "Plants Calendar", {
+    self.registration.showNotification(data.title || "Sowling", {
       body: data.body || "",
       tag: data.tag,
       icon: "/icons/icon-192.png",

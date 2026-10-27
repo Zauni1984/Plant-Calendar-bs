@@ -1,4 +1,4 @@
-# Benutzerhandbuch — BlockSocial Plants Calendar
+# Benutzerhandbuch — Sowling
 
 ## 1. Erste Schritte
 
