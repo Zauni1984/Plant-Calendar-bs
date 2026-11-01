@@ -17,22 +17,37 @@ use shared::license::{self, LicenseClaims, LicenseError, VerifyingKey};
 
 use crate::local_db::StoredSession;
 
-/// Release builds must be given the production public key at compile time:
-///   SOWLING_LICENSE_PUBLIC_KEY=... npm run tauri build
-#[cfg(not(debug_assertions))]
-const PUBLIC_KEY: &str = env!("SOWLING_LICENSE_PUBLIC_KEY", "set SOWLING_LICENSE_PUBLIC_KEY (from `sowling-backend gen-license-keys`) for release builds");
+/// Public half of the production license signing key (LICENSE_SIGNING_KEY on
+/// api.sowling.com). Public by design: it can only verify certificates, not
+/// issue them. Release builds use it unless SOWLING_LICENSE_PUBLIC_KEY is set.
+const PRODUCTION_PUBLIC_KEY: &str = "WtnqUpeO5TAL7IAVhuaFSFyEFgBNo_wfA-mgOGJT2r0";
 
-/// Server used for key activation when not signed in. Set SOWLING_API_URL for
-/// release builds; the development backend otherwise.
-pub const DEFAULT_API_URL: &str = match option_env!("SOWLING_API_URL") {
-    Some(url) => url,
-    None => "http://127.0.0.1:8080",
+#[cfg(not(debug_assertions))]
+const PUBLIC_KEY: &str = match option_env!("SOWLING_LICENSE_PUBLIC_KEY") {
+    Some(key) => key,
+    None => PRODUCTION_PUBLIC_KEY,
 };
 
-/// The web app, where the desktop license is bought (SOWLING_WEB_URL).
+/// Server used for key activation when not signed in, and the web app where
+/// the license is bought. Release builds talk to production, debug builds to
+/// the local development servers; SOWLING_API_URL / SOWLING_WEB_URL override.
+#[cfg(not(debug_assertions))]
+const API_URL_DEFAULT: &str = "https://api.sowling.com";
+#[cfg(debug_assertions)]
+const API_URL_DEFAULT: &str = "http://127.0.0.1:8080";
+#[cfg(not(debug_assertions))]
+const WEB_URL_DEFAULT: &str = "https://app.sowling.com";
+#[cfg(debug_assertions)]
+const WEB_URL_DEFAULT: &str = "http://localhost:4173";
+
+pub const DEFAULT_API_URL: &str = match option_env!("SOWLING_API_URL") {
+    Some(url) => url,
+    None => API_URL_DEFAULT,
+};
+
 pub const WEB_URL: &str = match option_env!("SOWLING_WEB_URL") {
     Some(url) => url,
-    None => "http://localhost:4173",
+    None => WEB_URL_DEFAULT,
 };
 
 /// Renew once a day while online.
@@ -41,7 +56,7 @@ const RENEW_AFTER_HOURS: i64 = 24;
 fn verifying_key() -> VerifyingKey {
     #[cfg(not(debug_assertions))]
     {
-        license::verifying_key_from_b64(PUBLIC_KEY).expect("SOWLING_LICENSE_PUBLIC_KEY is not a valid key")
+        license::verifying_key_from_b64(PUBLIC_KEY).expect("license public key is not a valid key")
     }
     #[cfg(debug_assertions)]
     {
@@ -245,6 +260,11 @@ pub async fn remove(api_url: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn production_public_key_is_valid() {
+        assert!(license::verifying_key_from_b64(PRODUCTION_PUBLIC_KEY).is_some());
+    }
 
     /// End-to-end against a local debug backend (development signing key):
     ///   sowling-backend license create --devices 1     -> SOWLING_TEST_LICENSE_KEY

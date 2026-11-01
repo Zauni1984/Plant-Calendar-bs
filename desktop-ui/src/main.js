@@ -326,7 +326,7 @@ root.innerHTML = `
       <div id="${IS_TAURI ? 'licenseCard' : 'desktopAppCard'}" class="view-card" style="margin-top:14px;display:none;"></div>
       <!-- Hidden inputs for auth (used by handlers) -->
       <div style="display:none;">
-        <input id="backendUrl" value="http://localhost:8080" />
+        <input id="backendUrl" value="" />
         <input id="email" /><input id="password" type="password" />
       </div>
       <div id="settingsPanel" class="view-card" style="margin-top:14px;"></div>
@@ -987,6 +987,8 @@ let reminderPermissionState = typeof Notification === "undefined" ? "unsupported
 // Web only: this browser receives push reminders from the server, so the
 // in-tab reminder check must not show the same task a second time.
 let webPushActive = false;
+// Desktop development builds only: the backend URL can be changed at sign-in.
+let backendUrlEditable = false;
 let pushCardMessage = ''; // last result shown in the settings push card
 let homeTaskFilter = "all";
 let homeTaskGrouping = "flat";
@@ -4906,9 +4908,9 @@ function openModal(type, prefill = {}) {
       <div style="padding:12px; border-radius:12px; background:rgba(${TC.accentRgb},0.06); border:1px solid rgba(${TC.accentRgb},0.12); margin-bottom:14px; font-size:13px; color:${TC.textMuted};">
         ${IS_TAURI ? t('auth.modalHint') : t('auth.webModalHint')}
       </div>
-      <div class="form-group"${IS_TAURI ? '' : ' style="display:none;"'}>
+      <div class="form-group"${IS_TAURI && backendUrlEditable ? '' : ' style="display:none;"'}>
         <label class="form-label">${t('auth.field.backendUrl')}</label>
-        <input id="authModalBackendUrl" class="form-input" placeholder="http://localhost:8080" value="${escapeHtml($('backendUrl')?.value || 'http://localhost:8080')}" />
+        <input id="authModalBackendUrl" class="form-input" placeholder="http://localhost:8080" value="${escapeHtml($('backendUrl')?.value || '')}" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('auth.field.email')}</label>
@@ -8570,7 +8572,15 @@ bindPlantFilterControls();
 
 // Load data. In the browser, first exchange the refresh cookie for a session
 // so the initial load already sees the user's data.
-const startupSession = IS_TAURI ? Promise.resolve() : invoke("bootstrap_local_user").catch(() => {});
+// Desktop: which server this build talks to (production in release builds;
+// only development builds show the backend URL field).
+const startupSession = IS_TAURI
+  ? invoke("desktop_backend_config").then((cfg) => {
+      backendUrlEditable = !!cfg?.editable;
+      const field = document.getElementById("backendUrl");
+      if (field && !field.value) field.value = cfg?.url || "";
+    }).catch(() => {})
+  : invoke("bootstrap_local_user").catch(() => {});
 startupSession
   .then(() => (IS_TAURI ? checkDesktopLicense() : handleLicenseLinks()))
   .then(() => refreshWebSessionState())
