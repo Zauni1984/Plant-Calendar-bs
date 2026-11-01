@@ -21,13 +21,19 @@ impl StripeClient {
         })
     }
 
+    /// Subscription checkout. The plan travels in metadata (the webhook event
+    /// carries no line items) and the user id as client_reference_id.
+    /// The billing address is collected for the invoice.
     pub async fn create_checkout_session(
         &self,
         customer_email: &str,
         price_id: &str,
+        user_id: uuid::Uuid,
+        plan: &str,
         success_url: &str,
         cancel_url: &str,
     ) -> Result<String, String> {
+        let user_id = user_id.to_string();
         let resp = self
             .client
             .post("https://api.stripe.com/v1/checkout/sessions")
@@ -35,6 +41,10 @@ impl StripeClient {
             .form(&[
                 ("mode", "subscription"),
                 ("customer_email", customer_email),
+                ("client_reference_id", user_id.as_str()),
+                ("metadata[plan]", plan),
+                ("subscription_data[metadata][plan]", plan),
+                ("billing_address_collection", "required"),
                 ("line_items[0][price]", price_id),
                 ("line_items[0][quantity]", "1"),
                 ("success_url", success_url),
@@ -80,6 +90,7 @@ impl StripeClient {
                 ("customer_email", customer_email),
                 ("client_reference_id", user_id.as_str()),
                 ("metadata[kind]", kind),
+                ("billing_address_collection", "required"),
                 ("line_items[0][price]", price_id),
                 ("line_items[0][quantity]", "1"),
                 ("success_url", success_url),

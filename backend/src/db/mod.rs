@@ -15,6 +15,8 @@ pub struct AppState {
     pub license_key: std::sync::Arc<shared::license::SigningKey>,
     /// None when SMTP is not configured (no e-mail is sent).
     pub mail: Option<std::sync::Arc<crate::services::mail::Mailer>>,
+    /// None when LEXOFFICE_API_KEY is not set (no invoices are created).
+    pub lexoffice: Option<std::sync::Arc<crate::services::lexoffice::Lexoffice>>,
 }
 
 impl AppState {
@@ -41,7 +43,11 @@ impl AppState {
         if mail.is_none() {
             tracing::info!("SMTP_HOST not set: no e-mail is sent");
         }
-        Ok(Self { pg, jwt_secret, photos, push, license_key, mail })
+        let lexoffice = crate::services::lexoffice::Lexoffice::from_env().map(std::sync::Arc::new);
+        if lexoffice.is_none() {
+            tracing::info!("LEXOFFICE_API_KEY not set: payments are recorded, invoices wait");
+        }
+        Ok(Self { pg, jwt_secret, photos, push, license_key, mail, lexoffice })
     }
 }
 

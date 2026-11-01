@@ -147,10 +147,47 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
    **Abo**, „Desktop-App“ als **einmalige Zahlung**. Die Preis-IDs (`price_…`)
    in `.env` eintragen.
 2. Webhook anlegen: URL `https://api.sowling.com/subscription/webhook`,
-   Ereignisse `checkout.session.completed` und
+   Ereignisse `checkout.session.completed`, `invoice.paid` und
    `customer.subscription.deleted`. Das Signing-Secret (`whsec_…`) als
-   `STRIPE_WEBHOOK_SECRET`.
+   `STRIPE_WEBHOOK_SECRET`. Ohne `invoice.paid` entstehen für Abo-Zahlungen
+   keine Rechnungen. Ein bestehender Webhook lässt sich im Dashboard um das
+   Ereignis ergänzen.
 3. Nach Änderungen an `.env`: `docker compose up -d backend`
+
+## 8a. Rechnungen (Lexware Office)
+
+Jede Zahlung (Desktop-Kauf, jede Abo-Zahlung inklusive Verlängerungen) wird
+als Rechnung in Lexware Office erstellt, festgeschrieben (Lexware vergibt die
+Nummer), als PDF per Mail an den Kunden geschickt und im Konto angezeigt.
+
+1. In Lexware Office: **Einstellungen → Erweiterungen → Öffentliche API**
+   (app.lexware.de/addons/public-api) einen API-Schlüssel erzeugen und in
+   `.env` als `LEXOFFICE_API_KEY` eintragen.
+2. In Lexware Office die **E-Rechnung (ZUGFeRD)** einschalten: Dann ist jedes
+   PDF eine elektronische Rechnung nach EN 16931, und die Mail an den Kunden
+   weist darauf hin.
+3. `SELLER_VAT_ID=DE354082556` in `.env` (eigene USt-IdNr. für die
+   VIES-Prüfung; damit gibt VIES eine Abfragenummer als Nachweis zurück).
+4. In Stripe unter **Einstellungen → Kunden-E-Mails** die Stripe-eigenen
+   Rechnungs-Mails ausschalten, sonst bekommen Kunden zwei Rechnungen.
+   Zahlungsbelege (Quittungen) dürfen an bleiben.
+5. `docker compose up -d backend`
+
+Ohne `LEXOFFICE_API_KEY` werden Zahlungen trotzdem vorgemerkt und nachträglich
+als Rechnung erstellt, sobald der Schlüssel eingetragen ist. Klappt etwas
+nicht (Lexware nicht erreichbar, VIES gestört), versucht der Server es mit
+wachsenden Pausen erneut, bis zu 12 Mal; danach steht die Rechnung auf
+„failed“ und muss geprüft werden:
+
+```bash
+docker compose exec db psql -U sowling -c "SELECT stripe_ref, status, attempts, last_error FROM invoices WHERE status <> 'sent' ORDER BY paid_at DESC LIMIT 20"
+```
+
+**Steuer:** Privatkunden und deutsche Firmen zahlen 19 % USt (Bruttopreise).
+Firmen aus einem anderen EU-Land mit per VIES bestätigter USt-IdNr. bekommen
+eine Rechnung ohne USt (Reverse Charge), Firmen außerhalb der EU eine Rechnung
+ohne deutsche USt. Der von Stripe abgebuchte Betrag ist in allen Fällen der
+Listenpreis; bei Reverse Charge ist er der Nettobetrag der Rechnung.
 
 ## 9. Eigene Lizenzen ausstellen
 

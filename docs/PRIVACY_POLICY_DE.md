@@ -121,6 +121,20 @@ Kundenkennung. Zahlungsdaten (z. B. Karte) erhalten nur Stripe, nicht wir.
 Wir speichern Tarif, Stripe-Kunden-ID und den Verlauf von Tarifwechseln. Vor dem
 ersten Bezahlvorgang holt die App Ihre Zustimmung zur Weitergabe an Stripe ein.
 
+**Rechnungen.** Für jede Zahlung erstellen wir eine Rechnung in unserer
+Buchhaltungssoftware **Lexware Office** und senden sie Ihnen als PDF per E-Mail;
+im Konto unter „Abo“ können Sie sie jederzeit abrufen. Dafür verarbeiten wir
+Rechnungsempfänger (Name bzw. Firma, Anschrift, Land), E-Mail-Adresse,
+Leistung, Betrag und Zahlungsdatum (Art. 6 Abs. 1 lit. b und c DSGVO). Haben
+Sie keine Rechnungsdaten hinterlegt, verwenden wir Name und Anschrift aus dem
+Bezahlvorgang bei Stripe.
+
+**USt-IdNr. von Firmen.** Geben Sie als Firma aus einem anderen EU-Land eine
+USt-IdNr. an, prüfen wir sie über das System **VIES der EU-Kommission**; dabei
+übermitteln wir Ihre USt-IdNr. und unsere eigene. Das Prüfergebnis und die
+Abfragenummer speichern wir als Nachweis für die steuerfreie Rechnung
+(Art. 6 Abs. 1 lit. c DSGVO).
+
 ### 4.6 Desktop-Lizenzen
 
 Die Desktop-App ist im Abo (Basic, Pro, Gärtnerei) enthalten oder als Einmalkauf
@@ -185,6 +199,10 @@ Fotos gilt dann die 90-Tage-Frist aus 4.1.
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Zypern – Betrieb von Server und Datenbank im
   Auftrag (Art. 28 DSGVO), Serverstandort Deutschland (Frankfurt am Main);
   außerdem Versand der E-Mails aus 4.9 (Hostinger Mail).
+- **Haufe-Lexware GmbH & Co. KG** (Freiburg, Deutschland) – Lexware Office,
+  Erstellung und Aufbewahrung der Rechnungen im Auftrag (Art. 28 DSGVO).
+- **Europäische Kommission (VIES)** – nur bei Firmen aus einem anderen EU-Land
+  mit USt-IdNr., zur Prüfung dieser Nummer.
 - **Stripe Payments Europe Ltd.** (Irland) – Zahlungsabwicklung; konzernintern
   auch Stripe Inc. (USA).
 - **Open-Meteo** (Deutschland) – nur bei erteilter Einwilligung „Wetter“.
@@ -218,6 +236,8 @@ zertifiziert ist, sonst auf EU-Standardvertragsklauseln. Bei den Push-Diensten
 | Eingelöste Gutscheine | bis Sie Ihr Konto löschen |
 | Gesendete E-Mails (Postausgang) | höchstens 12 Monate |
 | Abrechnungsunterlagen (bei Stripe) | gesetzliche Aufbewahrungsfristen, i. d. R. 10 Jahre |
+| Rechnungen (bei uns und in Lexware Office) | 10 Jahre (§ 147 AO, § 257 HGB), auch nach Löschung des Kontos |
+| Rechnungsdaten (Empfänger, USt-IdNr.) | bis Sie sie oder Ihr Konto löschen; auf Rechnungen 10 Jahre |
 | Server-Protokolle | höchstens 30 Tage |
 | Datensicherungen | 30 Tage, danach überschrieben |
 
@@ -247,7 +267,8 @@ Sie haben das Recht auf
 - **Berichtigung** (Art. 16 DSGVO): direkt in der App;
 - **Löschung** (Art. 17 DSGVO): „Konto löschen“ entfernt Ihr Konto, Ihre
   Gartendaten, Fotos, Push-Adressen und den Stripe-Kundeneintrag;
-  gesetzlich aufzubewahrende Abrechnungsunterlagen bleiben bei Stripe;
+  gesetzlich aufzubewahrende Abrechnungsunterlagen bleiben bei Stripe,
+  Rechnungen bleiben bis zum Ende der Aufbewahrungsfrist erhalten;
 - **Einschränkung der Verarbeitung** (Art. 18 DSGVO);
 - **Widerspruch** gegen Verarbeitungen auf Grundlage berechtigter Interessen
   (Art. 21 DSGVO);

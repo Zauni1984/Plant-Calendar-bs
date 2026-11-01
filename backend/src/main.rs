@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
     let prune_state = state.clone();
     let push_state = state.clone();
     let voucher_state = state.clone();
+    let invoice_state = state.clone();
 
     // Rate limiter: 10 requests per 60 seconds per IP for auth endpoints
     let auth_rate_limiter = RateLimiter::new(10, 60);
@@ -105,6 +106,9 @@ async fn main() -> anyhow::Result<()> {
         .merge(password_change_routes)
         .merge(voucher_routes)
         .route("/vouchers/me", get(api::vouchers::my_voucher))
+        .route("/me/billing", get(api::billing::get_billing).put(api::billing::put_billing).delete(api::billing::delete_billing))
+        .route("/invoices", get(api::billing::list_invoices))
+        .route("/invoices/{id}/pdf", get(api::billing::invoice_pdf))
         .route("/me", get(api::get_me).patch(api::update_profile).delete(api::delete_account))
         .route("/me/export", get(api::export_me))
         .route("/me/import-guest", post(api::guest_import::import_guest_data))
@@ -168,6 +172,7 @@ async fn main() -> anyhow::Result<()> {
                 .allow_methods([
                     axum::http::Method::GET,
                     axum::http::Method::POST,
+                    axum::http::Method::PUT,
                     axum::http::Method::PATCH,
                     axum::http::Method::DELETE,
                 ])
@@ -256,6 +261,20 @@ async fn main() -> anyhow::Result<()> {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(accounts = n, "vouchers expired"),
                 Err(err) => tracing::warn!("voucher expiry failed: {err}"),
+            }
+        }
+    });
+
+    // Invoices: create in Lexware Office, fetch the PDF, mail it.
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            ticker.tick().await;
+            match api::billing::run_due(&invoice_state).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(invoices = n, "invoices processed"),
+                Err(err) => tracing::warn!("invoice run failed: {err}"),
             }
         }
     });
