@@ -16,7 +16,14 @@ man ein Konto (Web-App oder Desktop-App mit Konto).
 
 ## Erzeugen
 
-Auf dem Server im Ordner `/opt/sowling/deploy`:
+**Am einfachsten im Admin-Bereich** (https://admin.sowling.com → **Gutscheine**):
+Tarif, Dauer, Art, Anzahl oder Code-Text, optional Frist, Notiz und
+E-Mail-Empfänger eintragen und **Erstellen** klicken. Einzelcodes erscheinen
+nur dieses eine Mal; dort lassen sie sich kopieren oder als Textdatei
+herunterladen. Die Liste darunter zeigt alle bisherigen Gutscheine mit
+Einlösungen; **Sperren** entspricht `voucher revoke`.
+
+Alternativ auf dem Server im Ordner `/opt/sowling/deploy`:
 
 ```bash
 # 500 Einzelcodes, Pro für 3 Monate, als Datei (eine Zeile pro Code)

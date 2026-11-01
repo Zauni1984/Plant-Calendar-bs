@@ -6,6 +6,10 @@
 //!   POST   /admin/users/{id}/disable    { reason }
 //!   POST   /admin/users/{id}/enable
 //!   DELETE /admin/users/{id}            { confirm_email }
+//!   POST   /admin/users/{id}/plan       { plan, months | days | unlimited }
+//!   GET    /admin/vouchers              code batches
+//!   POST   /admin/vouchers              create codes
+//!   POST   /admin/vouchers/{batch}/revoke
 //!   GET    /admin/invoices/problems     invoices not sent
 //!   POST   /admin/invoices/{id}/retry
 //!   GET    /admin/audit                 who did what
@@ -26,7 +30,9 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::api_error;
+use shared::SubscriptionPlan;
+
+use super::{api_error, vouchers};
 use crate::{db::{repos, AppState}, services::totp};
 
 const TOKEN_MINUTES: i64 = 30;
@@ -349,6 +355,201 @@ pub async fn delete_user(State(state): State<AppState>, admin: AdminUser, Path(i
     }
     audit(&state, admin.user_id, "delete", Some(email), None).await;
     StatusCode::NO_CONTENT.into_response()
+}
+
+// --- plans ------------------------------------------------------------------------------
+
+/// How long a plan or code applies: exactly one of the three.
+#[derive(Deserialize)]
+pub struct DurationInput {
+    months: Option<i32>,
+    days: Option<i32>,
+    #[serde(default)]
+    unlimited: bool,
+}
+
+/// Some(None): unlimited; Some(Some(days)); None: invalid.
+fn duration_days(d: &DurationInput) -> Option<Option<i32>> {
+    match (d.months, d.days, d.unlimited) {
+        (Some(m), None, false) if (1..=120).contains(&m) => Some(Some(vouchers::months_to_days(m))),
+        (None, Some(n), false) if (1..=3650).contains(&n) => Some(Some(n)),
+        (None, None, true) => Some(None),
+        _ => None,
+    }
+}
+
+fn paid_plan(name: &str) -> Option<SubscriptionPlan> {
+    match name {
+        "basic" | "pro" | "nursery" => Some(repos::parse_plan(name)),
+        _ => None,
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PlanPayload {
+    plan: String,
+    #[serde(flatten)]
+    duration: DurationInput,
+}
+
+/// Grant a plan by hand, stored like a voucher next to the Stripe
+/// subscription: the account gets the better of the two. "free" removes the
+/// grant; a running Stripe subscription stays and has to be cancelled in
+/// Stripe.
+pub async fn set_plan(State(state): State<AppState>, admin: AdminUser, Path(id): Path<Uuid>, Json(p): Json<PlanPayload>) -> Response {
+    let email = match target_email(&state, id).await {
+        Ok(e) => e,
+        Err(r) => return r,
+    };
+    let (plan, until) = if p.plan == "free" {
+        (None, None)
+    } else {
+        let Some(plan) = paid_plan(&p.plan) else { return api_error(StatusCode::BAD_REQUEST, "plan must be free, basic, pro or nursery") };
+        let Some(days) = duration_days(&p.duration) else { return api_error(StatusCode::BAD_REQUEST, "give months (1-120), days (1-3650) or unlimited") };
+        (Some(plan), days.map(|d| Utc::now() + Duration::days(d.into())))
+    };
+    let result = async {
+        let previous = repos::get_user(&state, id).await?.map(|u| u.plan);
+        sqlx::query("UPDATE users SET voucher_plan = $2, voucher_until = $3 WHERE user_id = $1")
+            .bind(id)
+            .bind(plan.map(repos::plan_str))
+            .bind(until)
+            .execute(&state.pg)
+            .await?;
+        let effective = repos::apply_effective_plan(&state, id).await?;
+        let stripe: Option<String> = sqlx::query_scalar("SELECT stripe_plan FROM users WHERE user_id = $1").bind(id).fetch_one(&state.pg).await?;
+        anyhow::Ok((previous, effective, stripe))
+    }
+    .await;
+    let (previous, effective, stripe) = match result {
+        Ok(r) => r,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
+    let detail = match (plan, until) {
+        (None, _) => "free".to_string(),
+        (Some(pl), Some(u)) => format!("{} until {}", repos::plan_str(pl), u.format("%Y-%m-%d")),
+        (Some(pl), None) => format!("{} unlimited", repos::plan_str(pl)),
+    };
+    let message = format!("Tarif durch Admin gesetzt: {detail}");
+    let _ = repos::record_subscription_history(&state, id, "admin_plan_set", effective, previous, None, Some("admin"), Some("active"), Some(&message)).await;
+    audit(&state, admin.user_id, "set_plan", Some(email), Some(detail)).await;
+    Json(serde_json::json!({ "plan": repos::plan_str(effective), "stripe_plan": stripe, "voucher_until": until })).into_response()
+}
+
+// --- vouchers ---------------------------------------------------------------------------
+
+pub async fn list_vouchers(State(state): State<AppState>, _admin: AdminUser) -> Response {
+    match vouchers::list_batches(&state, true).await {
+        Ok(mut rows) => {
+            rows.reverse(); // newest first
+            Json(rows).into_response()
+        }
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct VoucherPayload {
+    plan: String,
+    #[serde(flatten)]
+    duration: DurationInput,
+    /// A readable code for many accounts; empty or missing: single codes.
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    count: Option<u32>,
+    #[serde(default)]
+    max_redemptions: Option<i32>,
+    /// Last day to redeem, YYYY-MM-DD.
+    #[serde(default)]
+    redeem_until: Option<String>,
+    #[serde(default)]
+    note: String,
+    /// Single code only: send it to this address.
+    #[serde(default)]
+    email: Option<String>,
+}
+
+pub async fn create_vouchers(State(state): State<AppState>, admin: AdminUser, Json(p): Json<VoucherPayload>) -> Response {
+    let bad = |msg: &str| api_error(StatusCode::BAD_REQUEST, msg);
+    let Some(plan) = paid_plan(&p.plan) else { return bad("plan must be basic, pro or nursery") };
+    let Some(duration_days) = duration_days(&p.duration) else { return bad("give months (1-120), days (1-3650) or unlimited") };
+    let shared_code = p.code.as_deref().map(str::trim).filter(|c| !c.is_empty()).map(str::to_string);
+    let count = p.count.unwrap_or(1);
+    if shared_code.is_none() && !(1..=vouchers::MAX_BATCH).contains(&count) {
+        return bad("count must be 1-10000");
+    }
+    if p.max_redemptions.is_some_and(|m| m < 1) {
+        return bad("max_redemptions must be at least 1");
+    }
+    let redeem_until = match p.redeem_until.as_deref().map(str::trim).filter(|d| !d.is_empty()) {
+        Some(d) => match chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d") {
+            // Redeemable through the whole of that day (UTC).
+            Ok(date) => Some(date.and_hms_opt(23, 59, 59).expect("valid time").and_utc()),
+            Err(_) => return bad("redeem_until must be YYYY-MM-DD"),
+        },
+        None => None,
+    };
+    if redeem_until.is_some_and(|u| u < Utc::now()) {
+        return bad("redeem_until lies in the past");
+    }
+    let email = p.email.as_deref().map(str::trim).filter(|e| !e.is_empty()).map(str::to_string);
+    if let Some(e) = &email {
+        if !e.contains('@') || e.len() > 254 {
+            return bad("email is not an e-mail address");
+        }
+        if shared_code.is_some() || count != 1 {
+            return bad("email sends one single code");
+        }
+        if state.mail.is_none() {
+            return bad("e-mail is not set up on the server (SMTP)");
+        }
+    }
+    let note: String = p.note.trim().chars().take(200).collect();
+    let batch = vouchers::NewBatch {
+        plan,
+        duration_days,
+        shared_code: shared_code.clone(),
+        count,
+        max_redemptions: p.max_redemptions,
+        redeem_until,
+        note: note.clone(),
+    };
+    let (batch_id, codes) = match vouchers::create_batch(&state, &batch).await {
+        Ok(created) => created,
+        Err(vouchers::BatchError::BadCode) => return bad("code: 4-32 letters or digits, dashes allowed, no umlauts"),
+        Err(vouchers::BatchError::Exists(code)) => return api_error(StatusCode::CONFLICT, format!("the code {code} exists already")),
+        Err(vouchers::BatchError::Db(err)) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
+    let mut emailed = false;
+    if let (Some(to), Some(mailer)) = (&email, &state.mail) {
+        let (plan_de, plan_en) = crate::services::voucher_cli::plan_names(plan);
+        let (dur_de, dur_en) = crate::services::voucher_cli::duration_text(duration_days, p.duration.months);
+        match mailer.send(to, &crate::services::mail::voucher_mail(&codes[0], plan_de, plan_en, &dur_de, &dur_en)).await {
+            Ok(()) => emailed = true,
+            Err(err) => tracing::warn!("voucher mail failed: {err}"),
+        }
+    }
+    let detail = format!(
+        "{}, {}, {}{}{}",
+        if shared_code.is_some() { "shared code".to_string() } else { format!("{} single", codes.len()) },
+        repos::plan_str(plan),
+        duration_days.map(|d| format!("{d} days")).unwrap_or_else(|| "unlimited".into()),
+        if note.is_empty() { String::new() } else { format!(", {note}") },
+        if emailed { format!(", sent to {}", email.as_deref().unwrap_or_default()) } else { String::new() },
+    );
+    audit(&state, admin.user_id, "voucher_create", Some(batch_id.to_string()), Some(detail)).await;
+    Json(serde_json::json!({ "batch_id": batch_id, "codes": codes, "emailed": emailed })).into_response()
+}
+
+pub async fn revoke_vouchers(State(state): State<AppState>, admin: AdminUser, Path(batch): Path<Uuid>) -> Response {
+    match vouchers::revoke_batch(&state, batch).await {
+        Ok(n) => {
+            audit(&state, admin.user_id, "voucher_revoke", Some(batch.to_string()), Some(format!("{n} code(s)"))).await;
+            Json(serde_json::json!({ "revoked": n })).into_response()
+        }
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
 }
 
 // --- invoices ---------------------------------------------------------------------------

@@ -17,8 +17,8 @@ use shared::SubscriptionPlan;
 use uuid::Uuid;
 
 use crate::{
-    api::vouchers::{code_hash, generate_code, normalize_code},
-    db::{repos::{parse_plan, plan_str}, AppState},
+    api::vouchers::{code_hash, create_batch, list_batches, months_to_days, normalize_code, revoke_batch, BatchError, NewBatch, MAX_BATCH},
+    db::{repos::parse_plan, AppState},
 };
 
 const USAGE: &str = "usage:
@@ -31,8 +31,6 @@ examples:
   voucher create --plan pro --months 3 --count 500 --note \"Hanfjack orders\" > hanfjack.txt
   voucher create --plan basic --months 1 --code FRUEHLING26 --max 1000 --until 2027-05-31 --note \"Flyer spring\"
   voucher create --plan nursery --unlimited --email someone@example.com --note \"Influencer\"";
-
-const MAX_BATCH: u32 = 10_000;
 
 fn flag(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned()
@@ -54,7 +52,7 @@ pub async fn run(state: &AppState, args: Vec<String>) -> anyhow::Result<()> {
     }
 }
 
-fn plan_names(plan: SubscriptionPlan) -> (&'static str, &'static str) {
+pub fn plan_names(plan: SubscriptionPlan) -> (&'static str, &'static str) {
     match plan {
         SubscriptionPlan::Basic => ("Basic", "Basic"),
         SubscriptionPlan::Pro => ("Pro", "Pro"),
@@ -63,12 +61,7 @@ fn plan_names(plan: SubscriptionPlan) -> (&'static str, &'static str) {
     }
 }
 
-/// Days for N months, rounded: 1 → 30, 3 → 91, 6 → 183, 12 → 365.
-fn months_to_days(months: i32) -> i32 {
-    ((f64::from(months) * 365.0 / 12.0).round()) as i32
-}
-
-fn duration_text(days: Option<i32>, months: Option<i32>) -> (String, String) {
+pub fn duration_text(days: Option<i32>, months: Option<i32>) -> (String, String) {
     match (days, months) {
         (None, _) => ("unbegrenzt".into(), "unlimited".into()),
         (Some(_), Some(1)) => ("1 Monat".into(), "1 month".into()),
@@ -134,47 +127,13 @@ async fn create(state: &AppState, args: &[String]) -> anyhow::Result<()> {
         }
     }
     let note = flag(args, "--note").unwrap_or_default();
-    let batch_id = Uuid::new_v4();
-
-    let codes: Vec<(String, String)> = if let Some(text) = &shared_code {
-        let normalized = normalize_code(text).ok_or_else(|| anyhow::anyhow!("--code: 4-32 letters/digits (dashes allowed), no umlauts"))?;
-        vec![(text.trim().to_uppercase(), normalized)]
-    } else {
-        use rand_core::{OsRng, RngCore};
-        (0..count)
-            .map(|_| {
-                let mut random = [0u8; 16];
-                OsRng.fill_bytes(&mut random);
-                let code = generate_code(random);
-                let normalized = normalize_code(&code).expect("generated codes are valid");
-                (code, normalized)
-            })
-            .collect()
+    let batch = NewBatch { plan, duration_days, shared_code: shared_code.clone(), count, max_redemptions: max, redeem_until, note };
+    let (batch_id, codes) = match create_batch(state, &batch).await {
+        Ok(created) => created,
+        Err(BatchError::BadCode) => anyhow::bail!("--code: 4-32 letters/digits (dashes allowed), no umlauts"),
+        Err(BatchError::Exists(code)) => anyhow::bail!("the code {code} exists already; nothing was created"),
+        Err(BatchError::Db(err)) => return Err(err),
     };
-
-    let mut tx = state.pg.begin().await?;
-    for (display, normalized) in &codes {
-        let inserted = sqlx::query(
-            "INSERT INTO vouchers (voucher_id, batch_id, kind, code_hash, code_display, plan, duration_days, max_redemptions, redeem_until, note) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (code_hash) DO NOTHING",
-        )
-        .bind(Uuid::new_v4())
-        .bind(batch_id)
-        .bind(if shared_code.is_some() { "shared" } else { "single" })
-        .bind(code_hash(normalized))
-        .bind(shared_code.is_some().then_some(display.as_str()))
-        .bind(plan_str(plan))
-        .bind(duration_days)
-        .bind(if shared_code.is_some() { max } else { Some(1) })
-        .bind(redeem_until)
-        .bind(&note)
-        .execute(&mut *tx)
-        .await?;
-        if inserted.rows_affected() == 0 {
-            anyhow::bail!("the code {display} exists already; nothing was created");
-        }
-    }
-    tx.commit().await?;
 
     let (plan_de, plan_en) = plan_names(plan);
     let (dur_de, dur_en) = duration_text(duration_days, months);
@@ -182,46 +141,21 @@ async fn create(state: &AppState, args: &[String]) -> anyhow::Result<()> {
     eprintln!("batch {batch_id}: {} code(s), {plan_en}, {dur_en}{}{}", codes.len(),
         redeem_until.map(|u| format!(", redeem by {}", u.format("%Y-%m-%d"))).unwrap_or_default(),
         match (&shared_code, max) { (Some(_), Some(m)) => format!(", up to {m} accounts"), (Some(_), None) => ", any number of accounts".into(), _ => String::new() });
-    for (display, _) in &codes {
-        println!("{display}");
+    for code in &codes {
+        println!("{code}");
     }
     if shared_code.is_none() {
         eprintln!("Single codes are shown only now; they are not stored in readable form.");
     }
     if let (Some(to), Some(mailer)) = (&email, &state.mail) {
-        mailer.send(to, &crate::services::mail::voucher_mail(&codes[0].0, plan_de, plan_en, &dur_de, &dur_en)).await?;
+        mailer.send(to, &crate::services::mail::voucher_mail(&codes[0], plan_de, plan_en, &dur_de, &dur_en)).await?;
         eprintln!("Code sent by e-mail to {to}.");
     }
     Ok(())
 }
 
-#[derive(sqlx::FromRow)]
-struct BatchRow {
-    batch_id: Uuid,
-    kind: String,
-    plan: String,
-    duration_days: Option<i32>,
-    codes: i64,
-    redeemed: i64,
-    max_redemptions: Option<i32>,
-    shared_code: Option<String>,
-    redeem_until: Option<chrono::DateTime<Utc>>,
-    revoked: i64,
-    note: String,
-    created_at: chrono::DateTime<Utc>,
-}
-
 async fn list(state: &AppState, all: bool) -> anyhow::Result<()> {
-    let rows: Vec<BatchRow> = sqlx::query_as(&format!(
-        "SELECT batch_id, MIN(kind) AS kind, MIN(plan) AS plan, MIN(duration_days) AS duration_days, \
-                COUNT(*) AS codes, COALESCE(SUM(redemption_count), 0)::BIGINT AS redeemed, \
-                MIN(max_redemptions) AS max_redemptions, MIN(code_display) AS shared_code, \
-                MIN(redeem_until) AS redeem_until, COUNT(revoked_at) AS revoked, MIN(note) AS note, MIN(created_at) AS created_at \
-         FROM vouchers GROUP BY batch_id {} ORDER BY MIN(created_at)",
-        if all { "" } else { "HAVING COUNT(revoked_at) < COUNT(*)" }
-    ))
-    .fetch_all(&state.pg)
-    .await?;
+    let rows = list_batches(state, all).await?;
     if rows.is_empty() {
         println!("no vouchers");
         return Ok(());
@@ -257,17 +191,18 @@ async fn list(state: &AppState, all: bool) -> anyhow::Result<()> {
 /// Revoked codes can no longer be redeemed. Accounts that already redeemed
 /// one keep their voucher until it runs out.
 async fn revoke(state: &AppState, target: &str) -> anyhow::Result<()> {
-    let result = if let Ok(batch) = Uuid::parse_str(target) {
-        sqlx::query("UPDATE vouchers SET revoked_at = NOW() WHERE batch_id = $1 AND revoked_at IS NULL").bind(batch).execute(&state.pg).await?
+    let revoked = if let Ok(batch) = Uuid::parse_str(target) {
+        revoke_batch(state, batch).await?
     } else if let Some(normalized) = normalize_code(target) {
         sqlx::query("UPDATE vouchers SET revoked_at = NOW() WHERE code_hash = $1 AND revoked_at IS NULL")
             .bind(code_hash(&normalized))
             .execute(&state.pg)
             .await?
+            .rows_affected()
     } else {
         anyhow::bail!("not a batch id or code: {target}");
     };
-    println!("{} code(s) revoked; accounts that already redeemed keep their voucher until it ends", result.rows_affected());
+    println!("{revoked} code(s) revoked; accounts that already redeemed keep their voucher until it ends");
     Ok(())
 }
 
