@@ -10,6 +10,11 @@ Internet ──443──▶ Caddy ──┬── app.sowling.com  → Web-App (
                                                       Backup (nachts, verschlüsselt)
 ```
 
+**Abkürzung:** Nach DNS (Schritt 1) und Code holen (Schritt 3) erledigt
+`sh deploy/bootstrap.sh` die Schritte 2, 4, 5 (ohne Stripe) und 6 in einem
+Durchgang. Es erzeugt alle Geheimnisse auf dem Server, ohne sie anzuzeigen, und
+nennt am Ende, was noch von Hand zu tun ist.
+
 ## 0. Voraussetzungen
 
 - **VPS** mit Ubuntu 24.04, mindestens 2 GB RAM (Hostinger „KVM 2“ reicht für den
