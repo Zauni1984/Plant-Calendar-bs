@@ -15,10 +15,15 @@ const charts = [];
 let Chart = null;
 
 const PLAN_NAMES = { free: "Free", basic: "Basic", pro: "Pro", nursery: "Gärtnerei" };
-const ACTIONS = { login: "Anmeldung", disable: "Konto deaktiviert", enable: "Konto aktiviert", delete: "Konto gelöscht", invoice_retry: "Rechnung neu angestoßen" };
+const ACTIONS = {
+  login: "Anmeldung", disable: "Konto deaktiviert", enable: "Konto aktiviert", delete: "Konto gelöscht",
+  invoice_retry: "Rechnung neu angestoßen", set_plan: "Tarif geändert", voucher_create: "Gutscheine erstellt", voucher_revoke: "Gutscheine gesperrt",
+};
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("de-DE") : "–");
+// "Redeem until" is the end of a day in UTC; show that day, not the next one in CET.
+const fmtDateUtc = (v) => (v ? new Date(v).toLocaleDateString("de-DE", { timeZone: "UTC" }) : "–");
 const fmtDateTime = (v) => (v ? new Date(v).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–");
 const fmtInt = (n) => new Intl.NumberFormat("de-DE").format(n ?? 0);
 const fmtEuro = (cents) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format((cents ?? 0) / 100);
@@ -101,6 +106,7 @@ function signOut(message) {
 const TABS = [
   ["overview", "Übersicht"],
   ["users", "Konten"],
+  ["vouchers", "Gutscheine"],
   ["invoices", "Rechnungen"],
   ["audit", "Protokoll"],
 ];
@@ -139,7 +145,7 @@ function showTab() {
   destroyCharts();
   const view = document.getElementById("view");
   view.innerHTML = `<div class="empty">Lädt…</div>`;
-  ({ overview: renderOverview, users: renderUsers, invoices: renderInvoices, audit: renderAudit })[tab](view).catch((err) => {
+  ({ overview: renderOverview, users: renderUsers, vouchers: renderVouchers, invoices: renderInvoices, audit: renderAudit })[tab](view).catch((err) => {
     view.innerHTML = `<div class="empty">Fehler: ${esc(err.message)}</div>`;
   });
 }
@@ -241,7 +247,7 @@ function planCell(u) {
   const parts = [`<strong>${esc(PLAN_NAMES[u.plan] || u.plan)}</strong>`];
   if (u.stripe_plan) parts.push(`<span class="badge">Stripe ${esc(PLAN_NAMES[u.stripe_plan] || u.stripe_plan)}</span>`);
   if (u.voucher_plan && (!u.voucher_until || new Date(u.voucher_until) > new Date())) {
-    parts.push(`<span class="badge badge--warn">Gutschein ${esc(PLAN_NAMES[u.voucher_plan] || u.voucher_plan)}${u.voucher_until ? ` bis ${esc(fmtDate(u.voucher_until))}` : " ∞"}</span>`);
+    parts.push(`<span class="badge badge--warn">Gutschein/manuell ${esc(PLAN_NAMES[u.voucher_plan] || u.voucher_plan)}${u.voucher_until ? ` bis ${esc(fmtDate(u.voucher_until))}` : " ∞"}</span>`);
   }
   return parts.join(" ");
 }
@@ -292,6 +298,7 @@ async function loadUsers() {
           ${u.disabled_at
             ? `<button class="btn btn--sm" data-act="enable" data-id="${esc(u.user_id)}">Aktivieren</button>`
             : `<button class="btn btn--sm" data-act="disable" data-id="${esc(u.user_id)}">Deaktivieren</button>`}
+          <button class="btn btn--sm" data-act="plan" data-id="${esc(u.user_id)}">Tarif</button>
           <button class="btn btn--sm btn--danger" data-act="delete" data-id="${esc(u.user_id)}">Löschen</button>
         </td>
       </tr>`).join("")
@@ -343,6 +350,38 @@ async function onUserAction(e) {
     });
     return;
   }
+  if (btn.dataset.act === "plan") {
+    const stripe = user.stripe_plan ? PLAN_NAMES[user.stripe_plan] || user.stripe_plan : null;
+    dialog(`
+      <form>
+        <h3>Tarif ändern</h3>
+        <p><strong>${esc(user.email)}</strong> hat jetzt <strong>${esc(PLAN_NAMES[user.plan] || user.plan)}</strong>.
+        Der neue Tarif gilt wie ein Gutschein und ersetzt einen bestehenden Gutschein. „Free“ entfernt ihn.</p>
+        ${stripe ? `<p class="warn-note">Stripe-Abo ${esc(stripe)} läuft: Das Konto behält mindestens diesen Tarif. Tiefer herabstufen geht nur nach Kündigung im Stripe-Dashboard.</p>` : ""}
+        <div class="form-grid">
+          <label class="mono">Tarif${planSelect("plan", user.plan === "free" ? "basic" : user.plan, true)}</label>
+          <label class="mono">Dauer${durationSelect("duration")}</label>
+          <label class="mono" data-days hidden>Tage<input class="input" name="days" type="number" min="1" max="3650" value="30" /></label>
+        </div>
+        <div class="error" role="alert"></div>
+        <div class="row"><button type="button" class="btn" data-cancel>Abbrechen</button><button type="submit" class="btn btn--primary">Speichern</button></div>
+      </form>`, async (form) => {
+      const body = form.plan.value === "free" ? { plan: "free" } : { plan: form.plan.value, ...durationBody(form) };
+      const res = await call(`/admin/users/${user.user_id}/plan`, { method: "POST", body });
+      const now = PLAN_NAMES[res.plan] || res.plan;
+      toast(res.plan !== body.plan ? `${user.email} hat ${now} (Stripe-Abo).` : `${user.email} hat jetzt ${now}.`);
+      await loadUsers();
+    });
+    const dlg = document.getElementById("dialog");
+    wireDuration(dlg);
+    const toggleDuration = () => {
+      const free = dlg.querySelector('[name="plan"]').value === "free";
+      dlg.querySelector('[name="duration"]').disabled = free;
+      dlg.querySelector('[name="days"]').disabled = free;
+    };
+    dlg.querySelector('[name="plan"]').addEventListener("change", toggleDuration);
+    return;
+  }
   if (btn.dataset.act === "delete") {
     dialog(`
       <form>
@@ -358,6 +397,201 @@ async function onUserAction(e) {
       await loadUsers();
     });
   }
+}
+
+// --- shared form parts -----------------------------------------------------------------
+
+function planSelect(name, selected, withFree = false) {
+  const plans = withFree ? ["free", "basic", "pro", "nursery"] : ["basic", "pro", "nursery"];
+  return `<select class="input" name="${name}">${plans.map((p) => `<option value="${p}"${p === selected ? " selected" : ""}>${PLAN_NAMES[p]}</option>`).join("")}</select>`;
+}
+
+function durationSelect(name) {
+  return `<select class="input" name="${name}">
+    <option value="m1">1 Monat</option><option value="m3" selected>3 Monate</option><option value="m6">6 Monate</option>
+    <option value="m12">12 Monate</option><option value="unlimited">unbegrenzt</option><option value="days">Tage angeben…</option>
+  </select>`;
+}
+
+// Shows the "days" field only when "Tage angeben…" is chosen.
+function wireDuration(scope) {
+  const select = scope.querySelector('[name="duration"]');
+  const days = scope.querySelector("[data-days]");
+  const update = () => { days.hidden = select.value !== "days"; };
+  select.addEventListener("change", update);
+  update();
+}
+
+function durationBody(form) {
+  const v = form.duration.value;
+  if (v === "unlimited") return { unlimited: true };
+  if (v === "days") return { days: Number(form.days.value) };
+  return { months: Number(v.slice(1)) };
+}
+
+function durationLabel(days) {
+  if (days == null) return "unbegrenzt";
+  const months = { 30: 1, 91: 3, 183: 6, 365: 12 }[days];
+  return months ? `${months} Monat${months > 1 ? "e" : ""}` : `${days} Tage`;
+}
+
+// --- vouchers ------------------------------------------------------------------------
+
+async function renderVouchers(view) {
+  view.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <h2>Gutscheine erstellen</h2>
+      <form id="voucherForm">
+        <div class="form-grid">
+          <label class="mono">Tarif${planSelect("plan", "pro")}</label>
+          <label class="mono">Dauer nach Einlösen${durationSelect("duration")}</label>
+          <label class="mono" data-days hidden>Tage<input class="input" name="days" type="number" min="1" max="3650" value="30" /></label>
+          <label class="mono">Art
+            <select class="input" name="kind">
+              <option value="single">Einzelcodes (je 1× einlösbar)</option>
+              <option value="shared">Ein Code für viele (z. B. Flyer)</option>
+            </select>
+          </label>
+          <label class="mono" data-single>Anzahl Codes<input class="input" name="count" type="number" min="1" max="10000" value="1" /></label>
+          <label class="mono" data-shared hidden>Code-Text<input class="input" name="code" maxlength="40" placeholder="z. B. FRUEHLING26" autocomplete="off" /></label>
+          <label class="mono" data-shared hidden>Höchstens Konten (leer = beliebig viele)<input class="input" name="max" type="number" min="1" /></label>
+          <label class="mono">Einlösbar bis (optional)<input class="input" name="until" type="date" /></label>
+          <label class="mono">Notiz (intern)<input class="input" name="note" maxlength="200" placeholder="z. B. Hanfjack Bestellungen" /></label>
+          <label class="mono" data-single>Per E-Mail senden an (optional, nur bei 1 Code)<input class="input" name="email" type="email" /></label>
+        </div>
+        <div class="error" role="alert"></div>
+        <button type="submit" class="btn btn--primary">Erstellen</button>
+      </form>
+      <div id="voucherResult"></div>
+    </div>
+    <h2>Bisherige Gutscheine</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Erstellt</th><th>Code</th><th>Tarif</th><th>Dauer</th><th class="num">Eingelöst</th><th>Einlösbar bis</th><th>Notiz</th><th>Status</th><th></th></tr></thead>
+      <tbody id="voucherRows"><tr><td colspan="9" class="empty">Lädt…</td></tr></tbody>
+    </table></div>`;
+  const form = document.getElementById("voucherForm");
+  wireDuration(form);
+  const toggleKind = () => {
+    const shared = form.kind.value === "shared";
+    form.querySelectorAll("[data-shared]").forEach((el) => { el.hidden = !shared; });
+    form.querySelectorAll("[data-single]").forEach((el) => { el.hidden = shared; });
+  };
+  form.kind.addEventListener("change", toggleKind);
+  toggleKind();
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const error = form.querySelector(".error");
+    error.textContent = "";
+    const shared = form.kind.value === "shared";
+    const body = { plan: form.plan.value, ...durationBody(form), note: form.note.value, redeem_until: form.until.value || null };
+    if (shared) {
+      if (!form.code.value.trim()) { error.textContent = "Bitte einen Code-Text eingeben."; return; }
+      body.code = form.code.value.trim();
+      if (form.max.value) body.max_redemptions = Number(form.max.value);
+    } else {
+      body.count = Number(form.count.value || 1);
+      if (form.email.value.trim()) {
+        if (body.count !== 1) { error.textContent = "Per E-Mail lässt sich nur 1 Code verschicken."; return; }
+        body.email = form.email.value.trim();
+      }
+    }
+    button.disabled = true;
+    try {
+      const res = await call("/admin/vouchers", { method: "POST", body });
+      showCodes(res, shared);
+      toast(`${res.codes.length} Code${res.codes.length > 1 ? "s" : ""} erstellt.`);
+      await loadVouchers();
+    } catch (err) {
+      error.textContent = voucherError(err.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  document.getElementById("voucherRows").addEventListener("click", onVoucherAction);
+  await loadVouchers();
+}
+
+function voucherError(message) {
+  if (message.includes("exists already")) return "Diesen Code gibt es schon. Bitte einen anderen Text wählen.";
+  if (message.includes("code:")) return "Code-Text: 4 bis 32 Buchstaben oder Ziffern, Bindestriche erlaubt, keine Umlaute.";
+  if (message.includes("SMTP")) return "E-Mail ist auf dem Server nicht eingerichtet.";
+  if (message.includes("past")) return "Das Datum „Einlösbar bis“ liegt in der Vergangenheit.";
+  return message;
+}
+
+function showCodes(res, shared) {
+  const box = document.getElementById("voucherResult");
+  const text = res.codes.join("\n");
+  box.innerHTML = `
+    <div class="codes">
+      <p>${shared
+        ? "Der Code ist gespeichert und bleibt in der Liste unten sichtbar."
+        : "<strong>Diese Codes werden nur jetzt angezeigt.</strong> Gespeichert ist nur eine Prüfsumme. Bitte jetzt kopieren oder herunterladen."}${res.emailed ? " Der Code wurde per E-Mail verschickt." : ""}</p>
+      <textarea class="input mono" readonly rows="${Math.min(12, res.codes.length + 1)}">${esc(text)}</textarea>
+      <div class="row" style="justify-content:flex-start;">
+        <button class="btn btn--sm" type="button" data-copy>Kopieren</button>
+        <button class="btn btn--sm" type="button" data-download>Als Textdatei herunterladen</button>
+      </div>
+    </div>`;
+  box.querySelector("[data-copy]").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(text); toast("Kopiert."); }
+    catch (_) { box.querySelector("textarea").select(); toast("Bitte mit Strg+C kopieren."); }
+  });
+  box.querySelector("[data-download]").addEventListener("click", () => {
+    const url = URL.createObjectURL(new Blob([text + "\n"], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sowling-gutscheine-${res.batch_id.slice(0, 8)}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+}
+
+let lastBatches = [];
+
+async function loadVouchers() {
+  lastBatches = await call("/admin/vouchers");
+  const rows = document.getElementById("voucherRows");
+  rows.innerHTML = lastBatches.length
+    ? lastBatches.map((b) => {
+      const revokedAll = b.revoked === b.codes;
+      const expired = b.redeem_until && new Date(b.redeem_until) < new Date();
+      const usedUp = b.kind === "shared" ? b.max_redemptions != null && b.redeemed >= b.max_redemptions : b.redeemed >= b.codes;
+      const status = revokedAll ? ["gesperrt", "badge--off"] : expired ? ["abgelaufen", "badge--muted"] : usedUp ? ["aufgebraucht", "badge--muted"] : ["aktiv", ""];
+      const redeemed = b.kind === "shared" ? `${fmtInt(b.redeemed)}${b.max_redemptions != null ? ` / ${fmtInt(b.max_redemptions)}` : ""}` : `${fmtInt(b.redeemed)} / ${fmtInt(b.codes)}`;
+      return `
+        <tr>
+          <td>${esc(fmtDate(b.created_at))}</td>
+          <td>${b.kind === "shared" ? `<strong>${esc(b.shared_code)}</strong>` : `${fmtInt(b.codes)} Einzelcode${b.codes > 1 ? "s" : ""}`}</td>
+          <td>${esc(PLAN_NAMES[b.plan] || b.plan)}</td>
+          <td>${esc(durationLabel(b.duration_days))}</td>
+          <td class="num">${redeemed}</td>
+          <td>${esc(fmtDateUtc(b.redeem_until))}</td>
+          <td>${esc(b.note || "")}</td>
+          <td><span class="badge ${status[1]}">${status[0]}</span>${b.revoked > 0 && !revokedAll ? `<div class="mono">${fmtInt(b.revoked)} gesperrt</div>` : ""}</td>
+          <td class="actions">${revokedAll ? "" : `<button class="btn btn--sm btn--danger" data-revoke="${esc(b.batch_id)}">Sperren</button>`}</td>
+        </tr>`;
+    }).join("")
+    : `<tr><td colspan="9" class="empty">Noch keine Gutscheine.</td></tr>`;
+}
+
+function onVoucherAction(e) {
+  const id = e.target.closest("[data-revoke]")?.dataset.revoke;
+  const batch = lastBatches.find((b) => b.batch_id === id);
+  if (!batch) return;
+  const label = batch.kind === "shared" ? `den Code ${batch.shared_code}` : `${batch.codes} Einzelcode${batch.codes > 1 ? "s" : ""}${batch.note ? ` („${batch.note}“)` : ""}`;
+  dialog(`
+    <form>
+      <h3>Gutscheine sperren</h3>
+      <p>Sperrt ${esc(label)}. Danach lässt sich nichts mehr einlösen. Wer schon eingelöst hat, behält den Tarif bis zum Ende der Laufzeit.</p>
+      <div class="error" role="alert"></div>
+      <div class="row"><button type="button" class="btn" data-cancel>Abbrechen</button><button type="submit" class="btn btn--danger">Sperren</button></div>
+    </form>`, async () => {
+    await call(`/admin/vouchers/${batch.batch_id}/revoke`, { method: "POST" });
+    toast("Gesperrt.");
+    await loadVouchers();
+  });
 }
 
 // --- invoices ------------------------------------------------------------------------

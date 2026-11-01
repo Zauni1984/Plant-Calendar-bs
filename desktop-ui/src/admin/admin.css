@@ -135,4 +135,15 @@ dialog h3 { margin: 0 0 8px; }
 dialog p { color: var(--muted); font-size: 13px; }
 dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 
+/* --- forms ------------------------------------------------------------------------- */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 8px 0 4px; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; }
+.form-grid label[hidden] { display: none; }
+dialog .form-grid { grid-template-columns: 1fr 1fr; }
+select.input option { background: var(--panel-2); color: var(--text); }
+.warn-note { color: var(--warn) !important; }
+.codes { margin-top: 16px; padding: 14px; border-radius: 12px; border: 1px solid rgba(255, 215, 110, 0.35); background: rgba(255, 215, 110, 0.05); }
+.codes p { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.codes textarea { resize: vertical; font-size: 14px; color: var(--text); letter-spacing: 0.04em; }
+
 .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 20; }

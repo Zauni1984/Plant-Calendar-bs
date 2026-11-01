@@ -1,6 +1,7 @@
 //! Vouchers: codes that unlock Basic, Pro or Nursery for a number of days or
 //! for good (influencers, shop orders, flyers). Created with the operator CLI
-//! (services/voucher_cli.rs), redeemed by a signed-in account:
+//! (services/voucher_cli.rs) or in the admin area, redeemed by a signed-in
+//! account:
 //!
 //!   POST /vouchers/redeem   { code }       rate-limited (code guessing)
 //!   GET  /vouchers/me                      the account's active voucher
@@ -217,6 +218,124 @@ pub async fn active_voucher(state: &AppState, user_id: Uuid) -> anyhow::Result<O
         .map(parse_plan)
         .filter(|_| until.is_none_or(|u| u > Utc::now()))
         .map(|p| (p, until)))
+}
+
+// --- creating and listing codes (operator CLI and admin area) --------------------------
+
+pub const MAX_BATCH: u32 = 10_000;
+
+/// Days for N months, rounded: 1 → 30, 3 → 91, 6 → 183, 12 → 365.
+pub fn months_to_days(months: i32) -> i32 {
+    ((f64::from(months) * 365.0 / 12.0).round()) as i32
+}
+
+pub struct NewBatch {
+    pub plan: SubscriptionPlan,
+    /// None: unlimited.
+    pub duration_days: Option<i32>,
+    /// Some: one shared code with this text for many accounts; None: `count`
+    /// single-use codes.
+    pub shared_code: Option<String>,
+    pub count: u32,
+    /// Shared codes only: at most this many accounts (None: any number).
+    pub max_redemptions: Option<i32>,
+    pub redeem_until: Option<DateTime<Utc>>,
+    pub note: String,
+}
+
+pub enum BatchError {
+    BadCode,
+    Exists(String),
+    Db(anyhow::Error),
+}
+
+/// Store a batch and return its id and the codes in readable form. Single
+/// codes are stored only as hashes, so this is the one time they exist.
+pub async fn create_batch(state: &AppState, b: &NewBatch) -> Result<(Uuid, Vec<String>), BatchError> {
+    let codes: Vec<(String, String)> = if let Some(text) = &b.shared_code {
+        let normalized = normalize_code(text).ok_or(BatchError::BadCode)?;
+        vec![(text.trim().to_uppercase(), normalized)]
+    } else {
+        use rand_core::{OsRng, RngCore};
+        (0..b.count.clamp(1, MAX_BATCH))
+            .map(|_| {
+                let mut random = [0u8; 16];
+                OsRng.fill_bytes(&mut random);
+                let code = generate_code(random);
+                let normalized = normalize_code(&code).expect("generated codes are valid");
+                (code, normalized)
+            })
+            .collect()
+    };
+    let db = |e: sqlx::Error| BatchError::Db(e.into());
+    let batch_id = Uuid::new_v4();
+    let shared = b.shared_code.is_some();
+    let mut tx = state.pg.begin().await.map_err(db)?;
+    for (display, normalized) in &codes {
+        let inserted = sqlx::query(
+            "INSERT INTO vouchers (voucher_id, batch_id, kind, code_hash, code_display, plan, duration_days, max_redemptions, redeem_until, note) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (code_hash) DO NOTHING",
+        )
+        .bind(Uuid::new_v4())
+        .bind(batch_id)
+        .bind(if shared { "shared" } else { "single" })
+        .bind(code_hash(normalized))
+        .bind(shared.then_some(display.as_str()))
+        .bind(plan_str(b.plan))
+        .bind(b.duration_days)
+        .bind(if shared { b.max_redemptions } else { Some(1) })
+        .bind(b.redeem_until)
+        .bind(&b.note)
+        .execute(&mut *tx)
+        .await
+        .map_err(db)?;
+        if inserted.rows_affected() == 0 {
+            // Dropping the transaction rolls back the codes inserted so far.
+            return Err(BatchError::Exists(display.clone()));
+        }
+    }
+    tx.commit().await.map_err(db)?;
+    Ok((batch_id, codes.into_iter().map(|(display, _)| display).collect()))
+}
+
+#[derive(sqlx::FromRow, serde::Serialize)]
+pub struct BatchRow {
+    pub batch_id: Uuid,
+    pub kind: String,
+    pub plan: String,
+    pub duration_days: Option<i32>,
+    pub codes: i64,
+    pub redeemed: i64,
+    pub max_redemptions: Option<i32>,
+    pub shared_code: Option<String>,
+    pub redeem_until: Option<DateTime<Utc>>,
+    pub revoked: i64,
+    pub note: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Batches, oldest first; without `all` only those with codes still usable.
+pub async fn list_batches(state: &AppState, all: bool) -> anyhow::Result<Vec<BatchRow>> {
+    Ok(sqlx::query_as(&format!(
+        "SELECT batch_id, MIN(kind) AS kind, MIN(plan) AS plan, MIN(duration_days) AS duration_days, \
+                COUNT(*) AS codes, COALESCE(SUM(redemption_count), 0)::BIGINT AS redeemed, \
+                MIN(max_redemptions) AS max_redemptions, MIN(code_display) AS shared_code, \
+                MIN(redeem_until) AS redeem_until, COUNT(revoked_at) AS revoked, MIN(note) AS note, MIN(created_at) AS created_at \
+         FROM vouchers GROUP BY batch_id {} ORDER BY MIN(created_at)",
+        if all { "" } else { "HAVING COUNT(revoked_at) < COUNT(*)" }
+    ))
+    .fetch_all(&state.pg)
+    .await?)
+}
+
+/// Revoked codes can no longer be redeemed. Accounts that already redeemed
+/// one keep their voucher until it runs out.
+pub async fn revoke_batch(state: &AppState, batch_id: Uuid) -> anyhow::Result<u64> {
+    Ok(sqlx::query("UPDATE vouchers SET revoked_at = NOW() WHERE batch_id = $1 AND revoked_at IS NULL")
+        .bind(batch_id)
+        .execute(&state.pg)
+        .await?
+        .rows_affected())
 }
 
 /// Hourly: end expired vouchers and fall back to the Stripe plan or Free.
