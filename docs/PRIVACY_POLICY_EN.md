@@ -28,7 +28,7 @@ No data protection officer is appointed, as there is no obligation to do so
 |---|---|---|
 | Account (e-mail, password hash) | Sign-in, providing the service | Art. 6(1)(b) GDPR (contract) |
 | Plants, tasks, logs, locations, seasons | Core function of the app | Art. 6(1)(b) GDPR |
-| Photos (Basic, Pro, CSC plans only) | Plant diary | Art. 6(1)(b) GDPR |
+| Photos (Basic, Pro, Nursery plans only) | Plant diary | Art. 6(1)(b) GDPR |
 | Weather (Open-Meteo) | Weather and climate display | Art. 6(1)(a) GDPR (consent) |
 | Push reminders (web app) | Reminders of due tasks | Art. 6(1)(a) GDPR (consent) |
 | Guest mode | Use without an account, browser only | Art. 6(1)(b) GDPR |
@@ -58,7 +58,7 @@ With an account and your "cloud sync" consent it is synchronised with the server
 
 ### 4.1 Photos
 
-Photos can only be uploaded with a subscription (Basic, Pro, CSC).
+Photos can only be uploaded with a subscription (Basic, Pro, Nursery).
 
 - Every photo is **re-encoded** on upload: scaled to at most 1000 × 1000 pixels,
   stored as WebP and **stripped of all metadata** (e.g. EXIF, GPS position,
@@ -120,7 +120,7 @@ the first payment the app asks for your agreement to pass data to Stripe.
 
 ### 4.6 Desktop licenses
 
-The desktop app is included in a subscription (Basic, Pro, CSC) or available as
+The desktop app is included in a subscription (Basic, Pro, Nursery) or available as
 a one-time purchase. To unlock it we process:
 
 - **License:** type (purchase or issued by us), your e-mail address or account

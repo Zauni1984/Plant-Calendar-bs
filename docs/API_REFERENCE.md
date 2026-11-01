@@ -171,8 +171,8 @@ Response: LogEntry object
 ### POST /locations
 ```json
 Request: {
-  "name": "Growzelt 1",
-  "location_type": "growzelt",
+  "name": "Gewächshaus 1",
+  "location_type": "tent",
   "description": "2x2m, LED"
 }
 Response: Location object

@@ -19,7 +19,7 @@ Beim ersten Start erscheint das **Willkommen-Overlay** mit einem Formular fuer d
 Die App hat 9 Tabs in der oberen Leiste:
 - **Kalender** — Startseite, Monats-/Wochen-/Tagesansicht
 - **Pflanzen** — Alle Pflanzen verwalten
-- **Standorte** — Orte wie Growzelt, Gewaechshaus etc.
+- **Standorte** — Orte wie Gewächshaus, Pflanzenzelt etc.
 - **Tipps** — Pflanzkalender, Vermehrung, Nachhaltigkeit
 - **Wetter** — Wetterstation mit Vorhersage und Charts
 - **Geraete** — IoT-Sensoren (experimentell)
@@ -126,7 +126,7 @@ Rechts in der Toolbar gibt es ein Dropdown mit 8 Kalendermodi:
 
 Im Tab "Standorte":
 - Neuen Standort erstellen (Name, Typ, Beschreibung)
-- Typen: Growzelt, Gewaechshaus, Outdoor, Indoor, Balkon, Eigener
+- Typen: Pflanzenzelt, Gewächshaus, Outdoor, Indoor, Balkon, Eigener
 - Pflanzen beim Bearbeiten einem Standort zuweisen
 - Koordinaten setzen (fuer standortspezifisches Wetter)
 

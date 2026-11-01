@@ -31,7 +31,7 @@ each major infrastructure change.
 | `TRUST_PROXY_HEADERS` | `1` behind Caddy, so rate limits see client IPs. Only with a proxy that overwrites `X-Forwarded-For`. |
 | `PHOTO_STORAGE_DIR` | Photo store (a backed-up volume). |
 | `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push reminders (optional; push is off without them). |
-| `STRIPE_PRICE_*` | Price IDs for Basic, Pro, CSC and the desktop one-time purchase. |
+| `STRIPE_PRICE_*` | Price IDs for Basic, Pro, Nursery ("Gärtnerei") and the desktop one-time purchase. |
 | `CHECKOUT_BASE_URL`, `DESKTOP_DOWNLOAD_URL` | Web app URL for Stripe return links; installer link. |
 
 Optional:

@@ -1079,7 +1079,7 @@ function calculateWateringNeed(plant) {
   }
 
   // Adjust for indoor/outdoor
-  if (location && (location.location_type === 'indoor' || location.location_type === 'growzelt')) {
+  if (location && (location.location_type === 'indoor' || location.location_type === 'tent' || location.location_type === 'growzelt')) {
     baseHours *= 0.9;
   }
 
@@ -2011,7 +2011,9 @@ async function handleCsvImport() {
 
 function normalizePlan(plan) {
   const raw = String(plan || "free").toLowerCase();
-  if (["basic", "pro", "csc", "free"].includes(raw)) return raw;
+  // "csc" is the former id of the nursery plan (older data and clients).
+  if (raw === "csc") return "nursery";
+  if (["basic", "pro", "nursery", "free"].includes(raw)) return raw;
   return "free";
 }
 
@@ -2019,7 +2021,7 @@ function planLimitFor(plan) {
   const normalized = normalizePlan(plan);
   if (normalized === "basic") return 3;
   if (normalized === "pro") return 100;
-  if (normalized === "csc") return Number.POSITIVE_INFINITY;
+  if (normalized === "nursery") return Number.POSITIVE_INFINITY;
   return 1;
 }
 
@@ -2096,7 +2098,7 @@ function planLabel(plan) {
   const normalized = normalizePlan(plan);
   if (normalized === "basic") return "Basic";
   if (normalized === "pro") return "Pro";
-  if (normalized === "csc") return "CSC";
+  if (normalized === "nursery") return t('plan.nursery.name');
   return "Free";
 }
 
@@ -2242,7 +2244,7 @@ async function loadLocations() {
 // module load and keep the startup language forever after a language switch.
 function getLocationTypeLabels() {
   return {
-    growzelt: t('location.type.tent'), gewaechshaus: t('location.type.greenhouse'), outdoor: t('location.type.outdoor'),
+    tent: t('location.type.tent'), gewaechshaus: t('location.type.greenhouse'), outdoor: t('location.type.outdoor'),
     indoor: t('location.type.indoor'), balkon: t('location.type.balcony'), custom: t('location.type.custom'),
   };
 }
@@ -2271,7 +2273,8 @@ function renderLocationsView() {
   } else {
     html += locations.map(loc => {
       const assignedPlants = plants.filter(p => p.location_id === loc.location_id);
-      const typeBadge = getLocationTypeLabels()[loc.location_type] || escapeHtml(loc.location_type);
+      // "growzelt" is the former id of "tent" (older data).
+      const typeBadge = getLocationTypeLabels()[loc.location_type === 'growzelt' ? 'tent' : loc.location_type] || escapeHtml(loc.location_type);
       return `<div class="view-card" style="margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
@@ -3184,7 +3187,7 @@ function getPlanConfig() {
     { key: "free",  title: "Free",  price: t('plan.price.free'),  limitText: t('plan.limit.1'),         accent: TC.textMuted, detail: t('plan.free.detail') },
     { key: "basic", title: "Basic", price: t('plan.price.basic'), limitText: t('plan.limit.3'),         accent: TC.accent,    detail: t('plan.basic.detail') },
     { key: "pro",   title: "Pro",   price: t('plan.price.pro'),   limitText: t('plan.limit.100'),       accent: "#9fd7ff",         detail: t('plan.pro.detail') },
-    { key: "csc",   title: "CSC",   price: t('plan.price.csc'),   limitText: t('plan.limit.unlimited'), accent: "#ffd76e",         detail: t('plan.csc.detail') },
+    { key: "nursery", title: t('plan.nursery.name'), price: t('plan.price.nursery'), limitText: t('plan.limit.unlimited'), accent: "#ffd76e", detail: t('plan.nursery.detail') },
   ];
 }
 const PLAN_CONFIG = getPlanConfig();
@@ -8974,7 +8977,7 @@ async function renderGuestCard() {
 
 // ── Desktop license ─────────────────────────────────────────────────────────
 // Desktop: the app needs a license certificate (src-tauri/src/license.rs).
-// It comes from a key, or from the signed-in account (Basic/Pro/CSC
+// It comes from a key, or from the signed-in account (Basic/Pro/Nursery
 // subscription, one-time purchase, or a grant to the account's e-mail).
 // Web: the account card shows whether the desktop app is included or bought,
 // offers the one-time purchase and the download.

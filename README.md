@@ -24,7 +24,7 @@ Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 - Topfgroesse und Substrat-Tracking
 
 ### Standorte
-- Standortverwaltung: Growzelt, Gewaechshaus, Outdoor, Indoor, Balkon
+- Standortverwaltung: Gewächshaus, Pflanzenzelt, Outdoor, Indoor, Balkon
 - Pflanzen einem Standort zuweisen
 - Pro Standort eigene Wetter-Koordinaten
 
@@ -70,7 +70,7 @@ Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 - GDPR-konforme Account-Loeschung
 
 ### Billing
-- Free (1 Pflanze) / Basic (3) / Pro (100) / CSC (unbegrenzt)
+- Free (1 Pflanze) / Basic (3) / Pro (100) / Gärtnerei (unbegrenzt)
 - Stripe Checkout mit Webhook-Validierung
 - Customer Portal, Grandfather-Regel bei Downgrade
 

@@ -4,7 +4,7 @@
 //! here, verified offline in the app; see shared/src/license.rs). A device
 //! gets one in three ways:
 //!   - a license key (purchase or operator-issued)         POST /licenses/activate
-//!   - its signed-in account: a Basic/Pro/CSC subscription,
+//!   - its signed-in account: a Basic/Pro/Nursery subscription,
 //!     a purchase, or an operator grant to the account's e-mail
 //!                                                         POST /licenses/desktop-access
 //!   - renewing the certificate it already has             POST /licenses/refresh
@@ -247,7 +247,7 @@ async fn account_certificate(state: &AppState, user_id: Uuid, device: &DeviceInf
             return license_error(
                 StatusCode::PAYMENT_REQUIRED,
                 "no_license",
-                "this account has no desktop license (one-time purchase, or included in Basic/Pro/CSC)",
+                "this account has no desktop license (one-time purchase, or included in Basic/Pro/Nursery)",
             )
         }
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),

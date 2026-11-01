@@ -322,7 +322,7 @@ impl LocalStore {
                 plan: match row.get::<_, String>(5)?.as_str() {
                     "basic" => SubscriptionPlan::Basic,
                     "pro" => SubscriptionPlan::Pro,
-                    "csc" => SubscriptionPlan::Csc,
+                    "nursery" | "csc" => SubscriptionPlan::Nursery,
                     _ => SubscriptionPlan::Free,
                 },
                 created_at: row.get(6)?,

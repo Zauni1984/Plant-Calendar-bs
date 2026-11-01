@@ -626,11 +626,11 @@ fn normalize_backend_url(value: Option<String>) -> Result<String, String> {
 #[tauri::command]
 fn get_plan_info() -> String {
     format!(
-        "Free: {}, Basic: {}, Pro: {}, CSC: {}",
+        "Free: {}, Basic: {}, Pro: {}, Nursery: {}",
         SubscriptionPlan::Free.plant_limit(),
         SubscriptionPlan::Basic.plant_limit(),
         SubscriptionPlan::Pro.plant_limit(),
-        if SubscriptionPlan::Csc.plant_limit() == usize::MAX { "∞".to_string() } else { SubscriptionPlan::Csc.plant_limit().to_string() }
+        if SubscriptionPlan::Nursery.plant_limit() == usize::MAX { "∞".to_string() } else { SubscriptionPlan::Nursery.plant_limit().to_string() }
     )
 }
 
@@ -638,7 +638,7 @@ fn parse_subscription_plan(value: &str) -> SubscriptionPlan {
     match value.to_lowercase().as_str() {
         "basic" => SubscriptionPlan::Basic,
         "pro" => SubscriptionPlan::Pro,
-        "csc" => SubscriptionPlan::Csc,
+        "nursery" | "csc" => SubscriptionPlan::Nursery,
         _ => SubscriptionPlan::Free,
     }
 }

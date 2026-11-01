@@ -367,17 +367,6 @@ fn build_catalog() -> Vec<CatalogEntry> {
             toxic_cats: false, toxic_dogs: false, toxic_humans: false, allergen: false, safety_note: "Essbar und ungiftig.".into(),
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
-        // -- Cannabis (CSC) --
-        CatalogEntry {
-            id: "cannabis".into(), name_de: "Cannabis".into(), name_en: "Cannabis".into(), category: "gemuese".into(), lifecycle: "annual".into(),
-            default_phase: "seed".into(), sow_indoor_months: vec![3,4,5], sow_outdoor_months: vec![5,6], harvest_months: vec![9,10,11],
-            sun: "full".into(), water: "high".into(), spacing_cm: 60,
-            good_neighbors: vec!["basil".into(),"marigold".into(),"mint".into(),"dill".into()],
-            bad_neighbors: vec![],
-            tips_de: "Photoperiodisch: 12/12 f\u{00fc}r Bl\u{00fc}te. pH 6.0-7.0, EC 1.0-2.0.".into(), color_suggestion: "#0B3D2E".into(), emoji: "\u{1F33F}".into(),
-            toxic_cats: true, toxic_dogs: true, toxic_humans: false, allergen: true, safety_note: "Giftig f\u{00fc}r Haustiere, allergieausl\u{00f6}send.".into(),
-            propagation_methods: vec!["steckling".into(),"samen".into()], propagation_note: "Stecklinge unter 18h Licht bewurzeln (10-14 Tage).".into(),
-        },
     ]
 }
 

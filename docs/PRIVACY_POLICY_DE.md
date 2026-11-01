@@ -28,7 +28,7 @@ Pflicht dazu besteht.
 |---|---|---|
 | Konto (E-Mail, Passwort-Hash) | Anmeldung, Bereitstellung des Dienstes | Art. 6 Abs. 1 lit. b DSGVO (Vertrag) |
 | Pflanzen, Aufgaben, Logs, Standorte, Saisons | Kernfunktion der App | Art. 6 Abs. 1 lit. b DSGVO |
-| Fotos (nur Abos Basic, Pro, CSC) | Pflanzentagebuch | Art. 6 Abs. 1 lit. b DSGVO |
+| Fotos (nur Abos Basic, Pro, Gärtnerei) | Pflanzentagebuch | Art. 6 Abs. 1 lit. b DSGVO |
 | Wetter (Open-Meteo) | Wetter- und Klimaanzeige | Art. 6 Abs. 1 lit. a DSGVO (Einwilligung) |
 | Push-Erinnerungen (Web-App) | Erinnerung an fällige Aufgaben | Art. 6 Abs. 1 lit. a DSGVO (Einwilligung) |
 | Gastmodus | Nutzung ohne Konto, nur im Browser | Art. 6 Abs. 1 lit. b DSGVO |
@@ -62,7 +62,7 @@ Nachkommastellen).
 
 ### 4.1 Fotos
 
-Fotos können nur mit einem Abo (Basic, Pro, CSC) hochgeladen werden.
+Fotos können nur mit einem Abo (Basic, Pro, Gärtnerei) hochgeladen werden.
 
 - Jedes Foto wird beim Hochladen **neu berechnet**: auf höchstens
   1000 × 1000 Pixel verkleinert, als WebP gespeichert und dabei **von allen
@@ -126,7 +126,7 @@ ersten Bezahlvorgang holt die App Ihre Zustimmung zur Weitergabe an Stripe ein.
 
 ### 4.6 Desktop-Lizenzen
 
-Die Desktop-App ist im Abo (Basic, Pro, CSC) enthalten oder als Einmalkauf
+Die Desktop-App ist im Abo (Basic, Pro, Gärtnerei) enthalten oder als Einmalkauf
 erhältlich. Für die Freischaltung verarbeiten wir:
 
 - **Lizenz:** Art (Kauf oder von uns vergeben), Ihre E-Mail-Adresse bzw.
