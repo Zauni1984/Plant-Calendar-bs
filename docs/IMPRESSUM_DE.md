@@ -1,12 +1,12 @@
 <!--
 ACHTUNG: Alle in eckigen Klammern [...] stehenden Angaben MÜSSEN vor dem
 produktiven Launch durch die tatsächlichen Firmendaten ersetzt werden.
-Ohne vollständiges Impressum liegt ein Verstoß gegen § 5 TMG / § 18 MStV vor.
+Ohne vollständiges Impressum liegt ein Verstoß gegen § 5 DDG / § 18 MStV vor.
 -->
 
 # Impressum
 
-Angaben gemäß § 5 TMG / § 18 MStV:
+Angaben gemäß § 5 DDG / § 18 MStV:
 
 ## Anbieter
 

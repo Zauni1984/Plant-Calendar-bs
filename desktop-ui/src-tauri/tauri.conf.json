@@ -38,6 +38,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "BlockSocial UG (haftungsbeschränkt)",
+    "copyright": "© 2026 BlockSocial UG (haftungsbeschränkt)",
+    "category": "Productivity",
+    "shortDescription": "Pflanzenkalender für Aufgaben, Logs, Wetter und Wachstum",
+    "longDescription": "Sowling ist ein Pflanzenkalender für Garten, Balkon und Gewächshaus: Aufgaben und Erinnerungen, Pflanzentagebuch mit Fotos, Wetter und Wachstumsphasen.",
+    "homepage": "https://sowling.com"
   }
 }

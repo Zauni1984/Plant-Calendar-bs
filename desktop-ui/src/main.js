@@ -4920,6 +4920,10 @@ function openModal(type, prefill = {}) {
       </div>
       <div id="authModalError" class="form-error" style="display:none;"></div>
       <div id="authModalSuccess" class="form-hint" style="display:none; color:${TC.accent};"></div>
+      <div style="margin-top:12px; font-size:12px; text-align:center;">
+        <button type="button" class="btn btn--ghost btn--sm" id="authModalImprint">${escapeHtml(t('settings.openImprint'))}</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="authModalPrivacy">${escapeHtml(t('settings.openPrivacy'))}</button>
+      </div>
       ${IS_TAURI || webGuest ? '' : `
       <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(${TC.accentRgb},0.12); text-align:center;">
         <button type="button" class="btn btn--ghost btn--sm" id="authModalGuest">${escapeHtml(t('guest.try'))}</button>
@@ -4966,6 +4970,9 @@ function openModal(type, prefill = {}) {
       }
     });
     document.getElementById('authModalGuest')?.addEventListener('click', startGuestMode);
+    // Imprint and privacy policy must be reachable before signing in, too.
+    document.getElementById('authModalImprint')?.addEventListener('click', openImprintDoc);
+    document.getElementById('authModalPrivacy')?.addEventListener('click', openPrivacyDoc);
     document.getElementById('authModalRegister')?.addEventListener('click', async () => {
       const { email, password, backendUrl } = getAuthFields();
       if (!email || !password) { showAuthError(t('auth.emailPasswordRequired')); return; }
