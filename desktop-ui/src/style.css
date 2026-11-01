@@ -467,6 +467,45 @@
   margin: 0 0 20px;
 }
 
+/* ── Colour swatches ── */
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.onboarding-card .color-picker { justify-content: center; }
+.color-swatch {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--accent-rgb),0.15);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: transform 0.1s ease;
+}
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.is-selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--card-solid), 0 0 0 4px var(--accent);
+}
+.color-swatch--custom {
+  background: conic-gradient(#e53935, #ffd54f, #2e7d32, #29b6f6, #ab47bc, #e53935);
+  overflow: hidden;
+}
+.color-swatch--custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+
 /* ── Common Form Styles ── */
 .form-input, .form-select, .form-textarea {
   width: 100%;

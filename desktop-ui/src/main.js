@@ -349,12 +349,12 @@ root.innerHTML = `
       <div class="form-group">
         <input id="onboardPlantName" class="form-input" placeholder="${t('onboard.plantName')}" />
       </div>
+      <div class="form-group">
+        <label class="form-label">${t('onboard.color')}</label>
+        ${colorPickerHtml('id="onboardPlantColor"', '#0B3D2E')}
+      </div>
       <div class="form-row" style="margin-bottom:12px;">
-        <div>
-          <label class="form-label">${t('onboard.color')}</label>
-          <input id="onboardPlantColor" type="color" value="#0B3D2E" class="form-input" />
-        </div>
-        <div>
+        <div style="grid-column:1 / -1;">
           <label class="form-label">${t('onboard.phase')}</label>
           <select id="onboardPlantPhase" class="form-select">
             <option value="seed">${t('phase.seed')}</option>
@@ -664,6 +664,50 @@ function sanitizeColorTag(color) {
   if (color && /^#[0-9a-fA-F]{3,8}$/.test(color)) return color;
   return '#888888';
 }
+
+// Colour choice as clickable swatches. The native colour dialog has no OK
+// button in Chromium/WebView2, so users could not tell how to confirm it; a
+// swatch applies with one click. The last swatch still opens the native
+// dialog for a custom colour. The <input type="color"> keeps the value, so
+// callers read `.value` as before.
+function colorPickerHtml(inputAttrs, value) {
+  const palette = ['#0B3D2E', '#2E7D32', '#6BFFBC', '#9CCC65', '#FFD54F', '#FF9800',
+    '#E53935', '#EC407A', '#AB47BC', '#5C6BC0', '#29B6F6', '#8D6E63'];
+  const current = sanitizeColorTag(value).toLowerCase();
+  const matched = palette.some(c => c.toLowerCase() === current);
+  const swatches = palette.map(c => `<button type="button" class="color-swatch${c.toLowerCase() === current ? ' is-selected' : ''}" data-color="${c}" style="background:${c};" aria-label="${c}"></button>`).join('');
+  return `<div class="color-picker">${swatches}<label class="color-swatch color-swatch--custom${matched ? '' : ' is-selected'}"${matched ? '' : ` style="background:${current};"`}><input type="color" ${inputAttrs} value="${current}" /></label></div>`;
+}
+
+function syncColorPicker(input) {
+  const picker = input?.closest?.('.color-picker');
+  if (!picker) return;
+  const value = String(input.value || '').toLowerCase();
+  let matched = false;
+  picker.querySelectorAll('.color-swatch[data-color]').forEach((sw) => {
+    const on = sw.dataset.color.toLowerCase() === value;
+    sw.classList.toggle('is-selected', on);
+    if (on) matched = true;
+  });
+  const custom = picker.querySelector('.color-swatch--custom');
+  if (custom) {
+    custom.classList.toggle('is-selected', !matched);
+    custom.style.background = matched ? '' : value;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const sw = e.target.closest?.('.color-swatch[data-color]');
+  if (!sw) return;
+  const input = sw.closest('.color-picker')?.querySelector('input[type="color"]');
+  if (!input) return;
+  input.value = sw.dataset.color;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+document.addEventListener('input', (e) => {
+  if (e.target?.matches?.('.color-picker input[type="color"]')) syncColorPicker(e.target);
+});
 
 // Convert #rgb or #rrggbb to "r,g,b" string for use in rgba().
 function hexToRgb(hex) {
@@ -1666,7 +1710,7 @@ function renderSettingsPanel() {
           </div>
           <div class="form-group">
             <label class="form-label">${t('settings.profileColor')}</label>
-            <input id="newProfileColor" type="color" value="#6bffbc" class="form-input" />
+            ${colorPickerHtml('id="newProfileColor"', '#6bffbc')}
           </div>
         </div>
         <button class="btn btn--primary btn--sm" data-settings-action="create-profile">${t('settings.createProfile')}</button>
@@ -3545,7 +3589,7 @@ function clearFormError(node) {
 
 function resetPlantForm() {
   if ($("plantName")) $("plantName").value = "";
-  if ($("plantColor")) $("plantColor").value = "#0B3D2E";
+  if ($("plantColor")) { $("plantColor").value = "#0B3D2E"; syncColorPicker($("plantColor")); }
   if ($("plantPhase")) $("plantPhase").value = "veg";
   clearFormError(plantFormError);
 }
@@ -5032,7 +5076,7 @@ function openModal(type, prefill = {}) {
       const phaseEl = $("plantPhase");
       const lifecycleEl = $("plantLifecycle");
       if (nameEl && !nameEl.value.trim()) nameEl.value = entry.name_de;
-      if (colorEl) colorEl.value = entry.color_suggestion;
+      if (colorEl) { colorEl.value = entry.color_suggestion; syncColorPicker(colorEl); }
       if (phaseEl) phaseEl.value = entry.default_phase;
       if (lifecycleEl) lifecycleEl.value = entry.lifecycle;
       if (preview) {
@@ -5250,9 +5294,9 @@ function renderPlantFormHTML(prefill = {}) {
       <input id="plantName" class="form-input" placeholder="${t('plant.form.namePlaceholder')}" value="${escapeHtml(prefill.name || '')}" />
     </div>
     <div class="form-row">
-      <div class="form-group">
+      <div class="form-group" style="grid-column:1 / -1;">
         <label class="form-label">${t('plant.color')}</label>
-        <input id="plantColor" type="color" value="${sanitizeColorTag(prefill.color || '#0B3D2E')}" class="form-input" />
+        ${colorPickerHtml('id="plantColor"', prefill.color || '#0B3D2E')}
       </div>
       <div class="form-group">
         <label class="form-label">${t('plant.phase')}</label>
@@ -6571,8 +6615,8 @@ function renderPlants() {
       ${isEditing ? `
         <div style="margin-top:12px; padding:12px; border-radius:12px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.12); display:grid; gap:10px;">
           <input data-edit-field="name" data-plant-id="${plant.plant_id}" value="${escapeHtml(plant.name)}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-            <input data-edit-field="color" data-plant-id="${plant.plant_id}" type="color" value="${sanitizeColorTag(plant.color_tag)}" style="width:100%; height:44px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg};" />
+          ${colorPickerHtml(`data-edit-field="color" data-plant-id="${plant.plant_id}"`, plant.color_tag)}
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <select data-edit-field="phase" data-plant-id="${plant.plant_id}" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">
               <option value="seed" ${plant.phase === 'seed' ? 'selected' : ''}>${t('phase.seed')}</option>
               <option value="veg" ${plant.phase === 'veg' ? 'selected' : ''}>${t('phase.veg')}</option>
