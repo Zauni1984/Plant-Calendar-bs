@@ -1293,6 +1293,7 @@
   "devices.desktopOnlyHint": "Bluetooth-Sensoren und Tuya-Geräte lassen sich nur in der Desktop-App verbinden: Browser dürfen keine Geräte im lokalen Netzwerk ansprechen, und auf iPhone und iPad gibt es kein Web-Bluetooth. Messwerte, die die Desktop-App speichert, siehst du hier trotzdem.",
   "auth.webModalHint": "Melde dich an oder lege ein Konto an. Deine Pflanzen, Aufgaben und Logs werden in deinem Konto gespeichert und sind auf allen deinen Geräten verfügbar.",
   "photo.requiresSubscription": "Fotos hochladen ist Teil des Abos.",
+  "photo.processingNote": "Fotos werden auf höchstens 1000 × 1000 Pixel verkleinert, als WebP gespeichert und von Metadaten wie EXIF und GPS-Position befreit.",
   "photo.deletionBanner": "Dein Abo ist beendet. Deine Fotos werden am {0} gelöscht, außer du schließt vorher wieder ein Abo ab.",
   "photo.downloadAll": "Alle Fotos herunterladen",
   "photo.downloadFailed": "Download fehlgeschlagen: {0}",
