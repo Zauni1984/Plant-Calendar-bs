@@ -1,53 +1,38 @@
-<!--
-ACHTUNG: Alle in eckigen Klammern [...] stehenden Angaben MÜSSEN vor dem
-produktiven Launch durch die tatsächlichen Firmendaten ersetzt werden.
-Ohne vollständiges Impressum liegt ein Verstoß gegen § 5 DDG / § 18 MStV vor.
--->
-
 # Impressum
 
-Angaben gemäß § 5 DDG / § 18 MStV:
+Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG).
 
 ## Anbieter
 
 BlockSocial UG (haftungsbeschränkt)
-[Straße und Hausnummer]
-[PLZ] [Ort]
+Kratzmühlstr. 14
+92339 Beilngries
 Deutschland
-
-## Vertreten durch
-
-Geschäftsführer: [Name des Geschäftsführers]
 
 ## Kontakt
 
+Telefon: +49 176 8327 5353
 E-Mail: info@blocksocial.eu
-Telefon: [Telefonnummer]
+
+## Vertreten durch
+
+Geschäftsführer: Alexandre Ederer, Stefan Zaunreither
 
 ## Registereintrag
 
-Eintragung im Handelsregister
-Registergericht: [Amtsgericht]
-Registernummer: HRB [Nummer]
+Registergericht: Amtsgericht Ingolstadt
+Registernummer: HRB 11740
 
 ## Umsatzsteuer-ID
 
-Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG:
-USt-IdNr.: [DE...]
+Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: DE354082556
 
-## Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV
+## Verantwortlich für den Inhalt
 
-[Name]
-[Anschrift wie oben]
+Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV: Alexandre Ederer und
+Stefan Zaunreither, Anschrift wie oben.
 
-## EU-Streitschlichtung
-
-Die Europäische Kommission stellt eine Plattform zur Online-Streit-
-beilegung (OS) bereit: https://ec.europa.eu/consumers/odr/
-
-Unsere E-Mail-Adresse finden Sie oben im Impressum.
-
-## Verbraucher­streit­beilegung / Universal­schlichtungs­stelle
+## Verbraucherstreitbeilegung
 
 Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor
 einer Verbraucherschlichtungsstelle teilzunehmen.
