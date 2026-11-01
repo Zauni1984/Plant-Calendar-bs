@@ -221,9 +221,9 @@ mod tests {
         assert_eq!(free.remaining_slots, Some(1));
         assert!(free.can_create);
 
-        let csc = SubscriptionStatusSummary::empty_for_plan(SubscriptionPlan::Csc);
-        assert_eq!(csc.plant_limit, None);
-        assert_eq!(csc.remaining_slots, None);
-        assert!(csc.can_create);
+        let nursery = SubscriptionStatusSummary::empty_for_plan(SubscriptionPlan::Nursery);
+        assert_eq!(nursery.plant_limit, None);
+        assert_eq!(nursery.remaining_slots, None);
+        assert!(nursery.can_create);
     }
 }

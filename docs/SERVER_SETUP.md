@@ -138,7 +138,7 @@ Snapshot-Funktion des Hostinger-VPS aktivieren.
 
 ## 8. Stripe
 
-1. Im Stripe-Dashboard (Live-Modus) Produkte anlegen: Basic, Pro, CSC als
+1. Im Stripe-Dashboard (Live-Modus) Produkte anlegen: Basic, Pro, Gärtnerei als
    **Abo**, „Desktop-App“ als **einmalige Zahlung**. Die Preis-IDs (`price_…`)
    in `.env` eintragen.
 2. Webhook anlegen: URL `https://api.sowling.com/subscription/webhook`,

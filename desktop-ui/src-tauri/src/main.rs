@@ -603,7 +603,8 @@ async fn authorized_delete_log(session: &StoredSession, log_id: Uuid) -> Result<
 }
 
 fn normalize_backend_url(value: Option<String>) -> Result<String, String> {
-    let raw = value.unwrap_or_else(|| "http://127.0.0.1:8080".into());
+    // Empty or missing: the build's server (production in release builds).
+    let raw = value.filter(|v| !v.trim().is_empty()).unwrap_or_else(|| license::DEFAULT_API_URL.into());
     let trimmed = raw.trim().trim_end_matches('/').to_string();
     let parsed = url::Url::parse(&trimmed)
         .map_err(|e| format!("invalid backend url: {}", e))?;
@@ -623,14 +624,21 @@ fn normalize_backend_url(value: Option<String>) -> Result<String, String> {
     Ok(trimmed)
 }
 
+/// The server this build talks to. Only development builds let the user
+/// point the app at another backend; release builds always use production.
+#[tauri::command]
+fn desktop_backend_config() -> serde_json::Value {
+    serde_json::json!({ "url": license::DEFAULT_API_URL, "editable": cfg!(debug_assertions) })
+}
+
 #[tauri::command]
 fn get_plan_info() -> String {
     format!(
-        "Free: {}, Basic: {}, Pro: {}, CSC: {}",
+        "Free: {}, Basic: {}, Pro: {}, Nursery: {}",
         SubscriptionPlan::Free.plant_limit(),
         SubscriptionPlan::Basic.plant_limit(),
         SubscriptionPlan::Pro.plant_limit(),
-        if SubscriptionPlan::Csc.plant_limit() == usize::MAX { "∞".to_string() } else { SubscriptionPlan::Csc.plant_limit().to_string() }
+        if SubscriptionPlan::Nursery.plant_limit() == usize::MAX { "∞".to_string() } else { SubscriptionPlan::Nursery.plant_limit().to_string() }
     )
 }
 
@@ -638,7 +646,7 @@ fn parse_subscription_plan(value: &str) -> SubscriptionPlan {
     match value.to_lowercase().as_str() {
         "basic" => SubscriptionPlan::Basic,
         "pro" => SubscriptionPlan::Pro,
-        "csc" => SubscriptionPlan::Csc,
+        "nursery" | "csc" => SubscriptionPlan::Nursery,
         _ => SubscriptionPlan::Free,
     }
 }
@@ -3205,6 +3213,7 @@ fn main() {
             license_activate_account,
             license_remove,
             license_open_purchase_page,
+            desktop_backend_config,
             get_plan_info,
             bootstrap_local_user,
             list_local_plants,

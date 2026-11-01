@@ -17,7 +17,10 @@ pub enum SubscriptionPlan {
     Free,
     Basic,
     Pro,
-    Csc,
+    /// Unlimited plants, for nurseries and larger teams ("Gärtnerei").
+    /// Accepts the former id "csc" from older clients and stored data.
+    #[serde(alias = "csc")]
+    Nursery,
 }
 
 impl Default for SubscriptionPlan {
@@ -32,7 +35,7 @@ impl SubscriptionPlan {
             SubscriptionPlan::Free => 1,
             SubscriptionPlan::Basic => 3,
             SubscriptionPlan::Pro => 100,
-            SubscriptionPlan::Csc => usize::MAX,
+            SubscriptionPlan::Nursery => usize::MAX,
         }
     }
 }
@@ -679,14 +682,21 @@ mod tests {
     }
 
     #[test]
+    fn nursery_plan_reads_its_former_id() {
+        let old: SubscriptionPlan = serde_json::from_str("\"csc\"").unwrap();
+        assert_eq!(old, SubscriptionPlan::Nursery);
+        assert_eq!(serde_json::to_string(&SubscriptionPlan::Nursery).unwrap(), "\"nursery\"");
+    }
+
+    #[test]
     fn empty_summary_helpers_are_consistent() {
         let free = SubscriptionStatusSummary::empty_for_plan(SubscriptionPlan::Free);
         assert!(free.has_finite_limit());
         assert!(!free.is_over_limit());
 
-        let csc = SubscriptionStatusSummary::empty_for_plan(SubscriptionPlan::Csc);
-        assert!(!csc.has_finite_limit());
-        assert!(!csc.is_over_limit());
+        let nursery = SubscriptionStatusSummary::empty_for_plan(SubscriptionPlan::Nursery);
+        assert!(!nursery.has_finite_limit());
+        assert!(!nursery.is_over_limit());
     }
 
     #[test]

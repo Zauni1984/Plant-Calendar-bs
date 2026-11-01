@@ -2,6 +2,8 @@
 name = "sowling_desktop"
 version = "0.1.0"
 edition = "2021"
+authors = ["BlockSocial UG (haftungsbeschränkt)"]
+description = "Sowling – Pflanzenkalender (Desktop-App)"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

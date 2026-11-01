@@ -27,7 +27,7 @@ fn parse_plan(value: &str) -> SubscriptionPlan {
     match value {
         "basic" => SubscriptionPlan::Basic,
         "pro" => SubscriptionPlan::Pro,
-        "csc" => SubscriptionPlan::Csc,
+        "nursery" | "csc" => SubscriptionPlan::Nursery,
         _ => SubscriptionPlan::Free,
     }
 }
@@ -37,7 +37,7 @@ fn plan_str(value: SubscriptionPlan) -> &'static str {
         SubscriptionPlan::Free => "free",
         SubscriptionPlan::Basic => "basic",
         SubscriptionPlan::Pro => "pro",
-        SubscriptionPlan::Csc => "csc",
+        SubscriptionPlan::Nursery => "nursery",
     }
 }
 

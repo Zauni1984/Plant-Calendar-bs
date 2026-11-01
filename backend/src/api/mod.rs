@@ -910,14 +910,14 @@ fn checkout_price_eur_month(plan: SubscriptionPlan) -> f32 {
         SubscriptionPlan::Free => 0.0,
         SubscriptionPlan::Basic => 0.99,
         SubscriptionPlan::Pro => 5.99,
-        SubscriptionPlan::Csc => 50.0,
+        SubscriptionPlan::Nursery => 50.0,
     }
 }
 
 fn checkout_mode_for(plan: SubscriptionPlan) -> &'static str {
     match plan {
         SubscriptionPlan::Free => "direct_plan_change",
-        SubscriptionPlan::Basic | SubscriptionPlan::Pro | SubscriptionPlan::Csc => "external_checkout_stub",
+        SubscriptionPlan::Basic | SubscriptionPlan::Pro | SubscriptionPlan::Nursery => "external_checkout_stub",
     }
 }
 
@@ -955,12 +955,21 @@ pub async fn get_subscription_checkout_return(Query(query): Query<CheckoutReturn
     }))
 }
 
+/// Stripe price of the "Gärtnerei" plan. STRIPE_PRICE_CSC is the variable's
+/// former name and still read, so an existing .env keeps working.
+fn nursery_price_id() -> Option<String> {
+    std::env::var("STRIPE_PRICE_NURSERY")
+        .or_else(|_| std::env::var("STRIPE_PRICE_CSC"))
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+}
+
 fn stripe_price_id_for(plan: SubscriptionPlan) -> Option<String> {
     match plan {
         SubscriptionPlan::Free => None,
         SubscriptionPlan::Basic => std::env::var("STRIPE_PRICE_BASIC").ok(),
         SubscriptionPlan::Pro => std::env::var("STRIPE_PRICE_PRO").ok(),
-        SubscriptionPlan::Csc => std::env::var("STRIPE_PRICE_CSC").ok(),
+        SubscriptionPlan::Nursery => nursery_price_id(),
     }
 }
 
@@ -1212,7 +1221,7 @@ fn determine_plan_from_stripe_session(session: &serde_json::Value) -> Subscripti
         match plan_str {
             "basic" => return SubscriptionPlan::Basic,
             "pro" => return SubscriptionPlan::Pro,
-            "csc" => return SubscriptionPlan::Csc,
+            "nursery" | "csc" => return SubscriptionPlan::Nursery,
             _ => {}
         }
     }
@@ -1226,8 +1235,8 @@ fn determine_plan_from_stripe_session(session: &serde_json::Value) -> Subscripti
         if std::env::var("STRIPE_PRICE_PRO").ok().as_deref() == Some(price_id) {
             return SubscriptionPlan::Pro;
         }
-        if std::env::var("STRIPE_PRICE_CSC").ok().as_deref() == Some(price_id) {
-            return SubscriptionPlan::Csc;
+        if nursery_price_id().as_deref() == Some(price_id) {
+            return SubscriptionPlan::Nursery;
         }
     }
     // Fallback to Basic

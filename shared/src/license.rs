@@ -33,7 +33,7 @@ const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LicenseSource {
-    /// Basic, Pro or CSC subscription of the signed-in account.
+    /// Basic, Pro or Nursery subscription of the signed-in account.
     Subscription,
     /// One-time purchase through Stripe.
     Purchase,

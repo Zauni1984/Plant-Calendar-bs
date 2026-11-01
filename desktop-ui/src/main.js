@@ -326,7 +326,7 @@ root.innerHTML = `
       <div id="${IS_TAURI ? 'licenseCard' : 'desktopAppCard'}" class="view-card" style="margin-top:14px;display:none;"></div>
       <!-- Hidden inputs for auth (used by handlers) -->
       <div style="display:none;">
-        <input id="backendUrl" value="http://localhost:8080" />
+        <input id="backendUrl" value="" />
         <input id="email" /><input id="password" type="password" />
       </div>
       <div id="settingsPanel" class="view-card" style="margin-top:14px;"></div>
@@ -987,6 +987,8 @@ let reminderPermissionState = typeof Notification === "undefined" ? "unsupported
 // Web only: this browser receives push reminders from the server, so the
 // in-tab reminder check must not show the same task a second time.
 let webPushActive = false;
+// Desktop development builds only: the backend URL can be changed at sign-in.
+let backendUrlEditable = false;
 let pushCardMessage = ''; // last result shown in the settings push card
 let homeTaskFilter = "all";
 let homeTaskGrouping = "flat";
@@ -1079,7 +1081,7 @@ function calculateWateringNeed(plant) {
   }
 
   // Adjust for indoor/outdoor
-  if (location && (location.location_type === 'indoor' || location.location_type === 'growzelt')) {
+  if (location && (location.location_type === 'indoor' || location.location_type === 'tent' || location.location_type === 'growzelt')) {
     baseHours *= 0.9;
   }
 
@@ -2011,7 +2013,9 @@ async function handleCsvImport() {
 
 function normalizePlan(plan) {
   const raw = String(plan || "free").toLowerCase();
-  if (["basic", "pro", "csc", "free"].includes(raw)) return raw;
+  // "csc" is the former id of the nursery plan (older data and clients).
+  if (raw === "csc") return "nursery";
+  if (["basic", "pro", "nursery", "free"].includes(raw)) return raw;
   return "free";
 }
 
@@ -2019,7 +2023,7 @@ function planLimitFor(plan) {
   const normalized = normalizePlan(plan);
   if (normalized === "basic") return 3;
   if (normalized === "pro") return 100;
-  if (normalized === "csc") return Number.POSITIVE_INFINITY;
+  if (normalized === "nursery") return Number.POSITIVE_INFINITY;
   return 1;
 }
 
@@ -2096,7 +2100,7 @@ function planLabel(plan) {
   const normalized = normalizePlan(plan);
   if (normalized === "basic") return "Basic";
   if (normalized === "pro") return "Pro";
-  if (normalized === "csc") return "CSC";
+  if (normalized === "nursery") return t('plan.nursery.name');
   return "Free";
 }
 
@@ -2242,7 +2246,7 @@ async function loadLocations() {
 // module load and keep the startup language forever after a language switch.
 function getLocationTypeLabels() {
   return {
-    growzelt: t('location.type.tent'), gewaechshaus: t('location.type.greenhouse'), outdoor: t('location.type.outdoor'),
+    tent: t('location.type.tent'), gewaechshaus: t('location.type.greenhouse'), outdoor: t('location.type.outdoor'),
     indoor: t('location.type.indoor'), balkon: t('location.type.balcony'), custom: t('location.type.custom'),
   };
 }
@@ -2271,7 +2275,8 @@ function renderLocationsView() {
   } else {
     html += locations.map(loc => {
       const assignedPlants = plants.filter(p => p.location_id === loc.location_id);
-      const typeBadge = getLocationTypeLabels()[loc.location_type] || escapeHtml(loc.location_type);
+      // "growzelt" is the former id of "tent" (older data).
+      const typeBadge = getLocationTypeLabels()[loc.location_type === 'growzelt' ? 'tent' : loc.location_type] || escapeHtml(loc.location_type);
       return `<div class="view-card" style="margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
@@ -3184,7 +3189,7 @@ function getPlanConfig() {
     { key: "free",  title: "Free",  price: t('plan.price.free'),  limitText: t('plan.limit.1'),         accent: TC.textMuted, detail: t('plan.free.detail') },
     { key: "basic", title: "Basic", price: t('plan.price.basic'), limitText: t('plan.limit.3'),         accent: TC.accent,    detail: t('plan.basic.detail') },
     { key: "pro",   title: "Pro",   price: t('plan.price.pro'),   limitText: t('plan.limit.100'),       accent: "#9fd7ff",         detail: t('plan.pro.detail') },
-    { key: "csc",   title: "CSC",   price: t('plan.price.csc'),   limitText: t('plan.limit.unlimited'), accent: "#ffd76e",         detail: t('plan.csc.detail') },
+    { key: "nursery", title: t('plan.nursery.name'), price: t('plan.price.nursery'), limitText: t('plan.limit.unlimited'), accent: "#ffd76e", detail: t('plan.nursery.detail') },
   ];
 }
 const PLAN_CONFIG = getPlanConfig();
@@ -4903,9 +4908,9 @@ function openModal(type, prefill = {}) {
       <div style="padding:12px; border-radius:12px; background:rgba(${TC.accentRgb},0.06); border:1px solid rgba(${TC.accentRgb},0.12); margin-bottom:14px; font-size:13px; color:${TC.textMuted};">
         ${IS_TAURI ? t('auth.modalHint') : t('auth.webModalHint')}
       </div>
-      <div class="form-group"${IS_TAURI ? '' : ' style="display:none;"'}>
+      <div class="form-group"${IS_TAURI && backendUrlEditable ? '' : ' style="display:none;"'}>
         <label class="form-label">${t('auth.field.backendUrl')}</label>
-        <input id="authModalBackendUrl" class="form-input" placeholder="http://localhost:8080" value="${escapeHtml($('backendUrl')?.value || 'http://localhost:8080')}" />
+        <input id="authModalBackendUrl" class="form-input" placeholder="http://localhost:8080" value="${escapeHtml($('backendUrl')?.value || '')}" />
       </div>
       <div class="form-group">
         <label class="form-label">${t('auth.field.email')}</label>
@@ -4917,6 +4922,10 @@ function openModal(type, prefill = {}) {
       </div>
       <div id="authModalError" class="form-error" style="display:none;"></div>
       <div id="authModalSuccess" class="form-hint" style="display:none; color:${TC.accent};"></div>
+      <div style="margin-top:12px; font-size:12px; text-align:center;">
+        <button type="button" class="btn btn--ghost btn--sm" id="authModalImprint">${escapeHtml(t('settings.openImprint'))}</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="authModalPrivacy">${escapeHtml(t('settings.openPrivacy'))}</button>
+      </div>
       ${IS_TAURI || webGuest ? '' : `
       <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(${TC.accentRgb},0.12); text-align:center;">
         <button type="button" class="btn btn--ghost btn--sm" id="authModalGuest">${escapeHtml(t('guest.try'))}</button>
@@ -4963,6 +4972,9 @@ function openModal(type, prefill = {}) {
       }
     });
     document.getElementById('authModalGuest')?.addEventListener('click', startGuestMode);
+    // Imprint and privacy policy must be reachable before signing in, too.
+    document.getElementById('authModalImprint')?.addEventListener('click', openImprintDoc);
+    document.getElementById('authModalPrivacy')?.addEventListener('click', openPrivacyDoc);
     document.getElementById('authModalRegister')?.addEventListener('click', async () => {
       const { email, password, backendUrl } = getAuthFields();
       if (!email || !password) { showAuthError(t('auth.emailPasswordRequired')); return; }
@@ -8560,7 +8572,15 @@ bindPlantFilterControls();
 
 // Load data. In the browser, first exchange the refresh cookie for a session
 // so the initial load already sees the user's data.
-const startupSession = IS_TAURI ? Promise.resolve() : invoke("bootstrap_local_user").catch(() => {});
+// Desktop: which server this build talks to (production in release builds;
+// only development builds show the backend URL field).
+const startupSession = IS_TAURI
+  ? invoke("desktop_backend_config").then((cfg) => {
+      backendUrlEditable = !!cfg?.editable;
+      const field = document.getElementById("backendUrl");
+      if (field && !field.value) field.value = cfg?.url || "";
+    }).catch(() => {})
+  : invoke("bootstrap_local_user").catch(() => {});
 startupSession
   .then(() => (IS_TAURI ? checkDesktopLicense() : handleLicenseLinks()))
   .then(() => refreshWebSessionState())
@@ -8974,7 +8994,7 @@ async function renderGuestCard() {
 
 // ── Desktop license ─────────────────────────────────────────────────────────
 // Desktop: the app needs a license certificate (src-tauri/src/license.rs).
-// It comes from a key, or from the signed-in account (Basic/Pro/CSC
+// It comes from a key, or from the signed-in account (Basic/Pro/Nursery
 // subscription, one-time purchase, or a grant to the account's e-mail).
 // Web: the account card shows whether the desktop app is included or bought,
 // offers the one-time purchase and the download.

@@ -24,7 +24,7 @@ Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 - Topfgroesse und Substrat-Tracking
 
 ### Standorte
-- Standortverwaltung: Growzelt, Gewaechshaus, Outdoor, Indoor, Balkon
+- Standortverwaltung: Gewächshaus, Pflanzenzelt, Outdoor, Indoor, Balkon
 - Pflanzen einem Standort zuweisen
 - Pro Standort eigene Wetter-Koordinaten
 
@@ -44,7 +44,13 @@ Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 ### Foto-Tagebuch
 - Chronologische Foto-Timeline pro Pflanze
 - Wachstumsfortschritt visualisieren (Tag X seit Start)
-- Fotos komplett lokal gespeichert (kein Server-Upload)
+- Foto-Upload in der Web-App ist Teil der Abos Basic, Pro und Gärtnerei; Fotos
+  liegen dann auf dem Server
+- Desktop-App: Fotos bleiben lokal auf dem Computer
+- Jedes Foto wird auf höchstens 1000 × 1000 Pixel verkleinert, als WebP
+  gespeichert und von Metadaten (EXIF, GPS) befreit
+- Nach Ende eines bezahlten Abos bleiben Server-Fotos 90 Tage abrufbar (ZIP-Download),
+  danach werden sie gelöscht
 
 ### Wetter
 - Echtzeit-Wetterdaten via Open-Meteo (kostenlos, kein API-Key)
@@ -70,7 +76,7 @@ Entwickelt von BlockSocial UG (haftungsbeschraenkt) — info@blocksocial.eu
 - GDPR-konforme Account-Loeschung
 
 ### Billing
-- Free (1 Pflanze) / Basic (3) / Pro (100) / CSC (unbegrenzt)
+- Free (1 Pflanze) / Basic (3) / Pro (100) / Gärtnerei (unbegrenzt)
 - Stripe Checkout mit Webhook-Validierung
 - Customer Portal, Grandfather-Regel bei Downgrade
 

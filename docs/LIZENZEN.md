@@ -4,7 +4,7 @@ Die Desktop-App läuft nur mit Lizenz. Freigeschaltet wird sie auf drei Wegen:
 
 | Weg | Wie | Gültigkeit offline |
 |---|---|---|
-| Abo Basic, Pro oder CSC | in der App „Mit Konto anmelden“ | 14 Tage, dann Online-Erneuerung |
+| Abo Basic, Pro oder Gärtnerei | in der App „Mit Konto anmelden“ | 14 Tage, dann Online-Erneuerung |
 | Einmalkauf (Stripe) | im Web unter Konto → Desktop-App kaufen; dann den angezeigten Lizenzschlüssel eingeben **oder** in der App mit dem Konto anmelden | 60 Tage |
 | Eigene Lizenz (Test, Betatester, treue Kunden) | Lizenzschlüssel eingeben **oder** mit der hinterlegten E-Mail anmelden | 60 Tage |
 
