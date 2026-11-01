@@ -2,9 +2,7 @@
 
 **Stand: 01.11.2026**
 
-<!-- Offen: Sobald der
-     E-Mail-Versand (Hostinger Mail) aktiv ist, Abschnitt 4.9 ergänzen. Eine
-     anwaltliche Prüfung vor dem Livegang wird empfohlen. -->
+<!-- Eine anwaltliche Prüfung vor dem Livegang wird empfohlen. -->
 
 Diese Datenschutzerklärung informiert Sie nach Art. 12–14 DSGVO darüber, welche
 personenbezogenen Daten wir verarbeiten, wenn Sie **Sowling** nutzen –
@@ -159,10 +157,34 @@ Zum Schutz vor Passwort- und Schlüssel-Ratversuchen zählen wir Anfragen pro
 IP-Adresse; diese Zählung liegt nur im Arbeitsspeicher und verfällt nach
 höchstens 15 Minuten.
 
+### 4.9 E-Mail-Versand
+
+Wir senden nur E-Mails, die zu einem Vorgang gehören, den Sie ausgelöst haben:
+
+- nach dem Kauf der Desktop-App den **Lizenzschlüssel** an die beim Kauf
+  angegebene E-Mail-Adresse,
+- einen **Lizenzschlüssel oder Gutscheincode**, den wir Ihnen persönlich
+  zukommen lassen (z. B. als Betatester oder Kooperationspartner).
+
+Dafür verarbeiten wir Ihre E-Mail-Adresse und den Inhalt der Nachricht
+(Art. 6 Abs. 1 lit. b DSGVO). Versendet wird über den E-Mail-Dienst unseres
+Hosters Hostinger (Absender service@sowling.com); Kopien bleiben nur im
+Postausgang dieses Postfachs. Newsletter oder Werbung versenden wir nicht, und
+die E-Mails enthalten keine Zählpixel.
+
+### 4.10 Gutscheine
+
+Lösen Sie einen Gutscheincode ein, speichern wir, welchen Gutschein Ihr Konto
+eingelöst hat, wann, sowie den freigeschalteten Tarif und dessen Laufzeit
+(Art. 6 Abs. 1 lit. b DSGVO). Gutscheincodes selbst speichern wir nur als Hash.
+Nach Ablauf fällt Ihr Konto auf Ihr bezahltes Abo bzw. auf Free zurück; für
+Fotos gilt dann die 90-Tage-Frist aus 4.1.
+
 ## 5. Empfänger und Auftragsverarbeiter
 
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Zypern – Betrieb von Server und Datenbank im
-  Auftrag (Art. 28 DSGVO), Serverstandort Deutschland (Frankfurt am Main).
+  Auftrag (Art. 28 DSGVO), Serverstandort Deutschland (Frankfurt am Main);
+  außerdem Versand der E-Mails aus 4.9 (Hostinger Mail).
 - **Stripe Payments Europe Ltd.** (Irland) – Zahlungsabwicklung; konzernintern
   auch Stripe Inc. (USA).
 - **Open-Meteo** (Deutschland) – nur bei erteilter Einwilligung „Wetter“.
@@ -193,6 +215,8 @@ zertifiziert ist, sonst auf EU-Standardvertragsklauseln. Bei den Push-Diensten
 | Lösch-Vermerke für die Synchronisation | 180 Tage |
 | Verlauf der Tarifwechsel | die letzten 200 Einträge je Konto |
 | Desktop-Lizenzen | solange die Lizenz besteht (siehe 4.6) |
+| Eingelöste Gutscheine | bis Sie Ihr Konto löschen |
+| Gesendete E-Mails (Postausgang) | höchstens 12 Monate |
 | Abrechnungsunterlagen (bei Stripe) | gesetzliche Aufbewahrungsfristen, i. d. R. 10 Jahre |
 | Server-Protokolle | höchstens 30 Tage |
 | Datensicherungen | 30 Tage, danach überschrieben |

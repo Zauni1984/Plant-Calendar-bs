@@ -95,6 +95,11 @@ nano .env
    - Beide geheimen Schlüssel zusätzlich im Passwort-Manager sichern.
 4. Stripe-Werte (Live-Schlüssel, Webhook-Secret, Preis-IDs), siehe Abschnitt 8.
 5. `DESKTOP_DOWNLOAD_URL`, sobald der Installer online ist.
+6. E-Mail (Hostinger Mail): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+   `MAIL_FROM`, siehe `.env.example`. Ohne Passwort verschickt der Server keine
+   Mails, läuft aber normal. Test: `docker compose exec backend sowling-backend
+   license create --email DEINE-ADRESSE --note "Mailtest" --send`; die Test-Lizenz
+   danach mit `license revoke` widerrufen.
 
 ## 6. Starten
 
@@ -154,7 +159,8 @@ docker compose exec backend sowling-backend license create --note "Betatester" -
 docker compose exec backend sowling-backend license list
 ```
 
-Mehr dazu in [LIZENZEN.md](LIZENZEN.md).
+Mehr dazu in [LIZENZEN.md](LIZENZEN.md). Abos verschenken (Influencer,
+Bestellungen, Flyer): [GUTSCHEINE.md](GUTSCHEINE.md).
 
 ## 10. Updates einspielen
 

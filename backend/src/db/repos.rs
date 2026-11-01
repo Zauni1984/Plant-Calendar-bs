@@ -23,7 +23,7 @@ fn auth_mode_str(value: &AuthMode) -> &'static str {
     }
 }
 
-fn parse_plan(value: &str) -> SubscriptionPlan {
+pub(crate) fn parse_plan(value: &str) -> SubscriptionPlan {
     match value {
         "basic" => SubscriptionPlan::Basic,
         "pro" => SubscriptionPlan::Pro,
@@ -32,7 +32,7 @@ fn parse_plan(value: &str) -> SubscriptionPlan {
     }
 }
 
-fn plan_str(value: SubscriptionPlan) -> &'static str {
+pub(crate) fn plan_str(value: SubscriptionPlan) -> &'static str {
     match value {
         SubscriptionPlan::Free => "free",
         SubscriptionPlan::Basic => "basic",
@@ -324,6 +324,54 @@ pub async fn upsert_user_plan(state: &AppState, user_id: Uuid, plan: Subscriptio
         .execute(&state.pg)
         .await?;
     Ok(())
+}
+
+/// Free < Basic < Pro < Nursery.
+pub fn plan_rank(plan: SubscriptionPlan) -> u8 {
+    match plan {
+        SubscriptionPlan::Free => 0,
+        SubscriptionPlan::Basic => 1,
+        SubscriptionPlan::Pro => 2,
+        SubscriptionPlan::Nursery => 3,
+    }
+}
+
+/// Record the plan of the Stripe subscription (None: no subscription) and
+/// apply the resulting effective plan.
+pub async fn set_stripe_plan(state: &AppState, user_id: Uuid, plan: Option<SubscriptionPlan>) -> anyhow::Result<SubscriptionPlan> {
+    let plan = plan.filter(|p| *p != SubscriptionPlan::Free);
+    sqlx::query("UPDATE users SET stripe_plan = $2 WHERE user_id = $1")
+        .bind(user_id)
+        .bind(plan.map(plan_str))
+        .execute(&state.pg)
+        .await?;
+    apply_effective_plan(state, user_id).await
+}
+
+/// users.plan = the better of the Stripe subscription and an unexpired
+/// voucher. Changes go through upsert_user_plan (photo retention clock) and
+/// enforce the plant limit on a downgrade.
+pub async fn apply_effective_plan(state: &AppState, user_id: Uuid) -> anyhow::Result<SubscriptionPlan> {
+    let (current, stripe, voucher, until): (String, Option<String>, Option<String>, Option<DateTime<Utc>>) =
+        sqlx::query_as("SELECT plan, stripe_plan, voucher_plan, voucher_until FROM users WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&state.pg)
+            .await?;
+    let stripe = stripe.as_deref().map(parse_plan).unwrap_or(SubscriptionPlan::Free);
+    let voucher = match (voucher.as_deref(), until) {
+        (Some(p), None) => parse_plan(p),
+        (Some(p), Some(u)) if u > Utc::now() => parse_plan(p),
+        _ => SubscriptionPlan::Free,
+    };
+    let effective = if plan_rank(voucher) > plan_rank(stripe) { voucher } else { stripe };
+    let current = parse_plan(&current);
+    if effective != current {
+        upsert_user_plan(state, user_id, effective).await?;
+        if plan_rank(effective) < plan_rank(current) {
+            enforce_user_plan_limit(state, user_id).await?;
+        }
+    }
+    Ok(effective)
 }
 
 pub async fn active_plant_count(state: &AppState, user_id: Uuid) -> anyhow::Result<i64> {

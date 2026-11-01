@@ -2,8 +2,8 @@
 
 **Last updated: 1 November 2026**
 
-<!-- Before publishing: add a section once e-mail sending (Hostinger Mail) is live. The German version
-     is authoritative; a legal review before launch is recommended. -->
+<!-- The German version is authoritative; a legal review before launch is
+     recommended. -->
 
 This policy explains, in line with Art. 12–14 GDPR, which personal data we
 process when you use **Sowling** – as a **web app** in your browser
@@ -149,10 +149,34 @@ continuously overwritten and kept for at most 30 days.
 To protect against password and key guessing we count requests per IP address;
 this count is held in memory only and expires after at most 15 minutes.
 
+### 4.9 E-mail
+
+We only send e-mails that belong to something you started:
+
+- after buying the desktop app, the **license key** to the e-mail address given
+  at checkout,
+- a **license key or voucher code** we send you personally (e.g. as a beta
+  tester or partner).
+
+For this we process your e-mail address and the content of the message
+(Art. 6(1)(b) GDPR). E-mails are sent through the mail service of our hosting
+provider Hostinger (sender service@sowling.com); copies stay only in that
+mailbox's sent folder. We send no newsletters or advertising, and the e-mails
+contain no tracking pixels.
+
+### 4.10 Vouchers
+
+When you redeem a voucher code, we store which voucher your account redeemed
+and when, plus the unlocked plan and how long it runs (Art. 6(1)(b) GDPR).
+Voucher codes themselves are stored only as a hash. When the voucher ends, your
+account returns to your paid subscription or to Free; for photos the 90-day
+period from 4.1 then applies.
+
 ## 5. Recipients and processors
 
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Cyprus – operating the server and database on our
-  behalf (Art. 28 GDPR), server location Germany (Frankfurt am Main).
+  behalf (Art. 28 GDPR), server location Germany (Frankfurt am Main); also
+  sending the e-mails described in 4.9 (Hostinger Mail).
 - **Stripe Payments Europe Ltd.** (Ireland) – payment processing; within its
   group also Stripe Inc. (USA).
 - **Open-Meteo** (Germany) – only with your "weather" consent.
@@ -181,6 +205,8 @@ Push services only receive encrypted content.
 | Deletion markers for synchronisation | 180 days |
 | History of plan changes | last 200 entries per account |
 | Desktop licenses | as long as the license exists (see 4.6) |
+| Redeemed vouchers | until you delete your account |
+| Sent e-mails (sent folder) | at most 12 months |
 | Invoicing records (at Stripe) | statutory retention, usually 10 years |
 | Server logs | at most 30 days |
 | Backups | 30 days, then overwritten |

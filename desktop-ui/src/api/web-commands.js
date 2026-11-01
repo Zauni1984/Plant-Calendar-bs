@@ -665,6 +665,11 @@ export const webCommands = {
     requireSession();
     return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan) } });
   },
+  voucher_status_smart: () => (hasSession() ? api("/vouchers/me") : Promise.resolve(null)),
+  voucher_redeem_smart: ({ code }) => {
+    requireSession();
+    return api("/vouchers/redeem", { method: "POST", body: { code } });
+  },
   // A test hook for the desktop; it must never exist in a public web build.
   subscription_webhook_stub_smart: notYet("Der Webhook-Test"),
 

@@ -1009,6 +1009,8 @@ let checkoutState = { status: "idle", plan: null, message: "", checkoutUrl: null
 const CHECKOUT_HISTORY_STORAGE_KEY = "bs_checkout_history";
 let checkoutHistory = [];
 let subscriptionHistory = [];
+// The account's redeemed voucher: { plan, until } (until null: unlimited) or null.
+let currentVoucher = null;
 let subscriptionHistorySource = "local";
 let subscriptionStatusSummary = null;
 
@@ -3047,7 +3049,80 @@ function mapServerHistoryEntry(entry) {
   };
 }
 
+async function loadVoucherStatus() {
+  if (currentPlanSource !== "account") {
+    currentVoucher = null;
+    return;
+  }
+  try {
+    currentVoucher = (await invoke("voucher_status_smart")) || null;
+  } catch (_) {
+    currentVoucher = null;
+  }
+}
+
+// Server answers carry a reason code ("invalid", "used_up", …); on the
+// desktop it arrives inside the error text.
+function voucherErrorCode(err) {
+  const raw = String(err?.body?.code || err?.message || err || '');
+  const match = raw.match(/"code"\s*:\s*"([a-z_]+)"/);
+  const code = match ? match[1] : raw.trim();
+  return ['invalid', 'expired', 'used_up', 'already_redeemed', 'lower_plan', 'already_unlimited', 'would_replace_unlimited'].includes(code) ? code : null;
+}
+
+function renderVoucherCard() {
+  const isAccount = currentPlanSource === "account";
+  const status = currentVoucher
+    ? (currentVoucher.until
+      ? t('voucher.active', planLabel(currentVoucher.plan), new Date(currentVoucher.until).toLocaleDateString(localeTag(), { day: 'numeric', month: 'long', year: 'numeric' }))
+      : t('voucher.activeUnlimited', planLabel(currentVoucher.plan)))
+    : '';
+  return `
+    <div id="voucherCard" style="margin-top:12px; padding:14px; border-radius:16px; background:${TC.inputBg}; border:1px solid rgba(${TC.accentRgb},0.18);">
+      <strong style="font-size:15px; color:${TC.text};">${t('voucher.title')}</strong>
+      ${status ? `<div style="margin-top:6px; font-size:13px; color:${TC.accent};">${escapeHtml(status)}</div>` : ''}
+      ${isAccount ? `
+        <form id="voucherForm" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <input id="voucherCode" class="form-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"
+            placeholder="${escapeHtml(t('voucher.placeholder'))}" aria-label="${escapeHtml(t('voucher.title'))}" style="flex:1; min-width:180px; text-transform:uppercase;" />
+          <button type="submit" class="btn btn--primary btn--sm">${t('voucher.redeem')}</button>
+        </form>
+        <div style="margin-top:6px; font-size:11px; color:${TC.textDim};">${t('voucher.hint')}</div>
+        <div id="voucherMsg" role="status" style="margin-top:6px; font-size:12px;"></div>
+      ` : `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">${t('voucher.loginNeeded')}</div>`}
+    </div>
+  `;
+}
+
+async function redeemVoucher(code) {
+  const msg = $("voucherMsg");
+  const show = (text, ok) => {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.style.color = ok ? TC.accent : '#ffb3a7';
+  };
+  if (!code.trim()) return;
+  showLoading(t('voucher.redeeming'));
+  try {
+    const result = await invoke("voucher_redeem_smart", { code: code.trim() });
+    await refreshAll({ autoReminderReason: "plan_change" });
+    const name = planLabel(result?.voucher_plan);
+    const text = result?.voucher_until
+      ? t('voucher.success', name, new Date(result.voucher_until).toLocaleDateString(localeTag(), { day: 'numeric', month: 'long', year: 'numeric' }))
+      : t('voucher.successUnlimited', name);
+    // The panel was re-rendered by refreshAll; show the result in the new one.
+    const fresh = $("voucherMsg");
+    if (fresh) { fresh.textContent = text; fresh.style.color = TC.accent; }
+  } catch (err) {
+    const code = voucherErrorCode(err);
+    show(code ? t(`voucher.error.${code}`) : t('voucher.error.generic', String(err?.message || err)), false);
+  } finally {
+    hideLoading();
+  }
+}
+
 async function loadSubscriptionHistory() {
+  await loadVoucherStatus();
   if (currentPlanSource !== "account") {
     subscriptionHistory = [];
     subscriptionHistorySource = "local";
@@ -3267,6 +3342,7 @@ function renderSubscriptionPanel() {
       ${t('billing.mvpStatus')}
     </div>
     ${renderUnifiedSubscriptionStatusCard()}
+    ${renderVoucherCard()}
     ${renderCheckoutStateCard()}
     ${renderCheckoutHistoryCard()}
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:12px;">${cards}</div>
@@ -8440,6 +8516,12 @@ $("syncNow")?.addEventListener("click", async () => {
   } finally {
     hideLoading();
   }
+});
+
+subscriptionPanel?.addEventListener("submit", (event) => {
+  if (event.target?.id !== "voucherForm") return;
+  event.preventDefault();
+  redeemVoucher($("voucherCode")?.value || "");
 });
 
 subscriptionPanel?.addEventListener("click", async (event) => {

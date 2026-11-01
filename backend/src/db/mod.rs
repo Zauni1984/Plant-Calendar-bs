@@ -13,6 +13,8 @@ pub struct AppState {
     pub push: Option<std::sync::Arc<crate::services::push::PushConfig>>,
     /// Signs desktop license certificates (LICENSE_SIGNING_KEY).
     pub license_key: std::sync::Arc<shared::license::SigningKey>,
+    /// None when SMTP is not configured (no e-mail is sent).
+    pub mail: Option<std::sync::Arc<crate::services::mail::Mailer>>,
 }
 
 impl AppState {
@@ -35,7 +37,11 @@ impl AppState {
         tracing::info!(dir = %photos.root().display(), "photo storage");
         let push = crate::services::push::PushConfig::from_env()?;
         let license_key = std::sync::Arc::new(license_signing_key()?);
-        Ok(Self { pg, jwt_secret, photos, push, license_key })
+        let mail = crate::services::mail::Mailer::from_env()?.map(std::sync::Arc::new);
+        if mail.is_none() {
+            tracing::info!("SMTP_HOST not set: no e-mail is sent");
+        }
+        Ok(Self { pg, jwt_secret, photos, push, license_key, mail })
     }
 }
 

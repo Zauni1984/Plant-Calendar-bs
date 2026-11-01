@@ -2,6 +2,7 @@ pub mod guest_import;
 pub mod licenses;
 pub mod photos;
 pub mod push;
+pub mod vouchers;
 pub mod weather;
 
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{HeaderMap, StatusCode}, response::{IntoResponse, Response}, Json};
@@ -989,7 +990,7 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
     if let Some(stripe) = StripeClient::from_env() {
         if payload.plan == SubscriptionPlan::Free {
             // Free plan: activate directly, no Stripe needed
-            match repos::upsert_user_plan(&state, session.user_id, payload.plan).await {
+            match repos::set_stripe_plan(&state, session.user_id, Some(payload.plan)).await {
                 Ok(_) => {
                     let _ = repos::enforce_user_plan_limit(&state, session.user_id).await;
                     let _ = repos::record_subscription_history(&state, session.user_id, "plan_downgrade_free", payload.plan, Some(previous_plan), None, Some("stripe"), Some("active"), Some("Downgrade zu Free direkt aktiviert.")).await;
@@ -1068,7 +1069,7 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
 
     let _ = repos::record_subscription_history(&state, session.user_id, "checkout_prepared", payload.plan, Some(previous_plan), checkout_id.as_deref(), Some("stub"), Some("pending"), Some(&message)).await;
 
-    match repos::upsert_user_plan(&state, session.user_id, payload.plan).await {
+    match repos::set_stripe_plan(&state, session.user_id, Some(payload.plan)).await {
         Ok(_) => {
             let _ = repos::enforce_user_plan_limit(&state, session.user_id).await;
             let _ = repos::record_subscription_history(&state, session.user_id, "plan_activated_mvp_direct", payload.plan, Some(previous_plan), checkout_id.as_deref(), Some("stub"), Some("active"), Some("Plan im MVP direkt aktiviert.")).await;
@@ -1135,7 +1136,7 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
             let plan = determine_plan_from_stripe_session(session_obj);
             let previous_plan = Some(user.plan);
 
-            if let Err(err) = repos::upsert_user_plan(&state, user.user_id, plan).await {
+            if let Err(err) = repos::set_stripe_plan(&state, user.user_id, Some(plan)).await {
                 return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
             }
             let _ = repos::enforce_user_plan_limit(&state, user.user_id).await;
@@ -1157,7 +1158,7 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
                     .await
                     .unwrap_or(None);
                 if let Some((user_id,)) = row {
-                    if let Err(err) = repos::upsert_user_plan(&state, user_id, SubscriptionPlan::Free).await {
+                    if let Err(err) = repos::set_stripe_plan(&state, user_id, None).await {
                         tracing::error!(%user_id, "cancellation: could not downgrade plan: {err}");
                     }
                     let _ = repos::enforce_user_plan_limit(&state, user_id).await;
@@ -1190,7 +1191,7 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
     let _ = repos::record_subscription_history(&state, payload.user_id, "webhook_received", payload.plan, previous_plan, payload.checkout_id.as_deref(), Some(&provider), Some(&payload.checkout_status), Some(&format!("Webhook-Event {event_type} empfangen."))).await;
 
     if activation_allowed {
-        if let Err(err) = repos::upsert_user_plan(&state, payload.user_id, payload.plan).await {
+        if let Err(err) = repos::set_stripe_plan(&state, payload.user_id, Some(payload.plan)).await {
             return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
         }
         let _ = repos::enforce_user_plan_limit(&state, payload.user_id).await;
@@ -1446,6 +1447,10 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    let voucher_export = match vouchers::active_voucher(&state, user_id).await {
+        Ok(v) => v.map(|(plan, until)| serde_json::json!({ "plan": plan, "until": until })),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
     let body = serde_json::json!({
         "schema_version": 1,
         "exported_at": Utc::now().to_rfc3339(),
@@ -1463,6 +1468,7 @@ pub async fn export_me(
         "photos_archive": "/photos/archive",
         "push_subscriptions": push_export,
         "desktop_licenses": license_export,
+        "voucher": voucher_export,
     });
 
     let json = match serde_json::to_vec(&body) {

@@ -23,6 +23,9 @@ sowling-backend license create --note "Betatester Max" --devices 2
 # dieser Adresse an, ein Schlüssel ist nicht nötig. Mit Schlüssel geht es zusätzlich.
 sowling-backend license create --email kunde@example.com --note "Treuer Kunde" --no-key
 
+# Schlüssel zusätzlich per E-Mail an die Person schicken (SMTP nötig)
+sowling-backend license create --email tester@example.com --note "Betatester" --send
+
 # Übersicht, Widerruf, Geräte zurücksetzen
 sowling-backend license list            # --all zeigt auch widerrufene
 sowling-backend license revoke SOWL-XXXX-XXXX-XXXX-XXXX   # oder Lizenz-ID oder E-Mail
@@ -31,7 +34,9 @@ sowling-backend license reset-devices <lizenz-id>
 
 Schlüssel werden nur als Hash gespeichert. Wer einen selbst ausgestellten Schlüssel verliert, bekommt einen neuen; den alten widerrufen.
 
-**Käufer-Schlüssel** stehen dauerhaft im Web-Konto (Konto → Desktop-App). Sie werden nicht gespeichert, sondern aus `LICENSE_SIGNING_KEY` und der Lizenz-ID berechnet. Nach einer Kontolöschung funktioniert der Schlüssel weiter; die Lizenz verliert nur den Bezug zur Person. **Deshalb `LICENSE_SIGNING_KEY` nie wechseln** – sonst passen die angezeigten Käufer-Schlüssel nicht mehr (das Konto zeigt dann keinen an).
+Ein ganzes **Abo** (inklusive Desktop-App) verschenkst du mit Gutscheinen, siehe [GUTSCHEINE.md](GUTSCHEINE.md).
+
+**Käufer-Schlüssel** gehen nach dem Kauf automatisch per E-Mail an den Käufer (wenn SMTP eingerichtet ist) und stehen dauerhaft im Web-Konto (Konto → Desktop-App). Sie werden nicht gespeichert, sondern aus `LICENSE_SIGNING_KEY` und der Lizenz-ID berechnet. Nach einer Kontolöschung funktioniert der Schlüssel weiter; die Lizenz verliert nur den Bezug zur Person. **Deshalb `LICENSE_SIGNING_KEY` nie wechseln** – sonst passen die angezeigten Käufer-Schlüssel nicht mehr (das Konto zeigt dann keinen an).
 
 ## Einmalig einrichten (Produktion)
 
