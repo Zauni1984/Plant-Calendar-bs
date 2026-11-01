@@ -230,7 +230,7 @@ const root = document.querySelector("#app");
 root.innerHTML = `
 <div class="app-shell">
   <header class="app-toolbar" id="appToolbar">
-    <div class="app-brand">Sowling<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
+    <div class="app-brand"><img class="app-brand__logo" src="/icons/icon-192.png" alt="" width="26" height="26" />Sowling<span id="profileIndicator" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;"></span></div>
     <nav class="app-nav" id="appNav"></nav>
     <div class="plant-context-bar" id="plantContextBar"></div>
   </header>

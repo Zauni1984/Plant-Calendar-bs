@@ -27,7 +27,8 @@ export default defineConfig({
           'assets/index-*.{js,css}',
           // Tiny chunks every start needs (lazy-import helper, SW registration).
           'assets/{preload-helper,virtual_pwa-register,workbox-window}*.js',
-          'icons/*.{png,svg}',
+          // Small icons only; the 512 px ones are fetched by the OS on install.
+          'icons/{favicon-32,icon-192,apple-touch-icon}.png',
           'manifest.webmanifest',
         ],
       },

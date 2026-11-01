@@ -24,6 +24,15 @@
   color: var(--accent);
   letter-spacing: 0.5px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-brand__logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex: none;
 }
 .app-nav {
   display: flex;
