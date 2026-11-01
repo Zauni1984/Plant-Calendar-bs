@@ -1,10 +1,8 @@
 # Privacy Policy – Sowling
 
-**Last updated: 16 October 2026**
+**Last updated: 1 November 2026**
 
-<!-- Before publishing: fill in the address (section 1), hosting provider and
-     server location (section 5), and the app name after the rename. Add a
-     section once e-mail sending (Hostinger Mail) is live. The German version
+<!-- Before publishing: add a section once e-mail sending (Hostinger Mail) is live. The German version
      is authoritative; a legal review before launch is recommended. -->
 
 This policy explains, in line with Art. 12–14 GDPR, which personal data we
@@ -15,8 +13,8 @@ In case of doubt, the German version applies.
 ## 1. Controller
 
 BlockSocial UG (haftungsbeschränkt)
-[Street, number]
-[Postcode, city], Germany
+Kratzmühlstr. 14
+92339 Beilngries, Germany
 E-mail: info@blocksocial.eu
 
 No data protection officer is appointed, as there is no obligation to do so
@@ -153,8 +151,8 @@ this count is held in memory only and expires after at most 15 minutes.
 
 ## 5. Recipients and processors
 
-- **Hosting:** [provider, address] – operating the server and database on our
-  behalf (Art. 28 GDPR), server location [country, EU].
+- **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Cyprus – operating the server and database on our
+  behalf (Art. 28 GDPR), server location Germany (Frankfurt am Main).
 - **Stripe Payments Europe Ltd.** (Ireland) – payment processing; within its
   group also Stripe Inc. (USA).
 - **Open-Meteo** (Germany) – only with your "weather" consent.
