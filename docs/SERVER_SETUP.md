@@ -31,6 +31,7 @@ für IPv6) auf die Server-IP setzen:
 |---|---|---|
 | `app` | A | IP des VPS |
 | `api` | A | IP des VPS |
+| `admin` | A | IP des VPS (Admin-Bereich) |
 
 Bis die Einträge weltweit sichtbar sind, kann es einige Minuten dauern.
 
@@ -188,6 +189,20 @@ Firmen aus einem anderen EU-Land mit per VIES bestätigter USt-IdNr. bekommen
 eine Rechnung ohne USt (Reverse Charge), Firmen außerhalb der EU eine Rechnung
 ohne deutsche USt. Der von Stripe abgebuchte Betrag ist in allen Fällen der
 Listenpreis; bei Reverse Charge ist er der Nettobetrag der Rechnung.
+
+## 8b. Admin-Bereich (admin.sowling.com)
+
+Statistiken mit Diagrammen, Kontenverwaltung (deaktivieren, löschen),
+Rechnungsprobleme und ein Protokoll aller Admin-Aktionen. Anleitung:
+[ADMIN.md](ADMIN.md).
+
+1. DNS: A-Eintrag `admin` auf die IP des VPS (wie `app` und `api`).
+2. Optional `ADMIN_DOMAIN` in `.env` (Standard `admin.sowling.com`).
+3. Dein normales Konto zum Admin machen und den QR-Code mit einer
+   Authenticator-App scannen:
+   ```bash
+   docker compose exec backend sowling-backend admin grant DEINE-ADRESSE
+   ```
 
 ## 9. Eigene Lizenzen ausstellen
 

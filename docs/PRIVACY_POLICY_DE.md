@@ -41,8 +41,13 @@ den Kontoeinstellungen widerrufen; der Widerruf wirkt für die Zukunft
 ## 3. Konto und Gartendaten
 
 **Daten:** E-Mail-Adresse, Passwort (nur als Argon2-Hash), Sprache, Zeitzone,
-Tarif, Erstellungsdatum; Ihre Pflanzen, Aufgaben, Logs (Notizen, Messwerte,
-Ernten), Standorte und Saisons.
+Tarif, Erstellungsdatum, Zeitpunkt der letzten Anmeldung; Ihre Pflanzen,
+Aufgaben, Logs (Notizen, Messwerte, Ernten), Standorte und Saisons.
+
+Den Zeitpunkt der letzten Anmeldung nutzen wir für Nutzungsstatistiken (Anzahl
+aktiver Konten) und um Missbrauch zu erkennen. Bei Verstößen gegen die
+Nutzungsbedingungen können wir ein Konto sperren; jede solche Maßnahme wird
+intern protokolliert (Art. 6 Abs. 1 lit. f DSGVO).
 
 **Web-App:** Die Daten liegen auf unserem Server, damit Sie sie auf allen
 Geräten nutzen können. Das ist der Kern des Dienstes, daher Vertrag als

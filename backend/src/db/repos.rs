@@ -1539,6 +1539,20 @@ pub async fn record_delete_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, us
     Ok(())
 }
 
+/// Disabled by an admin: no sign-in, no session renewal, no desktop access.
+pub async fn is_disabled(state: &AppState, user_id: Uuid) -> anyhow::Result<bool> {
+    let disabled: Option<bool> = sqlx::query_scalar("SELECT disabled_at IS NOT NULL FROM users WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.pg)
+        .await?;
+    Ok(disabled.unwrap_or(false))
+}
+
+/// Last sign-in or session renewal (admin statistics). Best effort.
+pub async fn touch_last_seen(state: &AppState, user_id: Uuid) {
+    let _ = sqlx::query("UPDATE users SET last_seen_at = NOW() WHERE user_id = $1").bind(user_id).execute(&state.pg).await;
+}
+
 pub async fn get_user_email(state: &AppState, user_id: Uuid) -> anyhow::Result<Option<String>> {
     let row: Option<(Option<String>,)> = sqlx::query_as("SELECT email FROM users WHERE user_id = $1")
         .bind(user_id)

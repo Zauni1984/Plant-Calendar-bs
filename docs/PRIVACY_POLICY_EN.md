@@ -41,8 +41,12 @@ in the account settings, with effect for the future (Art. 7(3) GDPR).
 ## 3. Account and garden data
 
 **Data:** e-mail address, password (Argon2 hash only), language, time zone,
-plan, creation date; your plants, tasks, logs (notes, measurements, harvests),
-locations and seasons.
+plan, creation date, time of last sign-in; your plants, tasks, logs (notes,
+measurements, harvests), locations and seasons.
+
+We use the time of the last sign-in for usage statistics (number of active
+accounts) and to detect abuse. In case of violations of the terms of use we may
+disable an account; every such action is logged internally (Art. 6(1)(f) GDPR).
 
 **Web app:** the data is stored on our server so you can use it on all your
 devices. This is the core of the service, hence contract as the legal basis.

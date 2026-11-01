@@ -42,6 +42,11 @@ async fn main() -> anyhow::Result<()> {
             db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
             return services::license_cli::run(&state, std::env::args().skip(2).collect()).await;
         }
+        Some("admin") => {
+            let state = AppState::from_env().await?;
+            db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+            return services::admin_cli::run(&state, std::env::args().skip(2).collect()).await;
+        }
         Some("voucher") => {
             let state = AppState::from_env().await?;
             db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
@@ -89,6 +94,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Voucher codes: signed-in only, still rate-limited against guessing.
     let voucher_rate_limiter = RateLimiter::new(10, 900);
+    // Admin sign-in: password + authenticator code; 5 tries per 15 minutes.
+    let admin_login_routes = Router::new()
+        .route("/admin/login", post(api::admin::login))
+        .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
+        .layer(Extension(RateLimiter::new(5, 900)));
+
     let voucher_routes = Router::new()
         .route("/vouchers/redeem", post(api::vouchers::redeem))
         .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
@@ -105,6 +116,15 @@ async fn main() -> anyhow::Result<()> {
         .merge(auth_routes)
         .merge(password_change_routes)
         .merge(voucher_routes)
+        .merge(admin_login_routes)
+        .route("/admin/stats", get(api::admin::stats))
+        .route("/admin/users", get(api::admin::list_users))
+        .route("/admin/users/{id}", axum::routing::delete(api::admin::delete_user))
+        .route("/admin/users/{id}/disable", post(api::admin::disable_user))
+        .route("/admin/users/{id}/enable", post(api::admin::enable_user))
+        .route("/admin/invoices/problems", get(api::admin::invoice_problems))
+        .route("/admin/invoices/{id}/retry", post(api::admin::retry_invoice))
+        .route("/admin/audit", get(api::admin::audit_log))
         .route("/vouchers/me", get(api::vouchers::my_voucher))
         .route("/me/billing", get(api::billing::get_billing).put(api::billing::put_billing).delete(api::billing::delete_billing))
         .route("/invoices", get(api::billing::list_invoices))

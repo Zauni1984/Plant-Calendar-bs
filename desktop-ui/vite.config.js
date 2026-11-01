@@ -8,6 +8,11 @@ export default defineConfig({
     // main.js awaits the active locale at top level before the first render.
     // ES2022 covers Safari 15+, Chrome/Edge 89+, Firefox 89+ and the Tauri webviews.
     target: 'es2022',
+    // Two pages: the app (index.html) and the admin area (admin.html, served
+    // on its own subdomain; see deploy/Caddyfile).
+    rollupOptions: {
+      input: { index: 'index.html', admin: 'admin.html' },
+    },
   },
   plugins: [
     VitePWA({

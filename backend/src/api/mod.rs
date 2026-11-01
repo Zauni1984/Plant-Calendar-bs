@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod billing;
 pub mod guest_import;
 pub mod licenses;
@@ -256,6 +257,12 @@ pub async fn auth_login(State(state): State<AppState>, headers: axum::http::Head
         Ok(None) => {},
         Err(_) => return api_error(StatusCode::UNAUTHORIZED, "invalid credentials"),
     }
+    match repos::is_disabled(&state, user.user_id).await {
+        Ok(false) => {}
+        Ok(true) => return api_error(StatusCode::FORBIDDEN, "account_disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    repos::touch_last_seen(&state, user.user_id).await;
     match crate::services::auth::issue_token(user.user_id, AuthMode::Email, &state.jwt_secret) {
         Ok(token) => {
             let (raw_refresh, refresh_hash) = crate::services::auth::issue_refresh_token();
@@ -346,6 +353,12 @@ pub async fn auth_refresh(State(state): State<AppState>, headers: axum::http::He
         Ok(None) => return api_error(StatusCode::UNAUTHORIZED, "user not found"),
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    match repos::is_disabled(&state, user.user_id).await {
+        Ok(false) => {}
+        Ok(true) => return api_error(StatusCode::FORBIDDEN, "account_disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    repos::touch_last_seen(&state, user.user_id).await;
 
     // Issue new access token
     let access_token = match crate::services::auth::issue_token(user.user_id, user.auth_mode.clone(), &state.jwt_secret) {
@@ -1382,31 +1395,31 @@ pub async fn delete_account(
     State(state): State<AppState>,
     session: SessionUser,
 ) -> impl IntoResponse {
+    match erase_account(&state, session.user_id).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+/// Erase an account and everything that belongs to it (GDPR Art. 17); used by
+/// "delete account" and by the admin area. Invoices stay (retention periods)
+/// but lose the link to the account.
+pub async fn erase_account(state: &AppState, user_id: Uuid) -> anyhow::Result<()> {
     // Photo files first (GDPR Art. 17): the database cascade removes the rows,
     // but nothing would ever remove the bytes on disk afterwards. If this
     // fails, abort so the user can retry rather than leaving orphaned images.
-    if let Err(err) = state.photos.delete_user(session.user_id).await {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
+    state.photos.delete_user(user_id).await?;
     // Licenses: account-bound ones (no key) are useless without the account
     // and go; keyed ones keep working for whoever holds the key but lose the
     // link to this person.
-    let email = repos::get_user_email(&state, session.user_id).await.ok().flatten();
-    let licenses = async {
-        let mut tx = state.pg.begin().await?;
-        sqlx::query("DELETE FROM licenses WHERE key_hash IS NULL AND (user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)))")
-            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
-        sqlx::query("UPDATE licenses SET user_id = NULL, email = NULL WHERE user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2))")
-            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
-        tx.commit().await
-    }.await;
-    if let Err(err) = licenses {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
-    if let Err(err) = repos::delete_user_cascade(&state, session.user_id).await {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
-    StatusCode::NO_CONTENT.into_response()
+    let email = repos::get_user_email(state, user_id).await.ok().flatten();
+    let mut tx = state.pg.begin().await?;
+    sqlx::query("DELETE FROM licenses WHERE key_hash IS NULL AND (user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)))")
+        .bind(user_id).bind(&email).execute(&mut *tx).await?;
+    sqlx::query("UPDATE licenses SET user_id = NULL, email = NULL WHERE user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2))")
+        .bind(user_id).bind(&email).execute(&mut *tx).await?;
+    tx.commit().await?;
+    repos::delete_user_cascade(state, user_id).await
 }
 
 /// GET /me/export — server-side JSON export of all data for the current user
