@@ -1,6 +1,7 @@
 # Auftrag: Sowling auf einem Hostinger-VPS in Betrieb nehmen
 
-Du (Claude in Chrome) richtest die Web-App **Sowling** auf einem Hostinger-VPS ein.
+Du (Claude in Chrome) richtest die Web-App **Sowling** auf einem **neuen, eigenen**
+Hostinger-VPS ein. Den VPS bucht der Nutzer selbst; du bestellst nichts.
 Arbeite die Schritte **der Reihe nach** ab. Nach jedem Schritt kurz auf Deutsch
 melden, was erledigt ist. Bei Fehlern oder Unklarheiten **anhalten und fragen**,
 nicht improvisieren.
@@ -15,8 +16,11 @@ nicht improvisieren.
 
 ## Regeln (wichtig)
 
-1. **Nichts kaufen ohne ausdrückliche Bestätigung.** Vor dem Bestellen Tarif,
-   Laufzeit und Gesamtpreis nennen und auf ein klares „Ja“ warten.
+1. **Nichts kaufen oder buchen.** Den VPS bestellt der Nutzer selbst.
+   **Niemals auf dem bestehenden VPS `srv1345352.hstgr.cloud` arbeiten:** Dort
+   läuft die App Yeet. Das Einrichtungsskript würde dort die Firewall und die
+   Ports 80/443 übernehmen und Yeet lahmlegen. Ist unklar, welcher VPS der
+   neue ist, anhalten und fragen.
 2. **Keine Passwörter oder API-Schlüssel eintippen.** Anmeldungen (Hostinger,
    GitHub), das Root-Passwort des VPS und Stripe-Schlüssel gibt der Nutzer selbst ein.
 3. **Geheimnisse nicht anzeigen oder wiedergeben.** Die Dateien
@@ -26,21 +30,23 @@ nicht improvisieren.
    für `app` und `api`. Mail-Einträge (MX, TXT/SPF, DKIM) nicht anfassen.
 5. Lange Befehle unverändert aus diesem Dokument kopieren.
 
-## Schritt 1 – VPS bestellen (Bestätigung nötig)
+## Schritt 1 – Den neuen VPS finden und prüfen
 
-hPanel → **VPS** → neuen VPS bestellen:
+Der Nutzer hat den VPS selbst gebucht. Empfohlen und erwartet:
 
-- **Tarif: KVM 2** (2 vCPU, 8 GB RAM, 100 GB NVMe). KVM 1 würde auch laufen,
-  ist aber beim Kompilieren langsam und hat wenig Platz für Fotos und Backups.
-- **Standort: Deutschland**; falls nicht verfügbar, ein anderes EU-Land
-  (Niederlande, Frankreich, Litauen). Kein Standort außerhalb der EU (DSGVO).
-- **Betriebssystem: Ubuntu 24.04** als **reines Betriebssystem**, ohne
-  Control Panel und ohne vorinstallierte App.
-- Root-Passwort: setzt der Nutzer selbst.
-- Falls angeboten: automatische Backups/Snapshots aktivieren.
+- **Tarif:** KVM 2 (2 vCPU, 8 GB RAM, 100 GB NVMe) oder größer
+- **Standort:** EU, idealerweise Deutschland (DSGVO)
+- **Betriebssystem:** Ubuntu 24.04 als **reines Betriebssystem**, ohne
+  Control Panel und ohne vorinstallierte App
 
-Vor dem Abschluss: Tarif, Laufzeit, Gesamtpreis nennen → auf Bestätigung warten.
-Danach die **IPv4-Adresse** (und ggf. IPv6) des VPS notieren und melden.
+hPanel → **VPS**: Den **neuen** VPS öffnen. Das ist **nicht**
+`srv1345352.hstgr.cloud`, der gehört zu Yeet. Hostname, Tarif, Standort,
+Betriebssystem und **IPv4-Adresse** (und ggf. IPv6) melden. Weicht etwas von der
+Liste oben ab (z. B. anderes Betriebssystem oder vorinstallierte App),
+anhalten und fragen.
+
+Falls angeboten: automatische Backups/Snapshots für diesen VPS dem Nutzer zur
+Aktivierung empfehlen (nicht selbst buchen, falls kostenpflichtig).
 
 ## Schritt 2 – Auftragsverarbeitung
 
@@ -65,8 +71,17 @@ wenigen Minuten erscheinen.
 
 ## Schritt 4 – Server-Terminal öffnen
 
-hPanel → VPS → **Browser-Terminal** (oder „Terminal“). Anmelden als `root`; das
-Passwort gibt der Nutzer ein. Alle weiteren Befehle laufen dort.
+hPanel → **der neue VPS** → **Browser-Terminal** (oder „Terminal“). Anmelden als
+`root`; das Passwort gibt der Nutzer ein. Alle weiteren Befehle laufen dort.
+
+Zuerst prüfen, dass es wirklich der neue, leere Server ist:
+
+```bash
+hostname; docker ps 2>/dev/null; ss -ltn | grep -E ':(80|443) '
+```
+
+Erwartet: ein anderer Hostname als `srv1345352`, keine laufenden Container und
+nichts auf Port 80/443. Läuft dort schon etwas, **sofort anhalten** und melden.
 
 ## Schritt 5 – Zugriff auf das GitHub-Repository
 
@@ -150,6 +165,6 @@ Dem Nutzer diese Liste geben und dabei **nicht** helfen, die Inhalte auszulesen:
 
 ## Abschlussmeldung
 
-Kurz melden: VPS-Tarif und Standort, IP-Adresse, ob `health` und die App
+Kurz melden: Hostname des neuen VPS, Tarif und Standort, IP-Adresse, ob `health` und die App
 erreichbar sind, ob das Test-Backup erstellt wurde, und dass Schritt 8 beim
 Nutzer liegt.
