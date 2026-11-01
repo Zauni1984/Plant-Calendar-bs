@@ -1,13 +1,14 @@
 //! Operator tool for desktop licenses: tests, beta testers, loyal customers.
 //!
-//!   sowling-backend license create [--email ADDRESS] [--note TEXT] [--devices N] [--no-key]
+//!   sowling-backend license create [--email ADDRESS [--send]] [--note TEXT] [--devices N] [--no-key]
 //!   sowling-backend license list [--all]
 //!   sowling-backend license revoke <license-id | key | email>
 //!   sowling-backend license reset-devices <license-id>
 //!
 //! `create` prints the key once; only its hash is stored. With --email the
 //! license also unlocks the desktop app for whoever signs in with that
-//! address, no key needed (--no-key: e-mail only). Uses DATABASE_URL.
+//! address, no key needed (--no-key: e-mail only); --send also e-mails the
+//! key there (needs SMTP). Uses DATABASE_URL.
 
 use shared::license;
 use uuid::Uuid;
@@ -15,7 +16,7 @@ use uuid::Uuid;
 use crate::{api::licenses::{create_license, KeyMode, LicenseRow, DEFAULT_MAX_DEVICES, LICENSE_COLUMNS}, db::AppState};
 
 const USAGE: &str = "usage:
-  license create [--email ADDRESS] [--note TEXT] [--devices N] [--no-key]
+  license create [--email ADDRESS [--send]] [--note TEXT] [--devices N] [--no-key]
   license list [--all]
   license revoke <license-id | key | email>
   license reset-devices <license-id>";
@@ -45,6 +46,13 @@ async fn create(state: &AppState, args: &[String]) -> anyhow::Result<()> {
         None => DEFAULT_MAX_DEVICES,
     };
     let with_key = !args.iter().any(|a| a == "--no-key");
+    let send = args.iter().any(|a| a == "--send");
+    if send && (email.is_none() || !with_key) {
+        anyhow::bail!("--send needs --email and a key");
+    }
+    if send && state.mail.is_none() {
+        anyhow::bail!("--send needs SMTP_HOST, SMTP_USER and SMTP_PASSWORD");
+    }
     if !with_key && email.is_none() {
         anyhow::bail!("--no-key needs --email (otherwise nobody could use the license)");
     }
@@ -63,6 +71,11 @@ async fn create(state: &AppState, args: &[String]) -> anyhow::Result<()> {
         println!("    {k}");
         println!();
         println!("This key is shown only now; it is not stored in readable form.");
+        if let (true, Some(mailer), Some(to)) = (send, &state.mail, &email) {
+            let download = std::env::var("DESKTOP_DOWNLOAD_URL").ok().filter(|u| !u.trim().is_empty());
+            mailer.send(to, &crate::services::mail::license_key_mail(&k, false, devices, download.as_deref())).await?;
+            println!("Key sent by e-mail to {to}.");
+        }
     }
     Ok(())
 }

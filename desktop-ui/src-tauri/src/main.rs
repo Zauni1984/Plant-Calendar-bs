@@ -1628,6 +1628,47 @@ async fn subscription_checkout_smart(state: State<'_, AppLocalState>, plan: Stri
 
 
 #[tauri::command]
+async fn voucher_status_smart(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
+    let session = {
+        let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
+        match store.load_session().map_err(|e| e.to_string())? {
+            Some(s) => s,
+            None => return Ok(serde_json::Value::Null),
+        }
+    };
+    let response = reqwest::Client::new()
+        .get(format!("{}/vouchers/me", session.backend_url))
+        .bearer_auth(&session.access_token)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(response.text().await.unwrap_or_else(|_| "voucher status failed".into()));
+    }
+    response.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn voucher_redeem_smart(state: State<'_, AppLocalState>, code: String) -> Result<serde_json::Value, String> {
+    let session = {
+        let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
+        store.load_session().map_err(|e| e.to_string())?.ok_or_else(|| "no stored session".to_string())?
+    };
+    let response = reqwest::Client::new()
+        .post(format!("{}/vouchers/redeem", session.backend_url))
+        .bearer_auth(&session.access_token)
+        .json(&serde_json::json!({ "code": code }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        // The body carries the reason code ({"code":"used_up",…}); the UI reads it.
+        return Err(response.text().await.unwrap_or_else(|_| "voucher redemption failed".into()));
+    }
+    response.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn subscription_webhook_stub_smart(state: State<'_, AppLocalState>, plan: String, checkout_status: Option<String>) -> Result<serde_json::Value, String> {
     let parsed_plan = parse_subscription_plan(&plan);
     let status_value = checkout_status.unwrap_or_else(|| "paid".to_string());
@@ -3257,6 +3298,8 @@ fn main() {
             auth_fetch_me,
             subscription_status_smart,
             subscription_checkout_smart,
+            voucher_status_smart,
+            voucher_redeem_smart,
             subscription_webhook_stub_smart,
             subscription_history_smart,
             sync_push_now,

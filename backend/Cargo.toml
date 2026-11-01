@@ -36,3 +36,5 @@ tokio-util = { version = "0.7", features = ["io"] }
 # signing in pure Rust, so the server build needs no OpenSSL.
 web-push-native = "0.5"
 base64ct = { version = "1", features = ["alloc"] }
+# E-mail (license keys, vouchers) over SMTP with TLS; rustls, so still no OpenSSL.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "hostname"] }

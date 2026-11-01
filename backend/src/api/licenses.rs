@@ -577,8 +577,19 @@ pub async fn handle_purchase_completed(state: &AppState, session: &serde_json::V
     };
     let email = session["customer_details"]["email"].as_str().or(session["customer_email"].as_str());
     match create_license(state, "purchase", email, Some(user_id), Some("Stripe one-time purchase"), DEFAULT_MAX_DEVICES, KeyMode::Derived, session["id"].as_str()).await {
-        Ok((id, _)) => {
+        Ok((id, key)) => {
             tracing::info!(%user_id, license = %id, "desktop license purchased");
+            // The key by e-mail, in the background: Stripe wants a quick answer.
+            if let (Some(mailer), Some(to), Some(key)) = (state.mail.clone(), email.map(str::to_string), key) {
+                tokio::spawn(async move {
+                    let download = std::env::var("DESKTOP_DOWNLOAD_URL").ok().filter(|u| !u.trim().is_empty());
+                    let mail = crate::services::mail::license_key_mail(&key, true, DEFAULT_MAX_DEVICES, download.as_deref());
+                    match mailer.send(&to, &mail).await {
+                        Ok(()) => tracing::info!(license = %id, "license key e-mail sent"),
+                        Err(err) => tracing::error!(license = %id, "license key e-mail failed: {err}"),
+                    }
+                });
+            }
             Json(serde_json::json!({ "status": "processed", "kind": "desktop_license" })).into_response()
         }
         Err(err) if err.to_string().contains("already exists") => {

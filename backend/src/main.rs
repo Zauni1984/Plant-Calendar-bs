@@ -22,7 +22,8 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         // CLI subcommands print their own output; only warnings in between.
         .with(tracing_subscriber::EnvFilter::new(if std::env::args().nth(1).is_some() { "warn" } else { "info" }))
-        .with(tracing_subscriber::fmt::layer())
+        // stderr: CLI output on stdout stays clean (`voucher create ... > codes.txt`).
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .init();
 
     // `sowling-backend gen-license-keys` / `sowling-backend license ...`
@@ -40,6 +41,11 @@ async fn main() -> anyhow::Result<()> {
             let state = AppState::from_env().await?;
             db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
             return services::license_cli::run(&state, std::env::args().skip(2).collect()).await;
+        }
+        Some("voucher") => {
+            let state = AppState::from_env().await?;
+            db::migrate::run(&state.pg).await.map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+            return services::voucher_cli::run(&state, std::env::args().skip(2).collect()).await;
         }
         _ => {}
     }
@@ -60,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
     // Cloned up front: the router takes ownership of `state` below.
     let prune_state = state.clone();
     let push_state = state.clone();
+    let voucher_state = state.clone();
 
     // Rate limiter: 10 requests per 60 seconds per IP for auth endpoints
     let auth_rate_limiter = RateLimiter::new(10, 60);
@@ -79,6 +86,13 @@ async fn main() -> anyhow::Result<()> {
         .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
         .layer(Extension(auth_rate_limiter.clone()));
 
+    // Voucher codes: signed-in only, still rate-limited against guessing.
+    let voucher_rate_limiter = RateLimiter::new(10, 900);
+    let voucher_routes = Router::new()
+        .route("/vouchers/redeem", post(api::vouchers::redeem))
+        .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
+        .layer(Extension(voucher_rate_limiter));
+
     let password_change_routes = Router::new()
         .route("/me/change-password", post(api::change_password))
         .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
@@ -89,6 +103,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/catalog", get(api::get_catalog))
         .merge(auth_routes)
         .merge(password_change_routes)
+        .merge(voucher_routes)
+        .route("/vouchers/me", get(api::vouchers::my_voucher))
         .route("/me", get(api::get_me).patch(api::update_profile).delete(api::delete_account))
         .route("/me/export", get(api::export_me))
         .route("/me/import-guest", post(api::guest_import::import_guest_data))
@@ -229,6 +245,20 @@ async fn main() -> anyhow::Result<()> {
             }
         });
     }
+
+    // Vouchers: end expired ones and fall back to the Stripe plan or Free.
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            ticker.tick().await;
+            match api::vouchers::expire_vouchers(&voucher_state).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(accounts = n, "vouchers expired"),
+                Err(err) => tracing::warn!("voucher expiry failed: {err}"),
+            }
+        }
+    });
 
     // Push reminders: check for due tasks every few minutes.
     if let Some(config) = push_state.push.clone() {

@@ -6,3 +6,5 @@ pub mod images;
 pub mod photo_store;
 pub mod push;
 pub mod license_cli;
+pub mod voucher_cli;
+pub mod mail;
