@@ -1627,6 +1627,65 @@ async fn subscription_checkout_smart(state: State<'_, AppLocalState>, plan: Stri
 }
 
 
+/// An authenticated call to the account API with the stored session.
+async fn account_call(state: &State<'_, AppLocalState>, method: reqwest::Method, path: &str, body: Option<serde_json::Value>) -> Result<reqwest::Response, String> {
+    let session = {
+        let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
+        store.load_session().map_err(|e| e.to_string())?.ok_or_else(|| "no stored session".to_string())?
+    };
+    let mut request = reqwest::Client::new()
+        .request(method, format!("{}{path}", session.backend_url))
+        .bearer_auth(&session.access_token);
+    if let Some(body) = body {
+        request = request.json(&body);
+    }
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        // The body carries the reason code ({"code":"vat_invalid",…}); the UI reads it.
+        return Err(response.text().await.unwrap_or_else(|_| "request failed".into()));
+    }
+    Ok(response)
+}
+
+#[tauri::command]
+async fn billing_get_smart(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::GET, "/me/billing", None).await?.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn billing_save_smart(state: State<'_, AppLocalState>, profile: serde_json::Value) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::PUT, "/me/billing", Some(profile)).await?.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn invoices_list_smart(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::GET, "/invoices", None).await?.json().await.map_err(|e| e.to_string())
+}
+
+/// Saves the invoice PDF in the Downloads folder, opens it and returns the path.
+#[tauri::command]
+async fn invoice_pdf_save(state: State<'_, AppLocalState>, invoice_id: String, number: Option<String>) -> Result<String, String> {
+    let id = uuid::Uuid::parse_str(&invoice_id).map_err(|_| "invalid invoice id".to_string())?;
+    let bytes = account_call(&state, reqwest::Method::GET, &format!("/invoices/{id}/pdf"), None)
+        .await?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).ok_or_else(|| "no home folder".to_string())?;
+    let dir = std::path::PathBuf::from(home).join("Downloads");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let safe: String = number.unwrap_or_else(|| id.to_string()).chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
+    let path = dir.join(format!("Sowling-Rechnung-{safe}.pdf"));
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    let _ = std::process::Command::new("explorer.exe").arg(&path).spawn();
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg(&path).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let _ = std::process::Command::new("xdg-open").arg(&path).spawn();
+    Ok(path.display().to_string())
+}
+
 #[tauri::command]
 async fn voucher_status_smart(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
     let session = {
@@ -3300,6 +3359,10 @@ fn main() {
             subscription_checkout_smart,
             voucher_status_smart,
             voucher_redeem_smart,
+            billing_get_smart,
+            billing_save_smart,
+            invoices_list_smart,
+            invoice_pdf_save,
             subscription_webhook_stub_smart,
             subscription_history_smart,
             sync_push_now,

@@ -10,7 +10,7 @@
 //! no tracking. Texts are German with an English part below.
 
 use lettre::{
-    message::{header::ContentType, Mailbox},
+    message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart},
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
@@ -59,6 +59,25 @@ impl Mailer {
             .subject(&mail.subject)
             .header(ContentType::TEXT_PLAIN)
             .body(mail.body.clone())?;
+        self.transport.send(message).await?;
+        Ok(())
+    }
+}
+
+impl Mailer {
+    /// Text plus one attachment (an invoice PDF).
+    pub async fn send_with_attachment(&self, to: &str, mail: &Mail, filename: &str, content_type: &str, data: Vec<u8>) -> anyhow::Result<()> {
+        let to: Mailbox = to.parse().map_err(|e| anyhow::anyhow!("invalid recipient: {e}"))?;
+        let content_type = ContentType::parse(content_type).map_err(|e| anyhow::anyhow!("content type: {e}"))?;
+        let message = Message::builder()
+            .from(self.from.clone())
+            .to(to)
+            .subject(&mail.subject)
+            .multipart(
+                MultiPart::mixed()
+                    .singlepart(SinglePart::plain(mail.body.clone()))
+                    .singlepart(Attachment::new(filename.to_string()).body(data, content_type)),
+            )?;
         self.transport.send(message).await?;
         Ok(())
     }
@@ -115,6 +134,41 @@ pub fn voucher_mail(code: &str, plan_de: &str, plan_en: &str, duration_de: &str,
              Hello,\n\nhere is your voucher for Sowling {plan_en} ({duration_en}):\n\n    {code}\n\n\
              To redeem it, open {web}, sign in or create an account, go to “Plan” → “Redeem voucher” \
              and enter the code. The desktop app is included.\n\nBest regards\nThe Sowling team\n\n{FOOTER}\n"
+        ),
+    }
+}
+
+/// The invoice as PDF attachment. `e_invoice`: the PDF is a ZUGFeRD e-invoice
+/// (EN 16931). `reverse_charge`: invoiced without VAT.
+pub fn invoice_mail(number: &str, description: &str, e_invoice: bool, reverse_charge: bool) -> Mail {
+    let web = web_url();
+    let (e_de, e_en) = if e_invoice {
+        (
+            "Die Rechnung ist eine elektronische Rechnung nach der EU-Norm EN 16931 (ZUGFeRD): Die Rechnungsdaten sind maschinenlesbar im PDF eingebettet.\n\n",
+            "The invoice is an electronic invoice under the EU standard EN 16931 (ZUGFeRD): the invoice data is embedded machine-readably in the PDF.\n\n",
+        )
+    } else {
+        ("", "")
+    };
+    let (rc_de, rc_en) = if reverse_charge {
+        (
+            "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge): Die Rechnung enthält keine Umsatzsteuer.\n\n",
+            "Reverse charge: the invoice contains no VAT; VAT is due from the recipient.\n\n",
+        )
+    } else {
+        ("", "")
+    };
+    Mail {
+        subject: format!("Deine Rechnung {number} / Your invoice {number} – Sowling"),
+        body: format!(
+            "Hallo,\n\nim Anhang findest du die Rechnung {number} für: {description}.\n\
+             Der Betrag wurde bereits bezahlt.\n\n{e_de}{rc_de}\
+             Alle Rechnungen findest du auch in der Web-App ({web}) unter „Abo“ → „Rechnungen“.\n\n\
+             Viele Grüße\ndein Sowling-Team\n\n\
+             ----------------------------------------\n\n\
+             Hello,\n\nattached is invoice {number} for: {description}.\nThe amount has already been paid.\n\n{e_en}{rc_en}\
+             You can also find all invoices in the web app ({web}) under “Plan” → “Invoices”.\n\n\
+             Best regards\nThe Sowling team\n\n{FOOTER}\n"
         ),
     }
 }

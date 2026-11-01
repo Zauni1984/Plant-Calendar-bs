@@ -665,6 +665,17 @@ export const webCommands = {
     requireSession();
     return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan) } });
   },
+  billing_get_smart: () => (hasSession() ? api("/me/billing") : Promise.resolve(null)),
+  billing_save_smart: ({ profile }) => {
+    requireSession();
+    return api("/me/billing", { method: "PUT", body: profile });
+  },
+  invoices_list_smart: () => (hasSession() ? api("/invoices") : Promise.resolve([])),
+  invoice_pdf_save: async ({ invoiceId, number }) => {
+    requireSession();
+    triggerDownload(`Sowling-Rechnung-${number || invoiceId}.pdf`, await apiBlob(`/invoices/${invoiceId}/pdf`));
+    return null;
+  },
   voucher_status_smart: () => (hasSession() ? api("/vouchers/me") : Promise.resolve(null)),
   voucher_redeem_smart: ({ code }) => {
     requireSession();

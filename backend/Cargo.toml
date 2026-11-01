@@ -38,3 +38,7 @@ web-push-native = "0.5"
 base64ct = { version = "1", features = ["alloc"] }
 # E-mail (license keys, vouchers) over SMTP with TLS; rustls, so still no OpenSSL.
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "hostname"] }
+# Admin sign-in: TOTP codes (RFC 6238 uses HMAC-SHA1) and the setup QR code in
+# the terminal.
+sha1 = "0.10"
+qrcode = { version = "0.14", default-features = false }

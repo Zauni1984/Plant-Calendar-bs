@@ -41,6 +41,32 @@
 	file_server
 }
 
+# --- admin area -----------------------------------------------------------------
+# Same build, other page. Only for admins (password + authenticator code); the
+# API checks every request. Search engines are kept out.
+{$ADMIN_DOMAIN} {
+	root * /srv/app
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Robots-Tag "noindex, nofollow"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://{$API_DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		Cache-Control "no-store"
+		-Server
+	}
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+
+	# Only the admin page and its files; the app itself is not served here.
+	@other not path /assets/* /icons/* /admin.html
+	rewrite @other /admin.html
+	file_server
+}
+
 # --- API ----------------------------------------------------------------------
 {$API_DOMAIN} {
 	encode zstd gzip

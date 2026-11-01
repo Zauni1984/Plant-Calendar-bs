@@ -41,8 +41,12 @@ in the account settings, with effect for the future (Art. 7(3) GDPR).
 ## 3. Account and garden data
 
 **Data:** e-mail address, password (Argon2 hash only), language, time zone,
-plan, creation date; your plants, tasks, logs (notes, measurements, harvests),
-locations and seasons.
+plan, creation date, time of last sign-in; your plants, tasks, logs (notes,
+measurements, harvests), locations and seasons.
+
+We use the time of the last sign-in for usage statistics (number of active
+accounts) and to detect abuse. In case of violations of the terms of use we may
+disable an account; every such action is logged internally (Art. 6(1)(f) GDPR).
 
 **Web app:** the data is stored on our server so you can use it on all your
 devices. This is the core of the service, hence contract as the legal basis.
@@ -116,6 +120,18 @@ details (e.g. card) are received only by Stripe, not by us.
 We store your plan, Stripe customer ID and the history of plan changes. Before
 the first payment the app asks for your agreement to pass data to Stripe.
 
+**Invoices.** For every payment we create an invoice in our accounting software
+**Lexware Office** and send it to you as a PDF by e-mail; you can also fetch it
+in your account under "Plan". For this we process the invoice recipient (name
+or company, address, country), e-mail address, service, amount and payment
+date (Art. 6(1)(b) and (c) GDPR). Without billing details in your account we
+use the name and address from the Stripe payment.
+
+**Company VAT IDs.** If you enter a VAT ID as a company from another EU country,
+we check it with the European Commission's **VIES** system, sending your VAT ID
+and ours. We keep the result and the consultation number as proof for the
+VAT-free invoice (Art. 6(1)(c) GDPR).
+
 ### 4.6 Desktop licenses
 
 The desktop app is included in a subscription (Basic, Pro, Nursery) or available as
@@ -177,6 +193,10 @@ period from 4.1 then applies.
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Cyprus – operating the server and database on our
   behalf (Art. 28 GDPR), server location Germany (Frankfurt am Main); also
   sending the e-mails described in 4.9 (Hostinger Mail).
+- **Haufe-Lexware GmbH & Co. KG** (Freiburg, Germany) – Lexware Office,
+  creating and keeping invoices on our behalf (Art. 28 GDPR).
+- **European Commission (VIES)** – only for companies from another EU country
+  with a VAT ID, to check that number.
 - **Stripe Payments Europe Ltd.** (Ireland) – payment processing; within its
   group also Stripe Inc. (USA).
 - **Open-Meteo** (Germany) – only with your "weather" consent.
@@ -208,6 +228,8 @@ Push services only receive encrypted content.
 | Redeemed vouchers | until you delete your account |
 | Sent e-mails (sent folder) | at most 12 months |
 | Invoicing records (at Stripe) | statutory retention, usually 10 years |
+| Invoices (with us and in Lexware Office) | 10 years (§ 147 AO, § 257 HGB), also after the account is deleted |
+| Billing details (recipient, VAT ID) | until you delete them or your account; on invoices 10 years |
 | Server logs | at most 30 days |
 | Backups | 30 days, then overwritten |
 
@@ -236,7 +258,8 @@ You have the right to
 - **rectification** (Art. 16 GDPR): directly in the app;
 - **erasure** (Art. 17 GDPR): "Delete account" removes your account, garden
   data, photos, push addresses and the Stripe customer record; invoicing records
-  that must be kept by law remain at Stripe;
+  that must be kept by law remain at Stripe, and invoices are kept until the
+  statutory retention period ends;
 - **restriction of processing** (Art. 18 GDPR);
 - **object** to processing based on legitimate interests (Art. 21 GDPR);
 - **withdraw** consent with effect for the future (Art. 7(3) GDPR), in the

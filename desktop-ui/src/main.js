@@ -1011,6 +1011,9 @@ let checkoutHistory = [];
 let subscriptionHistory = [];
 // The account's redeemed voucher: { plan, until } (until null: unlimited) or null.
 let currentVoucher = null;
+// Invoice recipient (GET /me/billing) and the account's invoices.
+let currentBilling = null;
+let currentInvoices = [];
 let subscriptionHistorySource = "local";
 let subscriptionStatusSummary = null;
 
@@ -3052,12 +3055,154 @@ function mapServerHistoryEntry(entry) {
 async function loadVoucherStatus() {
   if (currentPlanSource !== "account") {
     currentVoucher = null;
+    currentBilling = null;
+    currentInvoices = [];
     return;
   }
+  const [voucher, billing, invoices] = await Promise.allSettled([
+    invoke("voucher_status_smart"),
+    invoke("billing_get_smart"),
+    invoke("invoices_list_smart"),
+  ]);
+  currentVoucher = voucher.status === 'fulfilled' ? (voucher.value || null) : null;
+  currentBilling = billing.status === 'fulfilled' ? (billing.value || null) : null;
+  currentInvoices = invoices.status === 'fulfilled' && Array.isArray(invoices.value) ? invoices.value : [];
+}
+
+// EU member states first (VAT rules), then frequent other countries.
+const BILLING_COUNTRIES = ['DE', 'AT', 'BE', 'BG', 'CY', 'CZ', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT',
+  'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'CH', 'LI', 'NO', 'IS', 'GB', 'US', 'CA', 'AU', 'NZ'];
+
+function countryName(code) {
+  try { return new Intl.DisplayNames([localeTag()], { type: 'region' }).of(code) || code; } catch (_) { return code; }
+}
+
+function billingErrorCode(err) {
+  const raw = String(err?.body?.code || err?.message || err || '');
+  const match = raw.match(/"code"\s*:\s*"([a-z_]+)"/);
+  const code = match ? match[1] : raw.trim();
+  return ['name_required', 'address_required', 'country_invalid', 'vat_invalid', 'vat_country_mismatch'].includes(code) ? code : null;
+}
+
+function billingTreatmentText(b) {
+  if (!b) return '';
+  if (b.tax_treatment === 'reverse_charge') {
+    const date = b.vat_checked_at ? new Date(b.vat_checked_at).toLocaleDateString(localeTag()) : '';
+    return t('invoice.treatment.reverse_charge', date);
+  }
+  return t(`invoice.treatment.${b.tax_treatment || 'vat_19'}`);
+}
+
+function renderBillingCard() {
+  if (currentPlanSource !== "account") return '';
+  const b = currentBilling || {};
+  const isCompany = !!b.is_company;
+  const country = b.country_code || 'DE';
+  const options = BILLING_COUNTRIES
+    .map((c) => `<option value="${c}" ${c === country ? 'selected' : ''}>${escapeHtml(countryName(c))}</option>`)
+    .join('');
+  const field = (id, label, value, extra = '') => `
+    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:${TC.textMuted};">${escapeHtml(label)}
+      <input id="${id}" class="form-input" value="${escapeHtml(value || '')}" ${extra} />
+    </label>`;
+  return `
+    <details id="billingCard" ${currentBilling ? '' : 'open'} style="margin-top:12px; padding:14px; border-radius:16px; background:${TC.inputBg}; border:1px solid rgba(255,255,255,0.08);">
+      <summary style="cursor:pointer; font-weight:700; font-size:15px; color:${TC.text};">${t('invoice.billingTitle')}</summary>
+      <div style="margin-top:8px; font-size:12px; color:${TC.textMuted}; line-height:1.5;">${t('invoice.billingIntro')}</div>
+      ${currentBilling ? `<div style="margin-top:6px; font-size:12px; color:${TC.accent};">${escapeHtml(billingTreatmentText(currentBilling))}</div>` : ''}
+      <form id="billingForm" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-top:10px;">
+        <div style="grid-column:1/-1; display:flex; gap:16px; font-size:13px; color:${TC.text};">
+          <label><input type="radio" name="billingKind" value="private" ${isCompany ? '' : 'checked'} /> ${t('invoice.private')}</label>
+          <label><input type="radio" name="billingKind" value="company" ${isCompany ? 'checked' : ''} /> ${t('invoice.company')}</label>
+        </div>
+        ${field('billingName', isCompany ? t('invoice.nameCompany') : t('invoice.namePerson'), b.name, 'maxlength="200" autocomplete="name"')}
+        ${field('billingStreet', t('invoice.street'), b.street, 'maxlength="200" autocomplete="street-address"')}
+        ${field('billingZip', t('invoice.zip'), b.zip, 'maxlength="20" autocomplete="postal-code"')}
+        ${field('billingCity', t('invoice.city'), b.city, 'maxlength="100" autocomplete="address-level2"')}
+        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:${TC.textMuted};">${t('invoice.country')}
+          <select id="billingCountry" class="form-input">${options}</select>
+        </label>
+        <div id="billingVatGroup" style="display:${isCompany ? 'flex' : 'none'}; flex-direction:column; gap:4px;">
+          ${field('billingVat', t('invoice.vatId'), b.vat_id, 'maxlength="30" autocapitalize="characters" spellcheck="false"')}
+        </div>
+        <div id="billingVatHint" style="grid-column:1/-1; display:${isCompany ? 'block' : 'none'}; font-size:11px; color:${TC.textDim}; line-height:1.5;">${t('invoice.vatHint')}</div>
+        <div style="grid-column:1/-1; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="submit" class="btn btn--primary btn--sm">${t('invoice.save')}</button>
+          <span id="billingMsg" role="status" style="font-size:12px;"></span>
+        </div>
+      </form>
+    </details>
+  `;
+}
+
+function renderInvoicesCard() {
+  if (currentPlanSource !== "account") return '';
+  const rows = currentInvoices.map((inv) => {
+    const amount = new Intl.NumberFormat(localeTag(), { style: 'currency', currency: inv.currency || 'EUR' }).format((inv.amount_cents || 0) / 100);
+    const ready = !!inv.voucher_number;
+    const noVat = inv.tax_type && inv.tax_type !== 'gross';
+    return `
+      <tr>
+        <td style="padding:6px 8px 6px 0; white-space:nowrap;">${escapeHtml(new Date(inv.paid_at).toLocaleDateString(localeTag()))}</td>
+        <td style="padding:6px 8px;">${escapeHtml(inv.voucher_number || '–')}</td>
+        <td style="padding:6px 8px;">${escapeHtml(inv.description)}${noVat ? ` <span style="font-size:11px; color:${TC.textDim};">(${t('invoice.noVatBadge')})</span>` : ''}</td>
+        <td style="padding:6px 8px; text-align:right; white-space:nowrap;">${escapeHtml(amount)}</td>
+        <td style="padding:6px 0 6px 8px; text-align:right;">${ready
+          ? `<button type="button" class="btn btn--sm btn--ghost" data-invoice-pdf="${escapeHtml(inv.invoice_id)}" data-invoice-number="${escapeHtml(inv.voucher_number)}">${t('invoice.pdf')}</button>`
+          : `<span style="font-size:11px; color:${TC.textDim};">${t('invoice.pending')}</span>`}</td>
+      </tr>`;
+  }).join('');
+  return `
+    <div id="invoicesCard" style="margin-top:12px; padding:14px; border-radius:16px; background:${TC.inputBg}; border:1px solid rgba(255,255,255,0.08);">
+      <strong style="font-size:15px; color:${TC.text};">${t('invoice.listTitle')}</strong>
+      ${rows
+        ? `<div style="overflow-x:auto; margin-top:8px;"><table style="width:100%; border-collapse:collapse; font-size:13px; color:${TC.text};">${rows}</table></div>`
+        : `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">${t('invoice.listEmpty')}</div>`}
+      <div id="invoiceMsg" role="status" style="margin-top:6px; font-size:12px;"></div>
+    </div>
+  `;
+}
+
+async function saveBilling() {
+  const msg = $("billingMsg");
+  const show = (text, ok) => { if (msg) { msg.textContent = text; msg.style.color = ok ? TC.accent : '#ffb3a7'; } };
+  const isCompany = document.querySelector('input[name="billingKind"]:checked')?.value === 'company';
+  const profile = {
+    is_company: isCompany,
+    name: $("billingName")?.value || '',
+    street: $("billingStreet")?.value || '',
+    zip: $("billingZip")?.value || '',
+    city: $("billingCity")?.value || '',
+    country_code: $("billingCountry")?.value || 'DE',
+    vat_id: isCompany ? ($("billingVat")?.value || null) : null,
+  };
+  showLoading(t('invoice.saving'));
   try {
-    currentVoucher = (await invoke("voucher_status_smart")) || null;
-  } catch (_) {
-    currentVoucher = null;
+    const saved = await invoke("billing_save_smart", { profile });
+    currentBilling = saved;
+    renderSubscriptionPanel();
+    const card = $("billingCard");
+    if (card) card.open = true;
+    const fresh = $("billingMsg");
+    if (fresh) {
+      fresh.textContent = saved?.warning ? t(`invoice.warning.${saved.warning}`) : t('invoice.saved');
+      fresh.style.color = saved?.warning ? '#ffd76e' : TC.accent;
+    }
+  } catch (err) {
+    const code = billingErrorCode(err);
+    show(code ? t(`invoice.error.${code}`) : t('invoice.error.generic', String(err?.message || err)), false);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function downloadInvoicePdf(invoiceId, number) {
+  const msg = $("invoiceMsg");
+  try {
+    const path = await invoke("invoice_pdf_save", { invoiceId, number });
+    if (msg && path) { msg.textContent = t('invoice.pdfSaved', path); msg.style.color = TC.accent; }
+  } catch (err) {
+    if (msg) { msg.textContent = t('invoice.pdfFailed', String(err?.message || err)); msg.style.color = '#ffb3a7'; }
   }
 }
 
@@ -3343,6 +3488,8 @@ function renderSubscriptionPanel() {
     </div>
     ${renderUnifiedSubscriptionStatusCard()}
     ${renderVoucherCard()}
+    ${renderBillingCard()}
+    ${renderInvoicesCard()}
     ${renderCheckoutStateCard()}
     ${renderCheckoutHistoryCard()}
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:12px;">${cards}</div>
@@ -8519,9 +8666,30 @@ $("syncNow")?.addEventListener("click", async () => {
 });
 
 subscriptionPanel?.addEventListener("submit", (event) => {
-  if (event.target?.id !== "voucherForm") return;
-  event.preventDefault();
-  redeemVoucher($("voucherCode")?.value || "");
+  if (event.target?.id === "voucherForm") {
+    event.preventDefault();
+    redeemVoucher($("voucherCode")?.value || "");
+  } else if (event.target?.id === "billingForm") {
+    event.preventDefault();
+    saveBilling();
+  }
+});
+
+subscriptionPanel?.addEventListener("change", (event) => {
+  if (event.target?.name !== "billingKind") return;
+  const isCompany = event.target.value === 'company';
+  for (const id of ["billingVatGroup", "billingVatHint"]) {
+    const node = $(id);
+    if (node) node.style.display = isCompany ? (id === "billingVatGroup" ? 'flex' : 'block') : 'none';
+  }
+  const label = $("billingName")?.parentElement;
+  if (label?.firstChild) label.firstChild.textContent = isCompany ? t('invoice.nameCompany') : t('invoice.namePerson');
+});
+
+subscriptionPanel?.addEventListener("click", (event) => {
+  const button = event.target?.closest?.('[data-invoice-pdf]');
+  if (!button) return;
+  downloadInvoicePdf(button.dataset.invoicePdf, button.dataset.invoiceNumber || null);
 });
 
 subscriptionPanel?.addEventListener("click", async (event) => {

@@ -1,3 +1,5 @@
+pub mod admin;
+pub mod billing;
 pub mod guest_import;
 pub mod licenses;
 pub mod photos;
@@ -255,6 +257,12 @@ pub async fn auth_login(State(state): State<AppState>, headers: axum::http::Head
         Ok(None) => {},
         Err(_) => return api_error(StatusCode::UNAUTHORIZED, "invalid credentials"),
     }
+    match repos::is_disabled(&state, user.user_id).await {
+        Ok(false) => {}
+        Ok(true) => return api_error(StatusCode::FORBIDDEN, "account_disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    repos::touch_last_seen(&state, user.user_id).await;
     match crate::services::auth::issue_token(user.user_id, AuthMode::Email, &state.jwt_secret) {
         Ok(token) => {
             let (raw_refresh, refresh_hash) = crate::services::auth::issue_refresh_token();
@@ -345,6 +353,12 @@ pub async fn auth_refresh(State(state): State<AppState>, headers: axum::http::He
         Ok(None) => return api_error(StatusCode::UNAUTHORIZED, "user not found"),
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    match repos::is_disabled(&state, user.user_id).await {
+        Ok(false) => {}
+        Ok(true) => return api_error(StatusCode::FORBIDDEN, "account_disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    repos::touch_last_seen(&state, user.user_id).await;
 
     // Issue new access token
     let access_token = match crate::services::auth::issue_token(user.user_id, user.auth_mode.clone(), &state.jwt_secret) {
@@ -965,6 +979,13 @@ fn nursery_price_id() -> Option<String> {
         .filter(|v| !v.trim().is_empty())
 }
 
+/// The plan a Stripe price id belongs to (configured STRIPE_PRICE_* values).
+pub fn plan_for_price(price_id: &str) -> Option<SubscriptionPlan> {
+    [SubscriptionPlan::Basic, SubscriptionPlan::Pro, SubscriptionPlan::Nursery]
+        .into_iter()
+        .find(|plan| stripe_price_id_for(*plan).as_deref() == Some(price_id))
+}
+
 fn stripe_price_id_for(plan: SubscriptionPlan) -> Option<String> {
     match plan {
         SubscriptionPlan::Free => None,
@@ -1022,7 +1043,7 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
         let success_url = format!("{base_url}/checkout/success?plan={normalized_plan}&user_id={}", session.user_id);
         let cancel_url = format!("{base_url}/checkout/cancel");
 
-        match stripe.create_checkout_session(&email, &price_id, &success_url, &cancel_url).await {
+        match stripe.create_checkout_session(&email, &price_id, session.user_id, &normalized_plan, &success_url, &cancel_url).await {
             Ok(url) => {
                 let _ = repos::record_subscription_history(&state, session.user_id, "stripe_checkout_created", payload.plan, Some(previous_plan), None, Some("stripe"), Some("pending"), Some("Stripe Checkout Session erstellt.")).await;
                 return Json(CheckoutResponse {
@@ -1112,13 +1133,24 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
             let session_obj = &event["data"]["object"];
             // One-time desktop purchase: a license, not a subscription plan.
             if session_obj["metadata"]["kind"].as_str() == Some("desktop_license") {
+                if session_obj["payment_status"].as_str() == Some("paid") {
+                    billing::record_desktop_purchase(&state, session_obj).await;
+                }
                 return licenses::handle_purchase_completed(&state, session_obj).await;
             }
             let customer_email = session_obj["customer_email"].as_str().unwrap_or("");
             let customer_id = session_obj["customer"].as_str().unwrap_or("");
 
-            // Look up user by email
-            let user = match repos::get_user_by_email(&state, customer_email).await {
+            // The account: client_reference_id (set at checkout), else the e-mail.
+            let by_reference = match session_obj["client_reference_id"].as_str().and_then(|s| Uuid::parse_str(s).ok()) {
+                Some(id) => repos::get_user(&state, id).await.ok().flatten(),
+                None => None,
+            };
+            let lookup = match by_reference {
+                Some(u) => Ok(Some(u)),
+                None => repos::get_user_by_email(&state, customer_email).await,
+            };
+            let user = match lookup {
                 Ok(Some(u)) => u,
                 Ok(None) => {
                     tracing::warn!("stripe webhook: no user found for email {}", pseudonymize_email(customer_email));
@@ -1143,6 +1175,13 @@ pub async fn post_subscription_webhook(State(state): State<AppState>, headers: H
             let _ = repos::record_subscription_history(&state, user.user_id, "stripe_webhook_activated", plan, previous_plan, session_obj["id"].as_str(), Some("stripe"), Some("active"), Some("Plan via Stripe Webhook aktiviert.")).await;
 
             return Json(serde_json::json!({ "status": "processed", "event_type": event_type, "plan": format!("{:?}", plan).to_lowercase() })).into_response();
+        }
+
+        // Every paid subscription invoice (first payment and renewals): an
+        // invoice for the customer, and the plan follows what was paid for.
+        if event_type == "invoice.paid" {
+            billing::record_subscription_payment(&state, &event["data"]["object"]).await;
+            return Json(serde_json::json!({ "status": "processed", "event_type": event_type })).into_response();
         }
 
         // Handle customer.subscription.deleted (cancellation)
@@ -1356,31 +1395,31 @@ pub async fn delete_account(
     State(state): State<AppState>,
     session: SessionUser,
 ) -> impl IntoResponse {
+    match erase_account(&state, session.user_id).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+/// Erase an account and everything that belongs to it (GDPR Art. 17); used by
+/// "delete account" and by the admin area. Invoices stay (retention periods)
+/// but lose the link to the account.
+pub async fn erase_account(state: &AppState, user_id: Uuid) -> anyhow::Result<()> {
     // Photo files first (GDPR Art. 17): the database cascade removes the rows,
     // but nothing would ever remove the bytes on disk afterwards. If this
     // fails, abort so the user can retry rather than leaving orphaned images.
-    if let Err(err) = state.photos.delete_user(session.user_id).await {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
+    state.photos.delete_user(user_id).await?;
     // Licenses: account-bound ones (no key) are useless without the account
     // and go; keyed ones keep working for whoever holds the key but lose the
     // link to this person.
-    let email = repos::get_user_email(&state, session.user_id).await.ok().flatten();
-    let licenses = async {
-        let mut tx = state.pg.begin().await?;
-        sqlx::query("DELETE FROM licenses WHERE key_hash IS NULL AND (user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)))")
-            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
-        sqlx::query("UPDATE licenses SET user_id = NULL, email = NULL WHERE user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2))")
-            .bind(session.user_id).bind(&email).execute(&mut *tx).await?;
-        tx.commit().await
-    }.await;
-    if let Err(err) = licenses {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
-    if let Err(err) = repos::delete_user_cascade(&state, session.user_id).await {
-        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
-    }
-    StatusCode::NO_CONTENT.into_response()
+    let email = repos::get_user_email(state, user_id).await.ok().flatten();
+    let mut tx = state.pg.begin().await?;
+    sqlx::query("DELETE FROM licenses WHERE key_hash IS NULL AND (user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2)))")
+        .bind(user_id).bind(&email).execute(&mut *tx).await?;
+    sqlx::query("UPDATE licenses SET user_id = NULL, email = NULL WHERE user_id = $1 OR ($2::text IS NOT NULL AND lower(email) = lower($2))")
+        .bind(user_id).bind(&email).execute(&mut *tx).await?;
+    tx.commit().await?;
+    repos::delete_user_cascade(state, user_id).await
 }
 
 /// GET /me/export — server-side JSON export of all data for the current user
@@ -1447,6 +1486,18 @@ pub async fn export_me(
         Ok(v) => v,
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     };
+    let invoice_export = match billing::list_for_user(&state, user_id).await {
+        Ok(v) => v,
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    };
+    let billing_export: Option<serde_json::Value> = sqlx::query_scalar(
+        "SELECT to_jsonb(b) - 'user_id' - 'lexoffice_contact_id' FROM billing_profiles b WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pg)
+    .await
+    .ok()
+    .flatten();
     let voucher_export = match vouchers::active_voucher(&state, user_id).await {
         Ok(v) => v.map(|(plan, until)| serde_json::json!({ "plan": plan, "until": until })),
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -1469,6 +1520,8 @@ pub async fn export_me(
         "push_subscriptions": push_export,
         "desktop_licenses": license_export,
         "voucher": voucher_export,
+        "billing_profile": billing_export,
+        "invoices": invoice_export,
     });
 
     let json = match serde_json::to_vec(&body) {

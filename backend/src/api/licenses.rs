@@ -228,6 +228,11 @@ pub async fn desktop_access(State(state): State<AppState>, session: SessionUser,
 }
 
 async fn account_certificate(state: &AppState, user_id: Uuid, device: &DeviceInfo) -> Response {
+    match repos::is_disabled(state, user_id).await {
+        Ok(false) => {}
+        Ok(true) => return license_error(StatusCode::FORBIDDEN, "account_disabled", "this account has been disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
     let user = match repos::get_user(state, user_id).await {
         Ok(Some(u)) => u,
         Ok(None) => return license_error(StatusCode::FORBIDDEN, "no_license", "account not found"),
