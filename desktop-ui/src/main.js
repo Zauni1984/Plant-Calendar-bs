@@ -5234,6 +5234,7 @@ function renderLogFormHTML(prefill = {}) {
         <button type="button" class="btn btn--sm" id="logPhotoSelectBtn">${t('log.pickPhoto')}</button>
         <span id="logPhotoPath" style="font-size:12px;color:${TC.textDim};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;"></span>
       </div>
+      <div style="font-size:11px;color:${TC.textDim};margin-top:4px;">${t('photo.processingNote')}</div>
       <input type="hidden" id="logPhotoFilePath" />
     </div>
     <div id="logFormError" class="form-error" style="display:none;"></div>
@@ -8152,6 +8153,7 @@ function renderPhotoGallery() {
         ? `<span style="font-size:12px;color:${TC.textMuted};">${t('photo.requiresSubscription')}</span>`
         : `<button class="btn btn--sm btn--primary" id="addPhotoBtn">${t('photo.add')}</button>`}
     </div>
+    ${uploadLocked ? '' : `<div style="font-size:11px;color:${TC.textDim};margin:-4px 0 10px;">${t('photo.processingNote')}</div>`}
     ${deletionAt ? `
       <div role="alert" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;border-radius:12px;background:${TC.warningBg};border:1px solid ${TC.warning};color:${TC.text};font-size:13px;">
         <span>${t('photo.deletionBanner', deletionAt.toLocaleDateString(localeTag(), { day: 'numeric', month: 'long', year: 'numeric' }))}</span>

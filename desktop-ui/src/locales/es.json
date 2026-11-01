@@ -1293,6 +1293,7 @@
   "devices.desktopOnlyHint": "Los sensores Bluetooth y los dispositivos Tuya solo se pueden conectar en la aplicación de escritorio: los navegadores no pueden acceder a dispositivos de la red local, y el iPhone y el iPad no tienen Web Bluetooth. Las mediciones guardadas por la aplicación de escritorio se muestran aquí de todos modos.",
   "auth.webModalHint": "Inicia sesión o crea una cuenta. Tus plantas, tareas y registros se guardan en tu cuenta y están disponibles en todos tus dispositivos.",
   "photo.requiresSubscription": "Subir fotos forma parte de la suscripción.",
+  "photo.processingNote": "Las fotos se reducen a un máximo de 1000 × 1000 píxeles, se guardan como WebP y se eliminan metadatos como EXIF y la ubicación GPS.",
   "photo.deletionBanner": "Tu suscripción ha terminado. Tus fotos se eliminarán el {0}, salvo que vuelvas a suscribirte antes.",
   "photo.downloadAll": "Descargar todas las fotos",
   "photo.downloadFailed": "Error en la descarga: {0}",

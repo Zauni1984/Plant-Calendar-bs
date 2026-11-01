@@ -1293,6 +1293,7 @@
   "devices.desktopOnlyHint": "Les capteurs Bluetooth et les appareils Tuya ne peuvent être connectés que dans l'application de bureau : les navigateurs n'ont pas le droit d'accéder aux appareils du réseau local, et l'iPhone et l'iPad ne prennent pas en charge le Web Bluetooth. Les mesures enregistrées par l'application de bureau s'affichent tout de même ici.",
   "auth.webModalHint": "Connecte-toi ou crée un compte. Tes plantes, tâches et journaux sont enregistrés dans ton compte et disponibles sur tous tes appareils.",
   "photo.requiresSubscription": "L'ajout de photos fait partie de l'abonnement.",
+  "photo.processingNote": "Les photos sont réduites à 1000 × 1000 pixels maximum, enregistrées en WebP et débarrassées des métadonnées comme EXIF et la position GPS.",
   "photo.deletionBanner": "Ton abonnement a pris fin. Tes photos seront supprimées le {0}, sauf si tu te réabonnes d'ici là.",
   "photo.downloadAll": "Télécharger toutes les photos",
   "photo.downloadFailed": "Échec du téléchargement : {0}",
