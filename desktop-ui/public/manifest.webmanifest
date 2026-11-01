@@ -1,7 +1,7 @@
 {
   "name": "Sowling",
   "short_name": "Sowling",
-  "description": "Pflanzenkalender: Aufgaben, Logs, Wetter und Wachstum deiner Pflanzen auf allen Geräten.",
+  "description": "Sowling – dein Pflanzenkalender: Aufgaben, Logs, Wetter und Wachstum deiner Pflanzen auf allen Geräten.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
