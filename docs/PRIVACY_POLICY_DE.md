@@ -1,9 +1,8 @@
 # Datenschutzerklärung – Sowling
 
-**Stand: 16.10.2026**
+**Stand: 01.11.2026**
 
-<!-- Vor Veröffentlichung ausfüllen/prüfen: Anschrift (Abschnitt 1), Hoster und
-     Serverstandort (Abschnitt 5), App-Name nach der Umbenennung. Sobald der
+<!-- Offen: Sobald der
      E-Mail-Versand (Hostinger Mail) aktiv ist, Abschnitt 4.9 ergänzen. Eine
      anwaltliche Prüfung vor dem Livegang wird empfohlen. -->
 
@@ -15,8 +14,8 @@ als **Web-App** im Browser (auch installiert auf Smartphone oder Tablet) oder al
 ## 1. Verantwortlicher
 
 BlockSocial UG (haftungsbeschränkt)
-[Straße, Hausnummer]
-[PLZ Ort]
+Kratzmühlstr. 14
+92339 Beilngries
 E-Mail: info@blocksocial.eu
 
 Ein Datenschutzbeauftragter ist nach Art. 37 DSGVO nicht bestellt, da keine
@@ -162,8 +161,8 @@ höchstens 15 Minuten.
 
 ## 5. Empfänger und Auftragsverarbeiter
 
-- **Hosting:** [Hoster, Anschrift] – Betrieb von Server und Datenbank im
-  Auftrag (Art. 28 DSGVO), Serverstandort [Land, EU].
+- **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Zypern – Betrieb von Server und Datenbank im
+  Auftrag (Art. 28 DSGVO), Serverstandort Deutschland (Frankfurt am Main).
 - **Stripe Payments Europe Ltd.** (Irland) – Zahlungsabwicklung; konzernintern
   auch Stripe Inc. (USA).
 - **Open-Meteo** (Deutschland) – nur bei erteilter Einwilligung „Wetter“.
