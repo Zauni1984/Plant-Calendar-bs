@@ -188,6 +188,7 @@ async function createTask(plantId, b) {
     repeat_interval_hours: b.repeat_interval_hours ?? null,
     repeat_until: b.repeat_until ?? null,
     notification_enabled: b.notification_enabled ?? true,
+    feeds: b.feeds ?? null,
     status: "open",
     created_at: t,
     updated_at: t,

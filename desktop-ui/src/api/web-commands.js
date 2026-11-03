@@ -83,12 +83,16 @@ function resolveRepeatUntil(raw, dueAtIso, repeatHours) {
   return null;
 }
 
-const METRIC_FIELDS = ["ph", "ec", "temp_c", "rh", "harvest_kg", "harvest_count", "harvest_quality", "water_liters", "water_method"];
+const METRIC_FIELDS = [
+  "ph", "ec", "temp_c", "rh", "vpd", "harvest_kg", "harvest_count", "harvest_quality", "water_liters", "water_method",
+  "ppfd", "co2_ppm", "water_temp_c", "soil_moisture",
+];
 
 /** The desktop sends a metrics object only when at least one metric is set. */
 function metricsFrom(p) {
-  if (!METRIC_FIELDS.some((f) => p[f] != null && p[f] !== "")) return null;
-  const m = { vpd: null };
+  const feeds = Array.isArray(p.feeds) && p.feeds.length ? p.feeds : null;
+  if (!feeds && !METRIC_FIELDS.some((f) => p[f] != null && p[f] !== "")) return null;
+  const m = { feeds };
   for (const f of METRIC_FIELDS) m[f] = p[f] ?? null;
   return m;
 }
@@ -517,6 +521,7 @@ export const webCommands = {
         repeat_interval_hours: payload.repeat_interval_hours ?? null,
         repeat_until: resolveRepeatUntil(payload.repeat_until, due_at, payload.repeat_interval_hours),
         notification_enabled: payload.notification_enabled ?? true,
+        feeds: Array.isArray(payload.feeds) && payload.feeds.length ? payload.feeds : null,
       },
     });
   },

@@ -6,6 +6,7 @@ import { invoke, convertFileSrc, openDialog as tauriOpenDialog, saveDialog as ta
 // German is the fallback for every missing key, so it ships in the main
 // bundle. The other nine are separate chunks loaded on demand: bundling all
 // ten put ~660 KB of JSON into startup, of which a visitor needs one.
+import { FERTILIZERS, FEED_UNITS } from './fertilizers.js';
 import localeDe from './locales/de.json';
 const LOCALE_LOADERS = import.meta.glob(['./locales/*.json', '!./locales/de.json'], { import: 'default' });
 
@@ -4965,6 +4966,7 @@ function showDayDetail(dayKey) {
         }
         playNotificationSound('success');
         await invoke("update_task_status_smart", { payload: { task_id: taskId, status: "done" } });
+        if (task?.category === 'feed') openFeedingLogFromTask(task);
         if (task && task.category === "water" && !hasRecentWateringLog(task.plant_id, task.title)) {
           try {
             await invoke("create_log_smart", { payload: {
@@ -5087,10 +5089,12 @@ function openPlantStatPopup(plant, kind) {
       if (!guardTaskDone(tid)) return;
       b.disabled = true;
       try {
+        const doneTask = allTasks.find(x => x.task_id === tid);
         await invoke("update_task_status_smart", { payload: { task_id: tid, status: "done" } });
         await refreshAll({ autoReminderReason: "task_action" });
         close();
-        openPlantStatPopup(plant, kind); // refresh popup
+        if (doneTask?.category === 'feed') openFeedingLogFromTask(doneTask);
+        else openPlantStatPopup(plant, kind); // refresh popup
       } catch (err) { alert(t('action.genericError', (err?.message || err))); b.disabled = false; }
     });
   });
@@ -5200,11 +5204,22 @@ function openModal(type, prefill = {}) {
     body.innerHTML = renderTaskFormHTML(prefill);
     footer.innerHTML = `<button class="btn btn--ghost" id="modalCancel">${t('action.cancel')}</button><button class="btn btn--primary" id="modalSubmitTask">${t('task.create')}</button>`;
     document.getElementById('modalSubmitTask')?.addEventListener('click', handleCreateTask);
+    const taskCat = document.getElementById('taskCategory');
+    if (prefill.category && taskCat) taskCat.value = prefill.category;
+    const toggleFeeds = () => {
+      const group = document.getElementById('taskFeedGroup');
+      if (group) group.style.display = taskCat?.value === 'feed' ? '' : 'none';
+    };
+    taskCat?.addEventListener('change', toggleFeeds);
+    toggleFeeds();
   } else if (type === 'log') {
     titleEl.textContent = t('log.new');
     body.innerHTML = renderLogFormHTML(prefill);
     footer.innerHTML = `<button class="btn btn--ghost" id="modalCancel">${t('action.cancel')}</button><button class="btn btn--primary" id="modalSubmitLog">${t('log.create')}</button>`;
     document.getElementById('modalSubmitLog')?.addEventListener('click', handleCreateLog);
+    const logTypeSelect = document.getElementById('logType');
+    applyLogFormType(body, logTypeSelect?.value || 'note');
+    logTypeSelect?.addEventListener('change', () => applyLogFormType(body, logTypeSelect.value));
     document.getElementById('logPhotoSelectBtn')?.addEventListener('click', async () => {
       try {
         const selected = await tauriOpenDialog({
@@ -5507,6 +5522,12 @@ function renderTaskFormHTML(prefill = {}) {
         <input id="taskRepeat" type="number" class="form-input" min="0" placeholder="${t('task.repeatHoursPlaceholder')}" value="${escapeHtml(String(prefill.repeat ?? ''))}" />
       </div>
     </div>
+    <div class="form-group" id="taskFeedGroup" style="display:none;">
+      <label class="form-label">${t('feed.planned')}</label>
+      ${feedEditorHtml('taskFeeds', prefill.feeds)}
+      ${feedDatalistsHtml()}
+      <div class="form-hint">${escapeHtml(t('feed.taskHint'))}</div>
+    </div>
     <div class="form-group">
       <label class="form-label">${t('task.due')}</label>
       <input id="taskDueAt" type="datetime-local" class="form-input" value="${dueDefault}" />
@@ -5551,53 +5572,20 @@ function renderLogFormHTML(prefill = {}) {
         <option value="measurement" ${logTypeDefault === 'measurement' ? 'selected' : ''}>${t('log.measurement')}</option>
         <option value="harvest" ${logTypeDefault === 'harvest' ? 'selected' : ''}>${t('log.harvest')}</option>
         <option value="watering" ${logTypeDefault === 'watering' ? 'selected' : ''}>${t('log.watering')}</option>
+        <option value="feeding" ${logTypeDefault === 'feeding' ? 'selected' : ''}>${t('log.feeding')}</option>
       </select>
     </div>
     <div class="form-group">
       <label class="form-label">${t('log.text')}</label>
       <textarea id="logText" class="form-textarea" placeholder="${t('log.textPlaceholder')}">${escapeHtml(prefill.text || '')}</textarea>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">pH</label>
-        <input id="logPh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '6.2')}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">EC</label>
-        <input id="logEc" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '1.2')}" />
-      </div>
+    <div data-log-group="feeding">
+      <label class="form-label">${t('feed.title')}</label>
+      ${prefill.fromTask ? `<div class="form-hint" style="margin-bottom:6px;">${escapeHtml(t('feed.fromTask'))}</div>` : ''}
+      ${feedEditorHtml('logFeeds', prefill.feeds)}
+      ${feedDatalistsHtml()}
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Temp (\u00b0C)</label>
-        <input id="logTemp" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '24')}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">RH (%)</label>
-        <input id="logRh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '55')}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">${t('harvest.kg')}</label>
-        <input id="logHarvestKg" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '2.5')}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">${t('harvest.count')}</label>
-        <input id="logHarvestCount" type="number" class="form-input" placeholder="${t('form.example', '12')}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">${t('harvest.quality')}</label>
-      <select id="logHarvestQuality" class="form-select">
-        <option value="">--</option>
-        <option value="excellent">${t('harvest.excellent')}</option>
-        <option value="good">${t('harvest.good')}</option>
-        <option value="average">${t('harvest.average')}</option>
-        <option value="poor">${t('harvest.poor')}</option>
-      </select>
-    </div>
-    <div class="form-row">
+    <div class="form-row" data-log-group="watering">
       <div class="form-group">
         <label class="form-label">${t('water.liters')}</label>
         <input id="logWaterLiters" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '2.0')}" />
@@ -5610,6 +5598,76 @@ function renderLogFormHTML(prefill = {}) {
           <option value="tropf">${t('water.drip')}</option>
           <option value="spruehen">${t('water.spray')}</option>
           <option value="regen">${t('water.rain')}</option>
+        </select>
+      </div>
+    </div>
+    <div data-log-group="solution">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">pH</label>
+          <input id="logPh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '6.2')}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">EC</label>
+          <input id="logEc" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '1.2')}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('metric.waterTemp')}</label>
+        <input id="logWaterTemp" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '20')}" />
+      </div>
+    </div>
+    <div data-log-group="environment">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Temp (\u00b0C)</label>
+          <input id="logTemp" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '24')}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">RH (%)</label>
+          <input id="logRh" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '55')}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">PPFD (\u00b5mol/m\u00b2/s)</label>
+          <input id="logPpfd" type="number" step="1" min="0" class="form-input" placeholder="${t('form.example', '650')}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">VPD (kPa)</label>
+          <input id="logVpd" type="number" step="0.01" min="0" class="form-input" placeholder="${t('form.example', '1.1')}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">CO\u2082 (ppm)</label>
+          <input id="logCo2" type="number" step="1" min="0" class="form-input" placeholder="${t('form.example', '800')}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('metric.soil')}</label>
+          <input id="logSoil" type="number" step="1" min="0" max="100" class="form-input" placeholder="${t('form.example', '40')}" />
+        </div>
+      </div>
+    </div>
+    <div data-log-group="harvest">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('harvest.kg')}</label>
+          <input id="logHarvestKg" type="number" step="0.1" class="form-input" placeholder="${t('form.example', '2.5')}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('harvest.count')}</label>
+          <input id="logHarvestCount" type="number" class="form-input" placeholder="${t('form.example', '12')}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('harvest.quality')}</label>
+        <select id="logHarvestQuality" class="form-select">
+          <option value="">--</option>
+          <option value="excellent">${t('harvest.excellent')}</option>
+          <option value="good">${t('harvest.good')}</option>
+          <option value="average">${t('harvest.average')}</option>
+          <option value="poor">${t('harvest.poor')}</option>
         </select>
       </div>
     </div>
@@ -5696,16 +5754,25 @@ async function handleCreateTask() {
     if (errEl) { errEl.textContent = t('task.validDueDate'); errEl.style.display = 'block'; }
     return;
   }
+  const category = $("taskCategory")?.value || 'water';
+  let feeds = null;
+  try {
+    feeds = category === 'feed' ? readFeeds(document.getElementById('taskFeeds')) : null;
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+    return;
+  }
   try {
     const task = await invoke("create_task_smart", {
       payload: {
         plant_id: plantId,
         title,
-        category: $("taskCategory")?.value || 'water',
+        category,
         due_at,
         repeat_interval_hours: repeat,
         repeat_until,
         notification_enabled,
+        feeds,
       },
     });
     logOut(task);
@@ -5735,14 +5802,27 @@ async function handleCreateLog() {
   const harvest_quality = $("logHarvestQuality")?.value || null;
   const water_liters = parseOptionalNumber("logWaterLiters");
   const water_method = $("logWaterMethod")?.value || null;
+  const ppfd = parseOptionalNumber("logPpfd");
+  const vpd = parseOptionalNumber("logVpd");
+  const co2_ppm = parseOptionalNumber("logCo2");
+  const water_temp_c = parseOptionalNumber("logWaterTemp");
+  const soil_moisture = parseOptionalNumber("logSoil");
   const log_type = $("logType")?.value || "note";
-  if ([ph, ec, temp_c, rh, harvest_kg, water_liters].some(Number.isNaN)) {
+  let feeds = null;
+  try {
+    feeds = log_type === 'feeding' ? readFeeds(document.getElementById('logFeeds')) : null;
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+    return;
+  }
+  if ([ph, ec, temp_c, rh, harvest_kg, water_liters, ppfd, vpd, co2_ppm, water_temp_c, soil_moisture].some(Number.isNaN)) {
     if (errEl) { errEl.textContent = "Messwerte m\u00fcssen leer oder g\u00fcltige Zahlen sein."; errEl.style.display = 'block'; }
     return;
   }
   const hasAnyValue = textValue || ph !== null || ec !== null || temp_c !== null || rh !== null
     || harvest_kg !== null || harvest_count !== null || harvest_quality
-    || water_liters !== null || water_method;
+    || water_liters !== null || water_method
+    || ppfd !== null || vpd !== null || co2_ppm !== null || water_temp_c !== null || soil_moisture !== null || feeds;
   if (!hasAnyValue) {
     if (errEl) { errEl.textContent = t('log.form.valueRequired'); errEl.style.display = 'block'; }
     return;
@@ -5762,6 +5842,12 @@ async function handleCreateLog() {
       harvest_quality,
       water_liters,
       water_method,
+      ppfd,
+      vpd,
+      co2_ppm,
+      water_temp_c,
+      soil_moisture,
+      feeds,
     };
     const log = await invoke("create_log_smart", { payload });
     logOut(log);
@@ -5888,6 +5974,9 @@ function renderTimelinePanel() {
       if (log.metrics?.water_liters) {
         const method = log.metrics.water_method ? ' (' + log.metrics.water_method + ')' : '';
         badge = `\u{1F4A7} ${log.metrics.water_liters} L${method}`;
+      }
+      if (log.metrics?.feeds?.length) {
+        badge = `\u{1F9EA} ${feedsSummary(log.metrics.feeds)}`;
       }
       return {
         type: "log",
@@ -6965,6 +7054,7 @@ function renderTasks() {
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(task.title)}</div>
           <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · ${t('task.everyHours', task.repeat_interval_hours)}` : ''}${task.repeat_until ? ` ${t('task.until', new Date(task.repeat_until).toLocaleDateString(localeTag()))}` : ''}</div>
+          ${task.feeds?.length ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${task.feeds.map(f => `<span class="cal-badge feed-badge">\u{1F9EA} ${escapeHtml(formatFeed(f))}</span>`).join('')}</div>` : ''}
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
           <button data-action="done" data-task-id="${task.task_id}">${t('task.doneBtn')}</button>
@@ -7052,6 +7142,7 @@ function renderTasks() {
           }
           const result = await invoke("update_task_status_smart", { payload: { task_id: taskId, status: action === "done" ? "done" : "skipped" } });
           playNotificationSound('success');
+          if (action === "done" && task.category === 'feed') openFeedingLogFromTask(task);
           // Auto-create watering log when completing a water task (idempotent)
           if (action === "done" && task.category === "water" && !hasRecentWateringLog(task.plant_id, task.title)) {
             try {
@@ -7112,10 +7203,11 @@ function renderLogs() {
     <div class="entity-row" style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
-          <div style="font-weight:700;">${escapeHtml(log.log_type)}</div>
+          <div style="font-weight:700;">${escapeHtml(t(`log.${log.log_type}`) || log.log_type)}</div>
           <div style="font-size:12px; color:${TC.textMuted};">${formatDate(log.created_at)}</div>
           <div style="margin-top:8px;">${escapeHtml(log.text ?? "-")}</div>
-          ${log.metrics ? `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">pH ${log.metrics.ph ?? '-'} · EC ${log.metrics.ec ?? '-'} · Temp ${log.metrics.temp_c ?? '-'} · RH ${log.metrics.rh ?? '-'}</div>` : ""}
+          ${metricsSummary(log.metrics) ? `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">${escapeHtml(metricsSummary(log.metrics))}</div>` : ""}
+          ${log.metrics?.feeds?.length ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${log.metrics.feeds.map(f => `<span class="cal-badge feed-badge">\u{1F9EA} ${escapeHtml(formatFeed(f))}</span>`).join('')}</div>` : ''}
           ${(harvestInfo || qualityInfo || waterInfo) ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${harvestInfo}${qualityInfo}${waterInfo}</div>` : ''}
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;"><button data-action="edit" data-log-id="${log.log_id}">${isEditing ? t('action.close') : t('action.edit')}</button><button data-action="delete" data-log-id="${log.log_id}">${t('action.delete')}</button></div>
@@ -7129,6 +7221,7 @@ function renderLogs() {
           <option value="photo" ${log.log_type === 'photo' ? 'selected' : ''}>${t('log.photo')}</option>
           <option value="harvest" ${log.log_type === 'harvest' ? 'selected' : ''}>${t('log.harvest')}</option>
           <option value="watering" ${log.log_type === 'watering' ? 'selected' : ''}>${t('log.watering')}</option>
+          <option value="feeding" ${log.log_type === 'feeding' ? 'selected' : ''}>${t('log.feeding')}</option>
         </select>
         <textarea data-log-edit="text" data-log-id="${log.log_id}" rows="3" style="width:100%; padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};">${escapeHtml(log.text ?? '')}</textarea>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -7138,6 +7231,20 @@ function renderLogs() {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <input data-log-edit="temp_c" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.temp_c ?? ''}" placeholder="Temp \u00b0C" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
           <input data-log-edit="rh" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.rh ?? ''}" placeholder="RH %" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <input data-log-edit="ppfd" data-log-id="${log.log_id}" type="number" step="1" value="${log.metrics?.ppfd ?? ''}" placeholder="PPFD" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+          <input data-log-edit="vpd" data-log-id="${log.log_id}" type="number" step="0.01" value="${log.metrics?.vpd ?? ''}" placeholder="VPD kPa" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <input data-log-edit="co2_ppm" data-log-id="${log.log_id}" type="number" step="1" value="${log.metrics?.co2_ppm ?? ''}" placeholder="CO\u2082 ppm" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+          <input data-log-edit="water_temp_c" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.water_temp_c ?? ''}" placeholder="${escapeHtml(t('metric.waterTempShort'))} \u00b0C" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+          <input data-log-edit="soil_moisture" data-log-id="${log.log_id}" type="number" step="1" value="${log.metrics?.soil_moisture ?? ''}" placeholder="${escapeHtml(t('metric.soilShort'))} %" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
+        </div>
+        <div>
+          <div style="font-size:12px; color:${TC.textMuted}; margin-bottom:4px;">${t('feed.title')}</div>
+          ${feedEditorHtml(`logEditFeeds-${log.log_id}`, log.metrics?.feeds)}
+          ${document.getElementById('feedBrandList') ? '' : feedDatalistsHtml()}
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <input data-log-edit="harvest_kg" data-log-id="${log.log_id}" type="number" step="0.1" value="${log.metrics?.harvest_kg ?? ''}" placeholder="${t('log.harvest.kgPh')}" style="padding:10px; border-radius:10px; border:1px solid #1f4036; background:${TC.inputBg}; color:${TC.text};" />
@@ -7217,6 +7324,12 @@ function renderLogs() {
             harvest_quality: stringFrom('harvest_quality'),
             water_liters: numberFrom('water_liters'),
             water_method: stringFrom('water_method'),
+            ppfd: numberFrom('ppfd'),
+            vpd: numberFrom('vpd'),
+            co2_ppm: numberFrom('co2_ppm'),
+            water_temp_c: numberFrom('water_temp_c'),
+            soil_moisture: numberFrom('soil_moisture'),
+            feeds: readFeeds(document.getElementById(`logEditFeeds-${logId}`)),
           }});
           editingLogId = null;
         } else if (action === "delete") {
@@ -8708,6 +8821,154 @@ async function refreshAll(options = {}) {
   } finally {
     hideLoading();
   }
+}
+
+// --- Fertilizer entries (feeding logs and feed tasks) ---------------------------------
+
+/** Brands and products for the suggestion lists: catalog plus what was used before. */
+function feedSuggestions() {
+  const map = new Map(Object.entries(FERTILIZERS).map(([b, list]) => [b, new Set(list)]));
+  const add = (f) => {
+    if (!f?.product) return;
+    const brand = (f.brand || '').trim() || t('feed.noBrand');
+    if (!map.has(brand)) map.set(brand, new Set());
+    map.get(brand).add(f.product.trim());
+  };
+  for (const l of allLogs || []) (l.metrics?.feeds || []).forEach(add);
+  for (const tk of allTasks || []) (tk.feeds || []).forEach(add);
+  return map;
+}
+
+function feedDatalistsHtml() {
+  const map = feedSuggestions();
+  const brands = [...map.keys()].sort((a, b) => a.localeCompare(b));
+  return `<datalist id="feedBrandList">${brands.map(b => `<option value="${escapeHtml(b)}"></option>`).join('')}</datalist>
+    <datalist id="feedProductList"></datalist>`;
+}
+
+function feedRowHtml(f = {}) {
+  const unit = f.unit || 'ml/l';
+  return `<div class="feed-row" data-feed-row>
+    <input class="form-input" data-feed="brand" list="feedBrandList" maxlength="60" placeholder="${escapeHtml(t('feed.brand'))}" value="${escapeHtml(f.brand || '')}" autocomplete="off" />
+    <input class="form-input" data-feed="product" list="feedProductList" maxlength="80" placeholder="${escapeHtml(t('feed.product'))}" value="${escapeHtml(f.product || '')}" autocomplete="off" />
+    <input class="form-input" data-feed="amount" type="number" step="0.1" min="0" placeholder="${escapeHtml(t('feed.amount'))}" value="${f.amount ?? ''}" />
+    <select class="form-select" data-feed="unit">${FEED_UNITS.map(u => `<option value="${u}" ${u === unit ? 'selected' : ''}>${u}</option>`).join('')}${FEED_UNITS.includes(unit) ? '' : `<option value="${escapeHtml(unit)}" selected>${escapeHtml(unit)}</option>`}</select>
+    <button type="button" class="btn btn--ghost btn--sm feed-remove" data-feed-remove aria-label="${escapeHtml(t('feed.remove'))}" title="${escapeHtml(t('feed.remove'))}">&times;</button>
+  </div>`;
+}
+
+/** The fertilizer editor: one row per product, "add" button below. */
+function feedEditorHtml(id, feeds) {
+  const rows = (feeds && feeds.length ? feeds : [{}]).map(feedRowHtml).join('');
+  return `<div class="feed-editor" id="${id}">
+    <div data-feed-rows>${rows}</div>
+    <button type="button" class="btn btn--ghost btn--sm" data-feed-add>+ ${escapeHtml(t('feed.add'))}</button>
+  </div>`;
+}
+
+/** Rows with a product; null when none. Throws with a message on bad input. */
+function readFeeds(container) {
+  if (!container) return null;
+  const out = [];
+  container.querySelectorAll('[data-feed-row]').forEach((row) => {
+    const get = (k) => row.querySelector(`[data-feed="${k}"]`)?.value?.trim() || '';
+    const product = get('product');
+    const brand = get('brand');
+    const amountRaw = get('amount');
+    if (!product && !brand && !amountRaw) return;
+    if (!product) throw new Error(t('feed.productRequired'));
+    const amount = amountRaw === '' ? null : Number(amountRaw.replace(',', '.'));
+    if (amount !== null && (Number.isNaN(amount) || amount < 0)) throw new Error(t('feed.amountInvalid'));
+    out.push({ brand: brand || null, product, amount, unit: get('unit') || null });
+  });
+  return out.length ? out : null;
+}
+
+function formatFeed(f) {
+  const amount = f.amount != null ? ` ${String(f.amount).replace('.', localeTag().startsWith('en') ? '.' : ',')} ${f.unit || ''}`.trimEnd() : '';
+  return `${f.brand ? f.brand + ' ' : ''}${f.product}${amount}`;
+}
+
+function feedsSummary(feeds) {
+  return (feeds || []).map(formatFeed).join(' · ');
+}
+
+/** Only the measured values, e.g. "pH 6,2 · EC 1,4 · PPFD 650". */
+function metricsSummary(m) {
+  if (!m) return '';
+  const parts = [];
+  const num = (v) => String(v).replace('.', localeTag().startsWith('en') ? '.' : ',');
+  if (m.ph != null) parts.push(`pH ${num(m.ph)}`);
+  if (m.ec != null) parts.push(`EC ${num(m.ec)}`);
+  if (m.temp_c != null) parts.push(`${num(m.temp_c)} °C`);
+  if (m.rh != null) parts.push(`${num(m.rh)} % RH`);
+  if (m.vpd != null) parts.push(`VPD ${num(m.vpd)} kPa`);
+  if (m.ppfd != null) parts.push(`PPFD ${num(m.ppfd)}`);
+  if (m.co2_ppm != null) parts.push(`CO₂ ${num(m.co2_ppm)} ppm`);
+  if (m.water_temp_c != null) parts.push(`${t('metric.waterTempShort')} ${num(m.water_temp_c)} °C`);
+  if (m.soil_moisture != null) parts.push(`${t('metric.soilShort')} ${num(m.soil_moisture)} %`);
+  return parts.join(' · ');
+}
+
+// Product suggestions follow the brand typed in the same row; add/remove rows.
+document.addEventListener('focusin', (e) => {
+  const input = e.target;
+  if (!input?.matches?.('[data-feed="product"]')) return;
+  const brand = input.closest('[data-feed-row]')?.querySelector('[data-feed="brand"]')?.value?.trim() || '';
+  const list = document.getElementById('feedProductList');
+  if (!list) return;
+  const map = feedSuggestions();
+  const key = [...map.keys()].find(k => k.toLowerCase() === brand.toLowerCase());
+  const products = key ? [...map.get(key)] : [...new Set([...map.values()].flatMap(set => [...set]))];
+  list.innerHTML = products.sort((a, b) => a.localeCompare(b)).map(p => `<option value="${escapeHtml(p)}"></option>`).join('');
+});
+document.addEventListener('click', (e) => {
+  const add = e.target.closest?.('[data-feed-add]');
+  if (add) {
+    const rows = add.closest('.feed-editor')?.querySelector('[data-feed-rows]');
+    if (rows && rows.children.length < 12) {
+      rows.insertAdjacentHTML('beforeend', feedRowHtml());
+      rows.lastElementChild?.querySelector('[data-feed="brand"]')?.focus();
+    }
+    return;
+  }
+  const remove = e.target.closest?.('[data-feed-remove]');
+  if (remove) {
+    const row = remove.closest('[data-feed-row]');
+    const rows = row?.parentElement;
+    if (rows && rows.children.length > 1) row.remove();
+    else row?.querySelectorAll('input').forEach((i) => { i.value = ''; });
+  }
+});
+
+// Which parts of the log form belong to which type.
+const LOG_FORM_GROUPS = {
+  note: [],
+  measurement: ['solution', 'environment'],
+  watering: ['watering', 'solution'],
+  feeding: ['feeding', 'watering', 'solution'],
+  harvest: ['harvest'],
+  action: [],
+  photo: [],
+};
+
+function applyLogFormType(scope, type) {
+  const groups = LOG_FORM_GROUPS[type] || [];
+  scope.querySelectorAll('[data-log-group]').forEach((el) => {
+    el.style.display = groups.includes(el.dataset.logGroup) ? '' : 'none';
+  });
+}
+
+/** Feed task done: open the feeding log with the planned fertilizers. */
+function openFeedingLogFromTask(task) {
+  if (!task || task.category !== 'feed') return;
+  openModal('log', {
+    plantId: task.plant_id,
+    logType: 'feeding',
+    feeds: task.feeds || [],
+    text: task.title,
+    fromTask: true,
+  });
 }
 
 // --- Two-factor sign-in (optional; backend api/two_factor.rs) ---------------------

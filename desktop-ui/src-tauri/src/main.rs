@@ -147,6 +147,8 @@ struct CreateTaskPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     repeat_until: Option<chrono::DateTime<Utc>>,
     notification_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    feeds: Option<Vec<shared::FeedItem>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -218,6 +220,8 @@ struct TaskCreateInput {
     repeat_interval_hours: Option<i32>,
     repeat_until: Option<String>,
     notification_enabled: Option<bool>,
+    #[serde(default)]
+    feeds: Option<Vec<shared::FeedItem>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -251,6 +255,18 @@ struct LogCreateInput {
     harvest_quality: Option<String>,
     water_liters: Option<f32>,
     water_method: Option<String>,
+    #[serde(default)]
+    vpd: Option<f32>,
+    #[serde(default)]
+    ppfd: Option<f32>,
+    #[serde(default)]
+    co2_ppm: Option<f32>,
+    #[serde(default)]
+    water_temp_c: Option<f32>,
+    #[serde(default)]
+    soil_moisture: Option<f32>,
+    #[serde(default)]
+    feeds: Option<Vec<shared::FeedItem>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -267,6 +283,18 @@ struct LogUpdateInput {
     harvest_quality: Option<String>,
     water_liters: Option<f32>,
     water_method: Option<String>,
+    #[serde(default)]
+    vpd: Option<f32>,
+    #[serde(default)]
+    ppfd: Option<f32>,
+    #[serde(default)]
+    co2_ppm: Option<f32>,
+    #[serde(default)]
+    water_temp_c: Option<f32>,
+    #[serde(default)]
+    soil_moisture: Option<f32>,
+    #[serde(default)]
+    feeds: Option<Vec<shared::FeedItem>>,
 }
 
 fn parse_plant_status(value: Option<&str>, fallback_archived: bool, fallback_active: bool) -> PlantStatus {
@@ -348,6 +376,7 @@ fn parse_log_type(value: Option<&str>) -> LogType {
         "action" => LogType::Action,
         "harvest" => LogType::Harvest,
         "watering" => LogType::Watering,
+        "feeding" => LogType::Feeding,
         _ => LogType::Note,
     }
 }
@@ -808,6 +837,7 @@ fn create_local_task(state: State<AppLocalState>, payload: TaskCreateInput) -> R
         due_at,
         repeat_interval_hours: payload.repeat_interval_hours,
         repeat_until,
+        feeds: payload.feeds.clone().filter(|f| !f.is_empty()),
         notification_enabled: payload.notification_enabled.unwrap_or(true),
         status: TaskStatus::Open,
         created_at: now,
@@ -911,27 +941,36 @@ fn list_local_logs(state: State<AppLocalState>, plant_id: Option<String>) -> Res
     Ok(logs)
 }
 
+/// Metrics from the log form; None when nothing was filled in.
+macro_rules! form_metrics {
+    ($p:expr) => {{
+        // Field by field: callers may already have moved `text` out of $p.
+        let m = Metrics {
+            ph: $p.ph, ec: $p.ec, temp_c: $p.temp_c, rh: $p.rh, vpd: $p.vpd,
+            harvest_kg: $p.harvest_kg, harvest_count: $p.harvest_count, harvest_quality: $p.harvest_quality.clone(),
+            water_liters: $p.water_liters, water_method: $p.water_method.clone(),
+            ppfd: $p.ppfd, co2_ppm: $p.co2_ppm, water_temp_c: $p.water_temp_c, soil_moisture: $p.soil_moisture,
+            feeds: $p.feeds.clone().filter(|f: &Vec<shared::FeedItem>| !f.is_empty()),
+        };
+        let any = m.ph.is_some() || m.ec.is_some() || m.temp_c.is_some() || m.rh.is_some() || m.vpd.is_some()
+            || m.harvest_kg.is_some() || m.harvest_count.is_some() || m.harvest_quality.is_some()
+            || m.water_liters.is_some() || m.water_method.is_some()
+            || m.ppfd.is_some() || m.co2_ppm.is_some() || m.water_temp_c.is_some() || m.soil_moisture.is_some()
+            || m.feeds.is_some();
+        if any { Some(m) } else { None }
+    }};
+}
+
 #[tauri::command]
 fn create_local_log(state: State<AppLocalState>, payload: LogCreateInput) -> Result<LogEntry, String> {
     let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
     let plant_id = Uuid::parse_str(&payload.plant_id).map_err(|e| e.to_string())?;
-    let has_metrics = payload.ph.is_some() || payload.ec.is_some() || payload.temp_c.is_some() || payload.rh.is_some()
-        || payload.harvest_kg.is_some() || payload.harvest_count.is_some() || payload.harvest_quality.is_some()
-        || payload.water_liters.is_some() || payload.water_method.is_some();
     let log = LogEntry {
         log_id: Uuid::new_v4(),
         plant_id,
         log_type: parse_log_type(payload.log_type.as_deref()),
         text: payload.text.filter(|t| !t.trim().is_empty()),
-        metrics: if has_metrics {
-            Some(Metrics {
-                ph: payload.ph, ec: payload.ec, temp_c: payload.temp_c, rh: payload.rh, vpd: None,
-                harvest_kg: payload.harvest_kg, harvest_count: payload.harvest_count, harvest_quality: payload.harvest_quality,
-                water_liters: payload.water_liters, water_method: payload.water_method,
-            })
-        } else {
-            None
-        },
+        metrics: form_metrics!(payload),
         action: None,
         photo_refs: None,
         created_at: parse_due_at(payload.created_at.as_deref(), Utc::now()),
@@ -953,14 +992,7 @@ fn update_local_log(state: State<AppLocalState>, payload: LogUpdateInput) -> Res
         .ok_or_else(|| "log not found".to_string())?;
     log.log_type = parse_log_type(payload.log_type.as_deref());
     log.text = payload.text.filter(|t| !t.trim().is_empty());
-    let has_metrics = payload.ph.is_some() || payload.ec.is_some() || payload.temp_c.is_some() || payload.rh.is_some()
-        || payload.harvest_kg.is_some() || payload.harvest_count.is_some() || payload.harvest_quality.is_some()
-        || payload.water_liters.is_some() || payload.water_method.is_some();
-    log.metrics = if has_metrics { Some(Metrics {
-        ph: payload.ph, ec: payload.ec, temp_c: payload.temp_c, rh: payload.rh, vpd: None,
-        harvest_kg: payload.harvest_kg, harvest_count: payload.harvest_count, harvest_quality: payload.harvest_quality,
-        water_liters: payload.water_liters, water_method: payload.water_method,
-    }) } else { None };
+    log.metrics = form_metrics!(payload);
     store.upsert_log(&log).map_err(|e| e.to_string())?;
     Ok(log)
 }
@@ -1090,6 +1122,7 @@ async fn create_task_smart(state: State<'_, AppLocalState>, payload: TaskCreateI
                 payload.repeat_interval_hours,
             ),
             notification_enabled: payload.notification_enabled.unwrap_or(true),
+            feeds: payload.feeds.clone().filter(|f| !f.is_empty()),
         };
         let task = authorized_create_task(&session, plant_id, &request).await?;
         let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
@@ -1178,9 +1211,6 @@ async fn list_current_logs(state: State<'_, AppLocalState>, plant_id: Option<Str
 #[tauri::command]
 async fn create_log_smart(state: State<'_, AppLocalState>, payload: LogCreateInput) -> Result<LogEntry, String> {
     let plant_id = Uuid::parse_str(&payload.plant_id).map_err(|e| e.to_string())?;
-    let has_metrics = payload.ph.is_some() || payload.ec.is_some() || payload.temp_c.is_some() || payload.rh.is_some()
-        || payload.harvest_kg.is_some() || payload.harvest_count.is_some() || payload.harvest_quality.is_some()
-        || payload.water_liters.is_some() || payload.water_method.is_some();
     let session = {
         let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
         store.load_session().map_err(|e| e.to_string())?
@@ -1189,12 +1219,7 @@ async fn create_log_smart(state: State<'_, AppLocalState>, payload: LogCreateInp
         let request = CreateLogPayload {
             log_type: parse_log_type(payload.log_type.as_deref()),
             text: payload.text.clone().filter(|t| !t.trim().is_empty()),
-            metrics: if has_metrics { Some(Metrics {
-                ph: payload.ph, ec: payload.ec, temp_c: payload.temp_c, rh: payload.rh, vpd: None,
-                harvest_kg: payload.harvest_kg, harvest_count: payload.harvest_count,
-                harvest_quality: payload.harvest_quality.clone(),
-                water_liters: payload.water_liters, water_method: payload.water_method.clone(),
-            }) } else { None },
+            metrics: form_metrics!(payload),
             action: None,
             photo_refs: None,
         };
@@ -1210,9 +1235,6 @@ async fn create_log_smart(state: State<'_, AppLocalState>, payload: LogCreateInp
 #[tauri::command]
 async fn update_log_smart(state: State<'_, AppLocalState>, payload: LogUpdateInput) -> Result<LogEntry, String> {
     let log_id = Uuid::parse_str(&payload.log_id).map_err(|e| e.to_string())?;
-    let has_metrics = payload.ph.is_some() || payload.ec.is_some() || payload.temp_c.is_some() || payload.rh.is_some()
-        || payload.harvest_kg.is_some() || payload.harvest_count.is_some() || payload.harvest_quality.is_some()
-        || payload.water_liters.is_some() || payload.water_method.is_some();
     let session = {
         let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
         store.load_session().map_err(|e| e.to_string())?
@@ -1221,12 +1243,7 @@ async fn update_log_smart(state: State<'_, AppLocalState>, payload: LogUpdateInp
         let request = CreateLogPayload {
             log_type: parse_log_type(payload.log_type.as_deref()),
             text: payload.text.clone().filter(|t| !t.trim().is_empty()),
-            metrics: if has_metrics { Some(Metrics {
-                ph: payload.ph, ec: payload.ec, temp_c: payload.temp_c, rh: payload.rh, vpd: None,
-                harvest_kg: payload.harvest_kg, harvest_count: payload.harvest_count,
-                harvest_quality: payload.harvest_quality.clone(),
-                water_liters: payload.water_liters, water_method: payload.water_method.clone(),
-            }) } else { None },
+            metrics: form_metrics!(payload),
             action: None,
             photo_refs: None,
         };
@@ -2453,6 +2470,7 @@ fn create_auto_log_from_reading(state: State<AppLocalState>, device_id: String) 
             vpd: reading.vpd,
             harvest_kg: None, harvest_count: None, harvest_quality: None,
             water_liters: None, water_method: None,
+            ..Default::default()
         }),
         action: None,
         photo_refs: None,

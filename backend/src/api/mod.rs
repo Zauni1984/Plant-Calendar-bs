@@ -597,6 +597,8 @@ pub struct CreateTaskPayload {
     #[serde(default)]
     pub repeat_until: Option<chrono::DateTime<Utc>>,
     pub notification_enabled: bool,
+    #[serde(default)]
+    pub feeds: Option<Vec<shared::FeedItem>>,
 }
 
 pub async fn create_task_for_plant(
@@ -621,6 +623,9 @@ pub async fn create_task_for_plant(
             return api_error(StatusCode::BAD_REQUEST, "repeat_until must not be before due_at");
         }
     }
+    if let Some(Err(msg)) = payload.feeds.as_deref().map(shared::FeedItem::check_all) {
+        return api_error(StatusCode::BAD_REQUEST, msg);
+    }
     if let Err(err) = repos::verify_plant_ownership(&state, session.user_id, id).await {
         return api_error(StatusCode::FORBIDDEN, err);
     }
@@ -633,6 +638,7 @@ pub async fn create_task_for_plant(
         due_at: payload.due_at,
         repeat_interval_hours: payload.repeat_interval_hours,
         repeat_until: payload.repeat_until,
+        feeds: payload.feeds.filter(|f| !f.is_empty()),
         notification_enabled: payload.notification_enabled,
         status: TaskStatus::Open,
         created_at: now,
@@ -726,6 +732,9 @@ pub async fn create_log_for_plant(
             return api_error(StatusCode::BAD_REQUEST, "log text too long (max 5000 characters)");
         }
     }
+    if let Some(Err(msg)) = payload.metrics.as_ref().and_then(|m| m.feeds.as_deref()).map(shared::FeedItem::check_all) {
+        return api_error(StatusCode::BAD_REQUEST, msg);
+    }
     if let Err(err) = repos::verify_plant_ownership(&state, session.user_id, id).await {
         return api_error(StatusCode::FORBIDDEN, err);
     }
@@ -756,6 +765,9 @@ pub struct UpdateLogPayload {
 }
 
 pub async fn update_log(Path(id): Path<Uuid>, State(state): State<AppState>, session: SessionUser, Json(payload): Json<UpdateLogPayload>) -> impl IntoResponse {
+    if let Some(Err(msg)) = payload.metrics.as_ref().and_then(|m| m.feeds.as_deref()).map(shared::FeedItem::check_all) {
+        return api_error(StatusCode::BAD_REQUEST, msg);
+    }
     if let Err(err) = repos::verify_log_ownership(&state, session.user_id, id).await {
         return api_error(StatusCode::FORBIDDEN, err);
     }

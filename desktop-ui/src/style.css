@@ -467,6 +467,20 @@
   margin: 0 0 20px;
 }
 
+/* ── Fertilizer rows ── */
+.feed-editor { display: grid; gap: 6px; margin-bottom: 10px; }
+.feed-row { display: grid; grid-template-columns: 1.1fr 1.4fr 0.7fr 0.8fr auto; gap: 6px; align-items: center; }
+.feed-row .form-input, .feed-row .form-select { padding: 8px 10px; min-width: 0; }
+.feed-remove { padding: 4px 10px; font-size: 16px; line-height: 1; }
+.feed-editor [data-feed-add] { justify-self: start; }
+.feed-badge { background: rgba(170, 120, 255, 0.14); color: #c9a8ff; }
+@media (max-width: 560px) {
+  /* Brand and product full width, then amount · unit · remove in one line. */
+  .feed-row { grid-template-columns: 1fr 1fr auto; }
+  .feed-row [data-feed="brand"], .feed-row [data-feed="product"] { grid-column: 1 / -1; }
+  .feed-row + .feed-row { padding-top: 8px; border-top: 1px solid rgba(var(--accent-rgb),0.12); }
+}
+
 /* ── Two-factor sign-in ── */
 .twofa-steps { margin: 0 0 8px; padding-left: 20px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 .twofa-qr { display: flex; justify-content: center; margin: 8px 0 10px; }
