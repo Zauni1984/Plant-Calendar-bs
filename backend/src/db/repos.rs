@@ -136,6 +136,7 @@ fn parse_log_type(value: &str) -> LogType {
         "action" => LogType::Action,
         "harvest" => LogType::Harvest,
         "watering" => LogType::Watering,
+        "feeding" => LogType::Feeding,
         _ => LogType::Note,
     }
 }
@@ -148,6 +149,7 @@ fn log_type_str(value: LogType) -> &'static str {
         LogType::Action => "action",
         LogType::Harvest => "harvest",
         LogType::Watering => "watering",
+        LogType::Feeding => "feeding",
     }
 }
 
@@ -218,6 +220,14 @@ pub fn location_from_row(row: LocationRow) -> Location {
     }
 }
 
+fn feeds_json(feeds: &Option<Vec<shared::FeedItem>>) -> Option<serde_json::Value> {
+    feeds.as_ref().filter(|f| !f.is_empty()).and_then(|f| serde_json::to_value(f).ok())
+}
+
+fn feeds_from_json(value: Option<serde_json::Value>) -> Option<Vec<shared::FeedItem>> {
+    value.and_then(|v| serde_json::from_value(v).ok())
+}
+
 pub fn task_from_row(row: TaskRow) -> Task {
     Task {
         task_id: row.task_id,
@@ -227,6 +237,7 @@ pub fn task_from_row(row: TaskRow) -> Task {
         due_at: row.due_at,
         repeat_interval_hours: row.repeat_interval_hours,
         repeat_until: row.repeat_until,
+        feeds: feeds_from_json(row.feeds_json.clone()),
         notification_enabled: row.notification_enabled,
         status: parse_status(&row.status),
         created_at: row.created_at,
@@ -551,7 +562,7 @@ pub async fn delete_plant(state: &AppState, user_id: Uuid, plant_id: Uuid) -> an
 
 pub async fn list_tasks_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::Result<Vec<Task>> {
     let rows = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json
          FROM tasks WHERE plant_id = $1 ORDER BY due_at ASC",
     )
     .bind(plant_id)
@@ -563,13 +574,13 @@ pub async fn list_tasks_for_plant(state: &AppState, plant_id: Uuid) -> anyhow::R
 pub async fn list_tasks_for_user_since(state: &AppState, user_id: Uuid, since: Option<DateTime<Utc>>) -> anyhow::Result<Vec<Task>> {
     let rows = if let Some(since) = since {
         sqlx::query_as::<_, TaskRow>(
-            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at
+            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at, t.feeds_json
              FROM tasks t INNER JOIN plants p ON p.plant_id = t.plant_id
              WHERE p.user_id = $1 AND t.updated_at > $2 ORDER BY t.updated_at DESC"
         ).bind(user_id).bind(since).fetch_all(&state.pg).await?
     } else {
         sqlx::query_as::<_, TaskRow>(
-            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at
+            "SELECT t.task_id, t.plant_id, t.title, t.category, t.due_at, t.repeat_interval_hours, t.repeat_until, t.notification_enabled, t.status, t.created_at, t.updated_at, t.feeds_json
              FROM tasks t INNER JOIN plants p ON p.plant_id = t.plant_id
              WHERE p.user_id = $1 ORDER BY t.updated_at DESC"
         ).bind(user_id).fetch_all(&state.pg).await?
@@ -579,7 +590,7 @@ pub async fn list_tasks_for_user_since(state: &AppState, user_id: Uuid, since: O
 
 pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<Task>> {
     let row = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json FROM tasks WHERE task_id = $1",
     )
     .bind(task_id)
     .fetch_optional(&state.pg)
@@ -593,6 +604,7 @@ pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<
         due_at: row.due_at,
         repeat_interval_hours: row.repeat_interval_hours,
         repeat_until: row.repeat_until,
+        feeds: feeds_from_json(row.feeds_json.clone()),
         notification_enabled: row.notification_enabled,
         status: parse_status(&row.status),
         created_at: row.created_at,
@@ -602,8 +614,8 @@ pub async fn get_task(state: &AppState, task_id: Uuid) -> anyhow::Result<Option<
 
 pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
     )
     .bind(task.task_id)
     .bind(task.plant_id)
@@ -616,6 +628,7 @@ pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     .bind(status_str(task.status))
     .bind(task.created_at)
     .bind(task.updated_at)
+    .bind(feeds_json(&task.feeds))
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -623,8 +636,8 @@ pub async fn insert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
 
 pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          ON CONFLICT (task_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             title = EXCLUDED.title,
@@ -632,6 +645,7 @@ pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
             due_at = EXCLUDED.due_at,
             repeat_interval_hours = EXCLUDED.repeat_interval_hours,
             repeat_until = EXCLUDED.repeat_until,
+            feeds_json = EXCLUDED.feeds_json,
             notification_enabled = EXCLUDED.notification_enabled,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at"
@@ -647,6 +661,7 @@ pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
     .bind(status_str(task.status))
     .bind(task.created_at)
     .bind(task.updated_at)
+    .bind(feeds_json(&task.feeds))
     .execute(&state.pg)
     .await?;
     Ok(())
@@ -654,7 +669,7 @@ pub async fn upsert_task(state: &AppState, task: &Task) -> anyhow::Result<()> {
 
 pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>, status: Option<TaskStatus>, due_at: Option<DateTime<Utc>>, repeat_interval_hours: Option<i32>, repeat_until: Option<DateTime<Utc>>, notification_enabled: Option<bool>) -> anyhow::Result<Task> {
     let row = sqlx::query_as::<_, TaskRow>(
-        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at FROM tasks WHERE task_id = $1",
+        "SELECT task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json FROM tasks WHERE task_id = $1",
     )
     .bind(task_id)
     .fetch_one(&state.pg)
@@ -685,6 +700,7 @@ pub async fn update_task(state: &AppState, task_id: Uuid, title: Option<String>,
         due_at: next_due_at,
         repeat_interval_hours: next_repeat,
         repeat_until: next_repeat_until,
+        feeds: feeds_from_json(row.feeds_json.clone()),
         notification_enabled: next_notification,
         status: next_status,
         created_at: row.created_at,
@@ -1464,8 +1480,8 @@ pub async fn upsert_plant_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pla
 
 pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task: &Task) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        "INSERT INTO tasks (task_id, plant_id, title, category, due_at, repeat_interval_hours, repeat_until, notification_enabled, status, created_at, updated_at, feeds_json)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          ON CONFLICT (task_id) DO UPDATE SET
             plant_id = EXCLUDED.plant_id,
             title = EXCLUDED.title,
@@ -1473,6 +1489,7 @@ pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task
             due_at = EXCLUDED.due_at,
             repeat_interval_hours = EXCLUDED.repeat_interval_hours,
             repeat_until = EXCLUDED.repeat_until,
+            feeds_json = EXCLUDED.feeds_json,
             notification_enabled = EXCLUDED.notification_enabled,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at
@@ -1489,6 +1506,7 @@ pub async fn upsert_task_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, task
     .bind(status_str(task.status))
     .bind(task.created_at)
     .bind(task.updated_at)
+    .bind(feeds_json(&task.feeds))
     .execute(&mut **tx)
     .await?;
     Ok(())

@@ -377,6 +377,10 @@ pub struct Task {
     pub repeat_until: Option<DateTime<Utc>>,
     pub notification_enabled: bool,
     pub status: TaskStatus,
+    /// Feed tasks: the planned fertilizers. Completing the task suggests a
+    /// feeding log with them.
+    #[serde(default)]
+    pub feeds: Option<Vec<FeedItem>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -401,6 +405,58 @@ pub struct Metrics {
     pub water_liters: Option<f32>,
     #[serde(default)]
     pub water_method: Option<String>,
+    // light, air and substrate
+    /// Light intensity at the canopy, µmol/m²/s.
+    #[serde(default)]
+    pub ppfd: Option<f32>,
+    #[serde(default)]
+    pub co2_ppm: Option<f32>,
+    /// Temperature of the nutrient solution / irrigation water.
+    #[serde(default)]
+    pub water_temp_c: Option<f32>,
+    /// Substrate moisture, percent.
+    #[serde(default)]
+    pub soil_moisture: Option<f32>,
+    // feeding
+    #[serde(default)]
+    pub feeds: Option<Vec<FeedItem>>,
+}
+
+/// One fertilizer given or planned.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct FeedItem {
+    #[serde(default)]
+    pub brand: Option<String>,
+    pub product: String,
+    #[serde(default)]
+    pub amount: Option<f32>,
+    /// "ml/l", "ml", "g/l" or "g" (free text up to 10 characters).
+    #[serde(default)]
+    pub unit: Option<String>,
+}
+
+impl FeedItem {
+    /// Limits for stored entries; Err names what is wrong.
+    pub fn check_all(feeds: &[FeedItem]) -> Result<(), &'static str> {
+        if feeds.len() > 12 {
+            return Err("at most 12 fertilizers per entry");
+        }
+        for f in feeds {
+            if f.product.trim().is_empty() || f.product.chars().count() > 80 {
+                return Err("fertilizer product must be 1-80 characters");
+            }
+            if f.brand.as_ref().is_some_and(|b| b.chars().count() > 60) {
+                return Err("fertilizer brand must be at most 60 characters");
+            }
+            if f.unit.as_ref().is_some_and(|u| u.chars().count() > 10) {
+                return Err("fertilizer unit must be at most 10 characters");
+            }
+            if f.amount.is_some_and(|a| !a.is_finite() || !(0.0..=100_000.0).contains(&a)) {
+                return Err("fertilizer amount must be 0-100000");
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -418,6 +474,7 @@ pub enum LogType {
     Action,
     Harvest,
     Watering,
+    Feeding,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

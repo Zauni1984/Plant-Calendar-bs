@@ -64,6 +64,7 @@ pub struct TaskRow {
     pub repeat_until: Option<DateTime<Utc>>,
     pub notification_enabled: bool,
     pub status: String,
+    pub feeds_json: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

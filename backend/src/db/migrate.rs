@@ -39,6 +39,7 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
     ("031_postgres_invoices", include_str!("../../../migrations/031_postgres_invoices.sql")),
     ("032_postgres_admin", include_str!("../../../migrations/032_postgres_admin.sql")),
     ("033_postgres_user_2fa", include_str!("../../../migrations/033_postgres_user_2fa.sql")),
+    ("034_postgres_task_feeds", include_str!("../../../migrations/034_postgres_task_feeds.sql")),
 ];
 
 /// Arbitrary but fixed key for the advisory lock that serialises migration

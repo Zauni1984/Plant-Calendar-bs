@@ -83,6 +83,8 @@ pub struct ImportTask {
     repeat_until: Option<DateTime<Utc>>,
     notification_enabled: bool,
     status: TaskStatus,
+    #[serde(default)]
+    feeds: Option<Vec<shared::FeedItem>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -306,6 +308,7 @@ async fn write_import(
             due_at: t.due_at,
             repeat_interval_hours: t.repeat_interval_hours,
             repeat_until: t.repeat_until,
+            feeds: t.feeds.filter(|f| shared::FeedItem::check_all(f).is_ok()),
             notification_enabled: t.notification_enabled,
             status: t.status,
             created_at: t.created_at,
