@@ -679,6 +679,8 @@
   "auth.field.password": "Wachtwoord",
   "auth.emailPlaceholder": "jouw@email.nl",
   "auth.passwordPlaceholder": "Minimaal 8 tekens",
+  "auth.showPassword": "Wachtwoord tonen",
+  "auth.hidePassword": "Wachtwoord verbergen",
   "auth.register": "Registreren",
   "auth.login": "Inloggen",
   "auth.emailPasswordRequired": "Voer e-mail en wachtwoord in.",

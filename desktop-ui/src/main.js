@@ -327,7 +327,7 @@ root.innerHTML = `
       <!-- Hidden inputs for auth (used by handlers) -->
       <div style="display:none;">
         <input id="backendUrl" value="" />
-        <input id="email" /><input id="password" type="password" />
+        <input id="email" /><input id="password" type="password" data-no-toggle />
       </div>
       <div id="settingsPanel" class="view-card" style="margin-top:14px;"></div>
       <div id="climateSettingsPanel" class="view-card" style="margin-top:14px;"></div>
@@ -708,6 +708,47 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => {
   if (e.target?.matches?.('.color-picker input[type="color"]')) syncColorPicker(e.target);
 });
+
+// Eye button on every password field: shows or hides what was typed. Fields
+// appear in dialogs rendered later, so new ones are picked up as they show up.
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+function addPasswordToggle(input) {
+  if (input.dataset.pwToggle || input.dataset.noToggle !== undefined) return;
+  input.dataset.pwToggle = '1';
+  const wrap = document.createElement('span');
+  wrap.className = 'pw-field';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pw-toggle';
+  const update = () => {
+    const shown = input.type === 'text';
+    btn.innerHTML = shown ? EYE_SHUT : EYE_OPEN;
+    btn.setAttribute('aria-label', t(shown ? 'auth.hidePassword' : 'auth.showPassword'));
+    btn.title = btn.getAttribute('aria-label');
+    btn.setAttribute('aria-pressed', String(shown));
+  };
+  btn.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    update();
+    input.focus();
+  });
+  update();
+  wrap.appendChild(btn);
+}
+
+function addPasswordToggles(scope = document) {
+  scope.querySelectorAll?.('input[type="password"]').forEach(addPasswordToggle);
+}
+
+new MutationObserver((records) => {
+  for (const r of records) r.addedNodes.forEach((n) => { if (n.nodeType === 1) addPasswordToggles(n.matches?.('input[type="password"]') ? n.parentNode : n); });
+}).observe(document.documentElement, { childList: true, subtree: true });
+addPasswordToggles();
+
 
 // Convert #rgb or #rrggbb to "r,g,b" string for use in rgba().
 function hexToRgb(hex) {

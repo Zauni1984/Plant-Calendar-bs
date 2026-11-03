@@ -679,6 +679,8 @@
   "auth.field.password": "Password",
   "auth.emailPlaceholder": "tua@email.it",
   "auth.passwordPlaceholder": "Almeno 8 caratteri",
+  "auth.showPassword": "Mostra password",
+  "auth.hidePassword": "Nascondi password",
   "auth.register": "Registrati",
   "auth.login": "Accedi",
   "auth.emailPasswordRequired": "Inserisci e-mail e password.",

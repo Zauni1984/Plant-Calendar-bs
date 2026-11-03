@@ -679,6 +679,8 @@
   "auth.field.password": "Mot de passe",
   "auth.emailPlaceholder": "votre@email.fr",
   "auth.passwordPlaceholder": "Au moins 8 caractères",
+  "auth.showPassword": "Afficher le mot de passe",
+  "auth.hidePassword": "Masquer le mot de passe",
   "auth.register": "S'inscrire",
   "auth.login": "Se connecter",
   "auth.emailPasswordRequired": "Veuillez saisir l'e-mail et le mot de passe.",
