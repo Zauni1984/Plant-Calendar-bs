@@ -4,6 +4,7 @@ pub mod guest_import;
 pub mod licenses;
 pub mod photos;
 pub mod push;
+pub mod two_factor;
 pub mod vouchers;
 pub mod weather;
 
@@ -228,6 +229,9 @@ pub async fn auth_register(State(state): State<AppState>, headers: axum::http::H
 pub struct LoginPayload {
     pub email: String,
     pub password: String,
+    /// Code from the authenticator app (or a recovery code) when 2FA is on.
+    #[serde(default)]
+    pub totp_code: Option<String>,
 }
 
 pub async fn auth_login(State(state): State<AppState>, headers: axum::http::HeaderMap, Json(payload): Json<LoginPayload>) -> impl IntoResponse {
@@ -260,6 +264,12 @@ pub async fn auth_login(State(state): State<AppState>, headers: axum::http::Head
     match repos::is_disabled(&state, user.user_id).await {
         Ok(false) => {}
         Ok(true) => return api_error(StatusCode::FORBIDDEN, "account_disabled"),
+        Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    // Second step, only after the password was right.
+    match two_factor::check_login(&state, user.user_id, payload.totp_code.as_deref()).await {
+        Ok(Ok(())) => {}
+        Ok(Err(code)) => return two_factor::login_error(code),
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
     repos::touch_last_seen(&state, user.user_id).await;
@@ -1520,6 +1530,7 @@ pub async fn export_me(
         "push_subscriptions": push_export,
         "desktop_licenses": license_export,
         "voucher": voucher_export,
+        "two_factor_enabled": two_factor::is_enabled(&state, session.user_id).await.unwrap_or(false),
         "billing_profile": billing_export,
         "invoices": invoice_export,
     });

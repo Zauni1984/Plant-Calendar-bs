@@ -63,6 +63,9 @@ struct LoginPayload {
     email: String,
     password: String,
     backend_url: Option<String>,
+    /// Code from the authenticator app when the account has 2FA on.
+    #[serde(default)]
+    totp_code: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1477,7 +1480,7 @@ async fn auth_login(state: State<'_, AppLocalState>, payload: LoginPayload) -> R
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{backend_url}/auth/login"))
-        .json(&serde_json::json!({ "email": payload.email, "password": payload.password }))
+        .json(&serde_json::json!({ "email": payload.email, "password": payload.password, "totp_code": payload.totp_code }))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -1645,6 +1648,27 @@ async fn account_call(state: &State<'_, AppLocalState>, method: reqwest::Method,
         return Err(response.text().await.unwrap_or_else(|_| "request failed".into()));
     }
     Ok(response)
+}
+
+// Two-factor sign-in for the account (backend api/two_factor.rs).
+#[tauri::command]
+async fn two_factor_status(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::GET, "/me/2fa", None).await?.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn two_factor_setup(state: State<'_, AppLocalState>) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::POST, "/me/2fa/setup", Some(serde_json::json!({}))).await?.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn two_factor_enable(state: State<'_, AppLocalState>, code: String) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::POST, "/me/2fa/enable", Some(serde_json::json!({ "code": code }))).await?.json().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn two_factor_disable(state: State<'_, AppLocalState>, password: String, code: String) -> Result<serde_json::Value, String> {
+    account_call(&state, reqwest::Method::POST, "/me/2fa/disable", Some(serde_json::json!({ "password": password, "code": code }))).await?.json().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3359,6 +3383,10 @@ fn main() {
             subscription_checkout_smart,
             voucher_status_smart,
             voucher_redeem_smart,
+            two_factor_status,
+            two_factor_setup,
+            two_factor_enable,
+            two_factor_disable,
             billing_get_smart,
             billing_save_smart,
             invoices_list_smart,

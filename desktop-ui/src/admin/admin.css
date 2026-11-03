@@ -151,4 +151,11 @@ select.input option { background: var(--panel-2); color: var(--text); }
 .codes p { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .codes textarea { resize: vertical; font-size: 14px; color: var(--text); letter-spacing: 0.04em; }
 
+.qr-dialog { max-width: 520px; }
+dialog:has(.qr-dialog) { max-width: 560px; }
+.qr-box { display: flex; justify-content: center; margin: 8px 0 12px; }
+.qr-box svg { width: 280px; height: 280px; border-radius: 12px; background: #fff; }
+.qr-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.qr-dialog .row { flex-wrap: wrap; }
+
 .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 20; }

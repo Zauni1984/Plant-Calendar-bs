@@ -107,6 +107,9 @@ async fn main() -> anyhow::Result<()> {
 
     let password_change_routes = Router::new()
         .route("/me/change-password", post(api::change_password))
+        // Codes are checked here too: same strict limit.
+        .route("/me/2fa/enable", post(api::two_factor::enable))
+        .route("/me/2fa/disable", post(api::two_factor::disable))
         .layer(middleware::from_fn(services::rate_limit::rate_limit_middleware))
         .layer(Extension(password_rate_limiter.clone()));
 
@@ -125,10 +128,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/admin/users/{id}/plan", post(api::admin::set_plan))
         .route("/admin/vouchers", get(api::admin::list_vouchers).post(api::admin::create_vouchers))
         .route("/admin/vouchers/{batch}/revoke", post(api::admin::revoke_vouchers))
+        .route("/admin/vouchers/qr", post(api::admin::voucher_qr))
         .route("/admin/invoices/problems", get(api::admin::invoice_problems))
         .route("/admin/invoices/{id}/retry", post(api::admin::retry_invoice))
         .route("/admin/audit", get(api::admin::audit_log))
         .route("/vouchers/me", get(api::vouchers::my_voucher))
+        .route("/me/2fa", get(api::two_factor::status))
+        .route("/me/2fa/setup", post(api::two_factor::setup))
+        .route("/admin/users/{id}/reset-2fa", post(api::admin::reset_two_factor))
         .route("/me/billing", get(api::billing::get_billing).put(api::billing::put_billing).delete(api::billing::delete_billing))
         .route("/invoices", get(api::billing::list_invoices))
         .route("/invoices/{id}/pdf", get(api::billing::invoice_pdf))

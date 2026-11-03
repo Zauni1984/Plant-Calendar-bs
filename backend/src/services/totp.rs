@@ -70,9 +70,11 @@ pub fn verify(secret: &str, code: &str, unix_time: i64, last_step: i64) -> Optio
 }
 
 /// otpauth:// link for authenticator apps (as QR code or typed in).
-pub fn provisioning_uri(secret: &str, account: &str) -> String {
+/// `issuer` is the name the app shows above the code ("Sowling", "Sowling Admin").
+pub fn provisioning_uri(secret: &str, account: &str, issuer: &str) -> String {
     let enc = |s: &str| s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-._~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect::<String>();
-    format!("otpauth://totp/Sowling%20Admin:{}?secret={secret}&issuer=Sowling%20Admin&digits=6&period=30", enc(account))
+    let issuer = enc(issuer);
+    format!("otpauth://totp/{issuer}:{}?secret={secret}&issuer={issuer}&digits=6&period=30", enc(account))
 }
 
 #[cfg(test)]
@@ -99,6 +101,6 @@ mod tests {
         assert_eq!(verify(&secret, "287082", 59 + 30, 0), Some(1), "one step of drift is fine");
         assert_eq!(verify(&secret, "287082", 59 + 300, 0), None, "too old");
         assert_eq!(verify(&secret, "28708", 59, 0), None);
-        assert!(provisioning_uri(&secret, "a+b@example.com").contains("a%2Bb%40example.com"));
+        assert!(provisioning_uri(&secret, "a+b@example.com", "Sowling Admin").contains("a%2Bb%40example.com"));
     }
 }

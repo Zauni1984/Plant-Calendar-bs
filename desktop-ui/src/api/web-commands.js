@@ -133,7 +133,7 @@ async function flushPendingConsents() {
 }
 
 async function signIn(kind, payload) {
-  await authenticate(kind, payload.email, payload.password);
+  await authenticate(kind, payload.email, payload.password, payload.totp_code || null);
   await flushPendingConsents().catch(() => {});
   return sessionView(await api("/me"));
 }
@@ -665,6 +665,10 @@ export const webCommands = {
     requireSession();
     return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan) } });
   },
+  two_factor_status: () => api("/me/2fa"),
+  two_factor_setup: () => api("/me/2fa/setup", { method: "POST", body: {} }),
+  two_factor_enable: ({ code }) => api("/me/2fa/enable", { method: "POST", body: { code } }),
+  two_factor_disable: ({ password, code }) => api("/me/2fa/disable", { method: "POST", body: { password, code } }),
   billing_get_smart: () => (hasSession() ? api("/me/billing") : Promise.resolve(null)),
   billing_save_smart: ({ profile }) => {
     requireSession();

@@ -23,6 +23,14 @@ nur dieses eine Mal; dort lassen sie sich kopieren oder als Textdatei
 herunterladen. Die Liste darunter zeigt alle bisherigen Gutscheine mit
 Einlösungen; **Sperren** entspricht `voucher revoke`.
 
+**QR-Code für Flyer:** In der Liste bei einem Sammelcode auf **QR-Code**
+klicken (bei bis zu 50 neuen Einzelcodes direkt im Ergebnis). Der QR-Code
+führt zu `https://app.sowling.com/?gutschein=CODE`: Die App öffnet sich, nach
+Anmelden oder Registrieren steht der Code schon im Feld „Gutschein einlösen“,
+ein Tipp auf **Einlösen** genügt. **SVG** für den Druck (beliebig groß
+skalierbar), **PNG** (1200 × 1200) für Social Media. Den Code selbst trotzdem
+lesbar daneben drucken, für alle, die nicht scannen.
+
 Alternativ auf dem Server im Ordner `/opt/sowling/deploy`:
 
 ```bash

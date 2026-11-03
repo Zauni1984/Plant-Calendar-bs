@@ -17,7 +17,7 @@ let Chart = null;
 const PLAN_NAMES = { free: "Free", basic: "Basic", pro: "Pro", nursery: "Gärtnerei" };
 const ACTIONS = {
   login: "Anmeldung", disable: "Konto deaktiviert", enable: "Konto aktiviert", delete: "Konto gelöscht",
-  invoice_retry: "Rechnung neu angestoßen", set_plan: "Tarif geändert", voucher_create: "Gutscheine erstellt", voucher_revoke: "Gutscheine gesperrt",
+  invoice_retry: "Rechnung neu angestoßen", set_plan: "Tarif geändert", reset_2fa: "2FA zurückgesetzt", voucher_create: "Gutscheine erstellt", voucher_revoke: "Gutscheine gesperrt",
 };
 
 const EYE_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -299,7 +299,7 @@ async function loadUsers() {
   rows.innerHTML = lastUsers.length
     ? lastUsers.map((u) => `
       <tr>
-        <td>${esc(u.email)}${u.is_admin ? ' <span class="badge">Admin</span>' : ""}<div class="mono">${esc(u.user_id)}</div></td>
+        <td>${esc(u.email)}${u.is_admin ? ' <span class="badge">Admin</span>' : ""}${u.two_factor ? ' <span class="badge badge--muted">2FA</span>' : ""}<div class="mono">${esc(u.user_id)}</div></td>
         <td>${planCell(u)}</td>
         <td>${esc(fmtDate(u.created_at))}</td>
         <td>${esc(fmtDate(u.last_seen_at))}</td>
@@ -313,6 +313,7 @@ async function loadUsers() {
             ? `<button class="btn btn--sm" data-act="enable" data-id="${esc(u.user_id)}">Aktivieren</button>`
             : `<button class="btn btn--sm" data-act="disable" data-id="${esc(u.user_id)}">Deaktivieren</button>`}
           <button class="btn btn--sm" data-act="plan" data-id="${esc(u.user_id)}">Tarif</button>
+          ${u.two_factor ? `<button class="btn btn--sm" data-act="reset2fa" data-id="${esc(u.user_id)}">2FA zurücksetzen</button>` : ""}
           <button class="btn btn--sm btn--danger" data-act="delete" data-id="${esc(u.user_id)}">Löschen</button>
         </td>
       </tr>`).join("")
@@ -360,6 +361,21 @@ async function onUserAction(e) {
       </form>`, async (form) => {
       await call(`/admin/users/${user.user_id}/disable`, { method: "POST", body: { reason: form.reason.value } });
       toast(`${user.email} ist deaktiviert.`);
+      await loadUsers();
+    });
+    return;
+  }
+  if (btn.dataset.act === "reset2fa") {
+    dialog(`
+      <form>
+        <h3>Zwei-Faktor-Anmeldung zurücksetzen</h3>
+        <p>Für <strong>${esc(user.email)}</strong>, wenn Handy und Wiederherstellungscodes verloren sind. Danach reicht zum Anmelden wieder das Passwort; die Person kann 2FA in den Einstellungen neu einrichten.</p>
+        <p class="warn-note">Nur, wenn sicher ist, dass die Anfrage wirklich von dieser Person kommt (z. B. Antwort von genau dieser E-Mail-Adresse).</p>
+        <div class="error" role="alert"></div>
+        <div class="row"><button type="button" class="btn" data-cancel>Abbrechen</button><button type="submit" class="btn btn--danger">Zurücksetzen</button></div>
+      </form>`, async () => {
+      await call(`/admin/users/${user.user_id}/reset-2fa`, { method: "POST" });
+      toast(`2FA für ${user.email} zurückgesetzt.`);
       await loadUsers();
     });
     return;
@@ -546,8 +562,11 @@ function showCodes(res, shared) {
       <div class="row" style="justify-content:flex-start;">
         <button class="btn btn--sm" type="button" data-copy>Kopieren</button>
         <button class="btn btn--sm" type="button" data-download>Als Textdatei herunterladen</button>
+        ${res.codes.length === 1 ? `<button class="btn btn--sm" type="button" data-qr="${esc(res.codes[0])}">QR-Code für Flyer</button>` : ""}
       </div>
+      ${res.codes.length > 1 && res.codes.length <= 50 ? `<div class="qr-list">${res.codes.map((c) => `<button class="btn btn--sm" type="button" data-qr="${esc(c)}">QR ${esc(c)}</button>`).join("")}</div>` : ""}
     </div>`;
+  box.querySelectorAll("[data-qr]").forEach((b) => b.addEventListener("click", () => showQr(b.dataset.qr)));
   box.querySelector("[data-copy]").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(text); toast("Kopiert."); }
     catch (_) { box.querySelector("textarea").select(); toast("Bitte mit Strg+C kopieren."); }
@@ -559,6 +578,54 @@ function showCodes(res, shared) {
     a.download = `sowling-gutscheine-${res.batch_id.slice(0, 8)}.txt`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+}
+
+// QR code that opens the app with the code in the redeem field.
+async function showQr(code) {
+  const res = await call("/admin/vouchers/qr", { method: "POST", body: { code } });
+  const dlg = document.getElementById("dialog");
+  dlg.innerHTML = `
+    <form method="dialog" class="qr-dialog">
+      <h3>QR-Code für ${esc(res.code)}</h3>
+      <div class="qr-box">${res.svg}</div>
+      <p>Scannen öffnet <span class="mono">${esc(res.url)}</span>. Dort ist der Code schon eingetragen; nach Anmelden oder Registrieren reicht ein Tipp auf „Einlösen“.</p>
+      <p class="mono">SVG für den Druck (beliebig groß, scharf), PNG für Social Media und Webseiten.</p>
+      <div class="row">
+        <button type="button" class="btn" data-copy-url>Link kopieren</button>
+        <button type="button" class="btn" data-svg>SVG herunterladen</button>
+        <button type="button" class="btn" data-png>PNG herunterladen</button>
+        <button type="submit" class="btn btn--primary">Schließen</button>
+      </div>
+    </form>`;
+  dlg.showModal();
+  const name = `sowling-gutschein-${res.code}`;
+  const save = (blob, ext) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.${ext}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  dlg.querySelector("[data-copy-url]").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(res.url); toast("Link kopiert."); } catch (_) { toast(res.url); }
+  });
+  dlg.querySelector("[data-svg]").addEventListener("click", () => save(new Blob([res.svg], { type: "image/svg+xml" }), "svg"));
+  dlg.querySelector("[data-png]").addEventListener("click", () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 1200;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, size, size);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, size, size);
+      canvas.toBlob((blob) => blob && save(blob, "png"), "image/png");
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(res.svg);
   });
 }
 
@@ -584,13 +651,15 @@ async function loadVouchers() {
           <td>${esc(fmtDateUtc(b.redeem_until))}</td>
           <td>${esc(b.note || "")}</td>
           <td><span class="badge ${status[1]}">${status[0]}</span>${b.revoked > 0 && !revokedAll ? `<div class="mono">${fmtInt(b.revoked)} gesperrt</div>` : ""}</td>
-          <td class="actions">${revokedAll ? "" : `<button class="btn btn--sm btn--danger" data-revoke="${esc(b.batch_id)}">Sperren</button>`}</td>
+          <td class="actions">${b.kind === "shared" && !revokedAll ? `<button class="btn btn--sm" data-qr="${esc(b.shared_code)}">QR-Code</button>` : ""}${revokedAll ? "" : `<button class="btn btn--sm btn--danger" data-revoke="${esc(b.batch_id)}">Sperren</button>`}</td>
         </tr>`;
     }).join("")
     : `<tr><td colspan="9" class="empty">Noch keine Gutscheine.</td></tr>`;
 }
 
 function onVoucherAction(e) {
+  const qr = e.target.closest("[data-qr]")?.dataset.qr;
+  if (qr) return showQr(qr);
   const id = e.target.closest("[data-revoke]")?.dataset.revoke;
   const batch = lastBatches.find((b) => b.batch_id === id);
   if (!batch) return;
