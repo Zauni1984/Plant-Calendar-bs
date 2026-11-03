@@ -63,6 +63,11 @@ button, input, select { font: inherit; color: inherit; }
 .login p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
 .login label { display: block; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
 .login label .input { margin-top: 4px; }
+.pw-field { position: relative; display: block; margin-top: 4px; }
+.pw-field .input { margin-top: 0 !important; padding-right: 42px; }
+.pw-toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.pw-toggle:hover, .pw-toggle:focus-visible { color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
+.pw-field .input::-ms-reveal { display: none; }
 .login .code { letter-spacing: 0.4em; font-size: 20px; text-align: center; }
 .login .btn { width: 100%; margin-top: 6px; padding: 10px; }
 .error { color: var(--danger); font-size: 13px; min-height: 20px; margin-top: 8px; }

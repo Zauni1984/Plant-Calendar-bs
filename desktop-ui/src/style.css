@@ -467,6 +467,30 @@
   margin: 0 0 20px;
 }
 
+/* ── Password field with eye button ── */
+.pw-field { position: relative; display: block; width: 100%; }
+.pw-field > input { width: 100%; padding-right: 42px; }
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.pw-toggle:hover, .pw-toggle:focus-visible { color: var(--accent); background: rgba(var(--accent-rgb),0.08); }
+/* Edge/WebView2 has its own reveal button; one is enough. */
+.pw-field > input::-ms-reveal, .pw-field > input::-ms-clear { display: none; }
+
 /* ── Colour swatches ── */
 .color-picker {
   display: flex;

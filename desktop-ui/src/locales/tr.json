@@ -679,6 +679,8 @@
   "auth.field.password": "Parola",
   "auth.emailPlaceholder": "seninle@email.com",
   "auth.passwordPlaceholder": "En az 8 karakter",
+  "auth.showPassword": "Şifreyi göster",
+  "auth.hidePassword": "Şifreyi gizle",
   "auth.register": "Kayıt ol",
   "auth.login": "Giriş yap",
   "auth.emailPasswordRequired": "Lütfen e-posta ve parola girin.",

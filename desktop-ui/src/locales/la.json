@@ -679,6 +679,8 @@
   "auth.field.password": "Tessera",
   "auth.emailPlaceholder": "tuus@email.com",
   "auth.passwordPlaceholder": "Saltem 8 characteres",
+  "auth.showPassword": "Tesseram ostende",
+  "auth.hidePassword": "Tesseram cela",
   "auth.register": "Registrare",
   "auth.login": "Inscribere",
   "auth.emailPasswordRequired": "Quaeso epistulam et tesseram insere.",

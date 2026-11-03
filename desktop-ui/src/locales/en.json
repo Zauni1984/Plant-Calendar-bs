@@ -679,6 +679,8 @@
   "auth.field.password": "Password",
   "auth.emailPlaceholder": "your@email.com",
   "auth.passwordPlaceholder": "At least 8 characters",
+  "auth.showPassword": "Show password",
+  "auth.hidePassword": "Hide password",
   "auth.register": "Register",
   "auth.login": "Log in",
   "auth.emailPasswordRequired": "Please enter email and password.",

@@ -20,6 +20,9 @@ const ACTIONS = {
   invoice_retry: "Rechnung neu angestoßen", set_plan: "Tarif geändert", voucher_create: "Gutscheine erstellt", voucher_revoke: "Gutscheine gesperrt",
 };
 
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("de-DE") : "–");
 // "Redeem until" is the end of a day in UTC; show that day, not the next one in CET.
@@ -65,13 +68,24 @@ function renderLogin(message = "") {
       <h1>Sowling Admin</h1>
       <p>Anmeldung mit Admin-Konto und Code aus der Authenticator-App.</p>
       <label>E-Mail<input class="input" name="email" type="email" autocomplete="username" required /></label>
-      <label>Passwort<input class="input" name="password" type="password" autocomplete="current-password" required /></label>
+      <label>Passwort<span class="pw-field"><input class="input" name="password" type="password" autocomplete="current-password" required /><button type="button" class="pw-toggle" id="pwToggle" aria-label="Passwort anzeigen" title="Passwort anzeigen" aria-pressed="false">${EYE_OPEN}</button></span></label>
       <label>Code aus der App<input class="input code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required /></label>
       <button class="btn btn--primary" type="submit">Anmelden</button>
       <div class="error" id="loginError" role="alert">${esc(message)}</div>
     </form>`;
   const form = document.getElementById("loginForm");
   form.email.focus();
+  const pwToggle = document.getElementById("pwToggle");
+  pwToggle.addEventListener("click", () => {
+    const show = form.password.type === "password";
+    form.password.type = show ? "text" : "password";
+    pwToggle.innerHTML = show ? EYE_SHUT : EYE_OPEN;
+    const label = show ? "Passwort verbergen" : "Passwort anzeigen";
+    pwToggle.setAttribute("aria-label", label);
+    pwToggle.title = label;
+    pwToggle.setAttribute("aria-pressed", String(show));
+    form.password.focus();
+  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const button = form.querySelector("button");
