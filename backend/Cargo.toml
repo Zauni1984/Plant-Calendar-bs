@@ -41,4 +41,4 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 # Admin sign-in: TOTP codes (RFC 6238 uses HMAC-SHA1) and the setup QR code in
 # the terminal.
 sha1 = "0.10"
-qrcode = { version = "0.14", default-features = false }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }

@@ -7,9 +7,11 @@
 //!   POST   /admin/users/{id}/enable
 //!   DELETE /admin/users/{id}            { confirm_email }
 //!   POST   /admin/users/{id}/plan       { plan, months | days | unlimited }
+//!   POST   /admin/users/{id}/reset-2fa  remove two-factor sign-in (lost phone)
 //!   GET    /admin/vouchers              code batches
 //!   POST   /admin/vouchers              create codes
 //!   POST   /admin/vouchers/{batch}/revoke
+//!   POST   /admin/vouchers/qr           { code }  link + QR code for flyers
 //!   GET    /admin/invoices/problems     invoices not sent
 //!   POST   /admin/invoices/{id}/retry
 //!   GET    /admin/audit                 who did what
@@ -254,6 +256,7 @@ struct UserRow {
     disabled_at: Option<DateTime<Utc>>,
     disabled_reason: Option<String>,
     is_admin: bool,
+    two_factor: bool,
     plants: i64,
     invoices: i64,
 }
@@ -263,6 +266,7 @@ pub async fn list_users(State(state): State<AppState>, _admin: AdminUser, Query(
     let rows: Result<Vec<UserRow>, _> = sqlx::query_as(
         "SELECT u.user_id, u.email, u.created_at, u.last_seen_at, u.plan, u.stripe_plan, u.voucher_plan, u.voucher_until, \
                 u.disabled_at, u.disabled_reason, (a.user_id IS NOT NULL) AS is_admin, \
+                EXISTS (SELECT 1 FROM user_totp t WHERE t.user_id = u.user_id AND t.enabled_at IS NOT NULL) AS two_factor, \
                 (SELECT COUNT(*) FROM plants p WHERE p.user_id = u.user_id) AS plants, \
                 (SELECT COUNT(*) FROM invoices i WHERE i.user_id = u.user_id) AS invoices \
          FROM users u LEFT JOIN admins a ON a.user_id = u.user_id \
@@ -355,6 +359,23 @@ pub async fn delete_user(State(state): State<AppState>, admin: AdminUser, Path(i
     }
     audit(&state, admin.user_id, "delete", Some(email), None).await;
     StatusCode::NO_CONTENT.into_response()
+}
+
+/// For an owner who lost both phone and recovery codes. Check first that the
+/// request really comes from the account owner.
+pub async fn reset_two_factor(State(state): State<AppState>, admin: AdminUser, Path(id): Path<Uuid>) -> Response {
+    let email = match target_email(&state, id).await {
+        Ok(e) => e,
+        Err(r) => return r,
+    };
+    match super::two_factor::reset(&state, id).await {
+        Ok(true) => {
+            audit(&state, admin.user_id, "reset_2fa", Some(email), None).await;
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Ok(false) => api_error(StatusCode::NOT_FOUND, "two-factor sign-in is not on for this account"),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
 }
 
 // --- plans ------------------------------------------------------------------------------
@@ -540,6 +561,23 @@ pub async fn create_vouchers(State(state): State<AppState>, admin: AdminUser, Js
     );
     audit(&state, admin.user_id, "voucher_create", Some(batch_id.to_string()), Some(detail)).await;
     Json(serde_json::json!({ "batch_id": batch_id, "codes": codes, "emailed": emailed })).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct QrPayload {
+    code: String,
+}
+
+/// A link that opens the app with the code already in the redeem field, and
+/// its QR code (SVG, prints sharply at any size).
+pub async fn voucher_qr(_admin: AdminUser, Json(p): Json<QrPayload>) -> Response {
+    let code = p.code.trim().to_uppercase();
+    if vouchers::normalize_code(&code).is_none() || !code.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        return api_error(StatusCode::BAD_REQUEST, "not a voucher code");
+    }
+    let base = std::env::var("CHECKOUT_BASE_URL").unwrap_or_else(|_| "http://localhost:1420".to_string());
+    let url = format!("{}/?gutschein={code}", base.trim_end_matches('/'));
+    Json(serde_json::json!({ "code": code, "url": url, "svg": super::two_factor::qr_svg(&url, 600) })).into_response()
 }
 
 pub async fn revoke_vouchers(State(state): State<AppState>, admin: AdminUser, Path(batch): Path<Uuid>) -> Response {

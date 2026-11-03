@@ -41,7 +41,9 @@ den Kontoeinstellungen widerrufen; der Widerruf wirkt für die Zukunft
 ## 3. Konto und Gartendaten
 
 **Daten:** E-Mail-Adresse, Passwort (nur als Argon2-Hash), Sprache, Zeitzone,
-Tarif, Erstellungsdatum, Zeitpunkt der letzten Anmeldung; Ihre Pflanzen,
+Tarif, Erstellungsdatum, Zeitpunkt der letzten Anmeldung, bei
+eingeschalteter Zwei-Faktor-Anmeldung deren Schlüssel und die Prüfsummen der
+Wiederherstellungscodes; Ihre Pflanzen,
 Aufgaben, Logs (Notizen, Messwerte, Ernten), Standorte und Saisons.
 
 Den Zeitpunkt der letzten Anmeldung nutzen wir für Nutzungsstatistiken (Anzahl

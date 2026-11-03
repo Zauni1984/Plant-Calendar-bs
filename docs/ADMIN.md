@@ -53,6 +53,10 @@ Aktivität, Anzahl Pflanzen und Rechnungen.
   Sitzung endet spätestens nach 60 Minuten. Die Daten bleiben erhalten.
   **Ein Stripe-Abo wird nicht gekündigt**, das geht im Stripe-Dashboard.
 - **Aktivieren:** Hebt die Sperre auf.
+- **2FA zurücksetzen** (nur bei Konten mit Zwei-Faktor-Anmeldung, Kennzeichen
+  „2FA“): wenn jemand Handy und Wiederherstellungscodes verloren hat. Danach
+  reicht wieder das Passwort. Vorher sicherstellen, dass die Anfrage wirklich
+  von dieser Person kommt, z. B. per Antwort von genau dieser E-Mail-Adresse.
 - **Tarif:** Hoch- oder herabstufen auf Free, Basic, Pro oder Gärtnerei, für
   1, 3, 6 oder 12 Monate, eine Anzahl Tage oder unbegrenzt. Der Tarif wird wie
   ein Gutschein gespeichert und ersetzt einen bestehenden Gutschein; „Free“
@@ -67,7 +71,10 @@ Aktivität, Anzahl Pflanzen und Rechnungen.
 **Gutscheine.** Codes für Basic, Pro oder Gärtnerei erstellen: Einzelcodes
 (je einmal einlösbar, auch mehrere tausend auf einmal) oder ein lesbarer
 Sammelcode für viele Konten, optional mit Höchstzahl und Einlöse-Frist. Ein
-einzelner Code lässt sich direkt per E-Mail verschicken. Darunter stehen alle
+einzelner Code lässt sich direkt per E-Mail verschicken. **QR-Code** (bei
+Sammelcodes in der Liste, bei bis zu 50 neuen Einzelcodes im Ergebnis): öffnet
+die App mit dem Code schon im Feld „Gutschein einlösen“. Download als SVG für
+den Druck oder PNG für Social Media. Darunter stehen alle
 bisherigen Gutscheine mit Einlösungen; **Sperren** verhindert weitere
 Einlösungen. Details: [GUTSCHEINE.md](GUTSCHEINE.md).
 
@@ -76,8 +83,8 @@ Fehler (z. B. Lexware nicht erreichbar, VIES gestört). „Erneut versuchen“
 startet sofort einen neuen Versuch.
 
 **Protokoll.** Jede Admin-Anmeldung und jede Aktion (deaktiviert, aktiviert,
-gelöscht, Tarif geändert, Gutscheine erstellt oder gesperrt, Rechnung neu
-angestoßen), mit Zeit und Admin.
+gelöscht, Tarif geändert, 2FA zurückgesetzt, Gutscheine erstellt oder
+gesperrt, Rechnung neu angestoßen), mit Zeit und Admin.
 
 ## Sicherheit
 

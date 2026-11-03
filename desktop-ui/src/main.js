@@ -1620,6 +1620,13 @@ function renderSettingsPanel() {
       <div id="passwordFeedback"></div>
     </div>` : '';
 
+  // Two-factor sign-in (only when logged in); filled by loadTwoFactorStatus().
+  const twoFactorSection = isLoggedIn ? `
+    <div class="settings-section">
+      <h3>${t('twofa.title')}</h3>
+      <div id="twoFactorStatus"><div class="settings-info">${t('common.loading')}</div></div>
+    </div>` : '';
+
   // Account deletion section (only when logged in)
   const deleteSection = isLoggedIn ? `
     <div class="settings-section" style="border-color: rgba(255,112,112,0.2);">
@@ -1759,6 +1766,7 @@ function renderSettingsPanel() {
     </div>
     ${profileSection}
     ${passwordSection}
+    ${twoFactorSection}
     ${deleteSection}
     <div class="settings-section">
       <h3>${t('settings.privacyLegal')}</h3>
@@ -1776,6 +1784,8 @@ function renderSettingsPanel() {
       </div>
     </div>
   `;
+
+  loadTwoFactorStatus();
 
   // Quick-action buttons
   settingsPanel.querySelectorAll('[data-settings-action]').forEach((button) => {
@@ -3300,6 +3310,41 @@ function voucherErrorCode(err) {
   return ['invalid', 'expired', 'used_up', 'already_redeemed', 'lower_plan', 'already_unlimited', 'would_replace_unlimited'].includes(code) ? code : null;
 }
 
+// A voucher link from a flyer QR code (?gutschein=CODE) puts the code into the
+// redeem field; it waits in sessionStorage through sign-in or registration.
+const PENDING_VOUCHER_KEY = 'pc_pending_voucher';
+let pendingVoucher = (() => {
+  if (IS_TAURI) return '';
+  try {
+    const url = new URL(window.location.href);
+    const fromLink = (url.searchParams.get('gutschein') || '').trim().toUpperCase();
+    if (fromLink && /^[A-Z0-9-]{4,40}$/.test(fromLink)) {
+      sessionStorage.setItem(PENDING_VOUCHER_KEY, fromLink);
+      url.searchParams.delete('gutschein');
+      window.history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+    }
+    return sessionStorage.getItem(PENDING_VOUCHER_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+})();
+
+function clearPendingVoucher() {
+  pendingVoucher = '';
+  try { sessionStorage.removeItem(PENDING_VOUCHER_KEY); } catch (_) {}
+}
+
+/** Signed in with a code from a link waiting: show it in the subscription view. */
+function showPendingVoucher() {
+  if (!pendingVoucher || IS_TAURI || !webSignedIn) return;
+  switchPageView('billing');
+  setTimeout(() => {
+    const input = $("voucherCode");
+    if (input) { input.value = pendingVoucher; input.focus(); }
+    document.getElementById('voucherCard')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 300);
+}
+
 function renderVoucherCard() {
   const isAccount = currentPlanSource === "account";
   const status = currentVoucher
@@ -3313,10 +3358,11 @@ function renderVoucherCard() {
       ${status ? `<div style="margin-top:6px; font-size:13px; color:${TC.accent};">${escapeHtml(status)}</div>` : ''}
       ${isAccount ? `
         <form id="voucherForm" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-          <input id="voucherCode" class="form-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"
+          <input id="voucherCode" class="form-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" value="${escapeHtml(pendingVoucher)}"
             placeholder="${escapeHtml(t('voucher.placeholder'))}" aria-label="${escapeHtml(t('voucher.title'))}" style="flex:1; min-width:180px; text-transform:uppercase;" />
           <button type="submit" class="btn btn--primary btn--sm">${t('voucher.redeem')}</button>
         </form>
+        ${pendingVoucher ? `<div style="margin-top:6px; font-size:12px; color:${TC.accent};">${t('voucher.fromLink')}</div>` : ''}
         <div style="margin-top:6px; font-size:11px; color:${TC.textDim};">${t('voucher.hint')}</div>
         <div id="voucherMsg" role="status" style="margin-top:6px; font-size:12px;"></div>
       ` : `<div style="margin-top:6px; font-size:12px; color:${TC.textMuted};">${t('voucher.loginNeeded')}</div>`}
@@ -3335,6 +3381,7 @@ async function redeemVoucher(code) {
   showLoading(t('voucher.redeeming'));
   try {
     const result = await invoke("voucher_redeem_smart", { code: code.trim() });
+    clearPendingVoucher();
     await refreshAll({ autoReminderReason: "plan_change" });
     const name = planLabel(result?.voucher_plan);
     const text = result?.voucher_until
@@ -5228,6 +5275,11 @@ function openModal(type, prefill = {}) {
         <label class="form-label">${t('auth.field.password')}</label>
         <input id="authModalPassword" class="form-input" type="password" placeholder="${t('auth.passwordPlaceholder')}" />
       </div>
+      <div class="form-group" id="authModalTotpGroup" style="display:none;">
+        <label class="form-label" for="authModalTotp">${t('twofa.loginCode')}</label>
+        <input id="authModalTotp" class="form-input twofa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" placeholder="123456" />
+        <div class="form-hint">${escapeHtml(t('twofa.loginHint'))}</div>
+      </div>
       <div id="authModalError" class="form-error" style="display:none;"></div>
       <div id="authModalSuccess" class="form-hint" style="display:none; color:${TC.accent};"></div>
       <div style="margin-top:12px; font-size:12px; text-align:center;">
@@ -5271,13 +5323,34 @@ function openModal(type, prefill = {}) {
       const { email, password, backendUrl } = getAuthFields();
       if (!email || !password) { showAuthError(t('auth.emailPasswordRequired')); return; }
       try {
-        const result = await invoke("auth_login", { payload: { email, password, backend_url: backendUrl || null } });
+        const totpGroup = document.getElementById('authModalTotpGroup');
+        const totpCode = totpGroup && totpGroup.style.display !== 'none'
+          ? (document.getElementById('authModalTotp')?.value?.trim() || null) : null;
+        const result = await invoke("auth_login", { payload: { email, password, backend_url: backendUrl || null, totp_code: totpCode } });
         logOut(result);
         showAuthSuccess(t('auth.loginSuccess'));
         setTimeout(() => { closeModal(); afterSignIn(); }, 800);
       } catch (err) {
+        const msg = String(err?.message || err);
+        const totpGroup = document.getElementById('authModalTotpGroup');
+        const totpInput = document.getElementById('authModalTotp');
+        if (msg.includes('totp_required') && totpGroup) {
+          // Password was right; the account wants the second step.
+          totpGroup.style.display = '';
+          showAuthSuccess(t('twofa.enterCode'));
+          totpInput?.focus();
+          return;
+        }
+        if (msg.includes('totp_invalid') || msg.includes('totp_locked')) {
+          showAuthError(twoFactorError(err));
+          totpInput?.select();
+          return;
+        }
         showAuthError(friendlyAuthError(err));
       }
+    });
+    document.getElementById('authModalTotp')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('authModalLogin')?.click();
     });
     document.getElementById('authModalGuest')?.addEventListener('click', startGuestMode);
     // Imprint and privacy policy must be reachable before signing in, too.
@@ -5291,7 +5364,9 @@ function openModal(type, prefill = {}) {
         const result = await invoke("auth_register", { payload: { email, password, backend_url: backendUrl || null } });
         logOut(result);
         showAuthSuccess(t('auth.registerSuccess'));
-        setTimeout(() => { closeModal(); afterSignIn(); }, 800);
+        // Offer two-factor sign-in right away; "skip" is fine. The app is
+        // refreshed once that dialog closes, however it is closed.
+        setTimeout(() => { modalOnClose = afterSignIn; openTwoFactorSetup({ offer: true }); }, 800);
       } catch (err) {
         showAuthError(friendlyAuthError(err));
       }
@@ -5303,9 +5378,15 @@ function openModal(type, prefill = {}) {
   body.querySelector('input, textarea, select')?.focus();
 }
 
+// Run once when the current dialog closes (e.g. refresh after registration).
+let modalOnClose = null;
+
 function closeModal() {
   activeModal = null;
   const _mo2 = document.getElementById('modalOverlay'); if (_mo2) _mo2.style.display = 'none';
+  const after = modalOnClose;
+  modalOnClose = null;
+  after?.();
 }
 
 function renderPlantFormHTML(prefill = {}) {
@@ -8629,6 +8710,168 @@ async function refreshAll(options = {}) {
   }
 }
 
+// --- Two-factor sign-in (optional; backend api/two_factor.rs) ---------------------
+// Offered right after registration (can be skipped) and in the settings.
+
+function twoFactorError(err) {
+  const msg = String(err?.message || err);
+  if (msg.includes('totp_invalid')) return t('twofa.codeWrong');
+  if (msg.includes('totp_locked')) return t('twofa.locked');
+  if (msg.includes('wrong_password')) return t('twofa.wrongPassword');
+  if (msg.includes('email_account_required')) return t('twofa.emailOnly');
+  if (msg.includes('already_enabled')) return t('twofa.isOn');
+  return friendlyAuthError(err);
+}
+
+function showTwoFactorModal(bodyHtml, footerHtml) {
+  activeModal = 'twofa';
+  document.getElementById('modalTitle').textContent = t('twofa.title');
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFooter').innerHTML = footerHtml;
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.style.display = '';
+}
+
+function twoFactorShowError(msg) {
+  const el = document.getElementById('twoFaError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+async function openTwoFactorSetup({ offer = false } = {}) {
+  if (offer) {
+    showTwoFactorModal(`
+      <p>${escapeHtml(t('twofa.offerText'))}</p>
+      <div class="form-hint">${escapeHtml(t('twofa.offerHint'))}</div>`,
+      `<button class="btn btn--ghost" id="twoFaSkip">${t('twofa.skip')}</button>
+       <button class="btn btn--primary" id="twoFaStart">${t('twofa.setupNow')}</button>`);
+    document.getElementById('twoFaSkip').addEventListener('click', closeModal);
+    document.getElementById('twoFaStart').addEventListener('click', () => openTwoFactorSetup());
+    return;
+  }
+  let setup;
+  try {
+    setup = await invoke('two_factor_setup');
+  } catch (err) {
+    showTwoFactorModal(`<div id="twoFaError" class="form-error"></div>`, `<button class="btn" id="twoFaClose">${t('action.close')}</button>`);
+    twoFactorShowError(twoFactorError(err));
+    document.getElementById('twoFaClose').addEventListener('click', closeModal);
+    return;
+  }
+  // On a phone the key can go straight into the app installed there.
+  const onPhone = !IS_TAURI && window.matchMedia?.('(pointer: coarse)').matches;
+  showTwoFactorModal(`
+    <ol class="twofa-steps">
+      <li>${escapeHtml(t('twofa.step1'))}</li>
+      <li>${escapeHtml(t('twofa.step2'))}</li>
+    </ol>
+    <div class="twofa-qr">${setup.qr_svg || ''}</div>
+    ${onPhone ? `<div style="text-align:center;margin-bottom:8px;"><a class="btn btn--ghost btn--sm" href="${escapeHtml(setup.otpauth_uri)}">${escapeHtml(t('twofa.openApp'))}</a></div>` : ''}
+    <div class="form-hint" style="text-align:center;">${escapeHtml(t('twofa.manualKey'))}</div>
+    <code class="twofa-secret">${escapeHtml(String(setup.secret).replace(/(.{4})/g, '$1 ').trim())}</code>
+    <ol class="twofa-steps" start="3"><li>${escapeHtml(t('twofa.step3'))}</li></ol>
+    <input id="twoFaCode" class="form-input twofa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456" />
+    <div id="twoFaError" class="form-error" style="display:none;"></div>`,
+    `<button class="btn btn--ghost" id="twoFaLater">${t('twofa.later')}</button>
+     <button class="btn btn--primary" id="twoFaConfirm">${t('twofa.activate')}</button>`);
+  const codeEl = document.getElementById('twoFaCode');
+  const button = document.getElementById('twoFaConfirm');
+  const confirm = async () => {
+    const code = codeEl.value.replace(/\s/g, '');
+    if (!/^\d{6}$/.test(code)) { twoFactorShowError(t('twofa.codeFormat')); codeEl.focus(); return; }
+    button.disabled = true;
+    try {
+      const res = await invoke('two_factor_enable', { code });
+      showRecoveryCodes(res.recovery_codes || []);
+    } catch (err) {
+      twoFactorShowError(twoFactorError(err));
+      button.disabled = false;
+      codeEl.select();
+    }
+  };
+  button.addEventListener('click', confirm);
+  codeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirm(); });
+  document.getElementById('twoFaLater').addEventListener('click', closeModal);
+  codeEl.focus();
+}
+
+function showRecoveryCodes(codes) {
+  const text = codes.join('\n');
+  showTwoFactorModal(`
+    <p><strong>${escapeHtml(t('twofa.enabledDone'))}</strong></p>
+    <p>${escapeHtml(t('twofa.recoveryText'))}</p>
+    <pre class="twofa-recovery">${codes.map(escapeHtml).join('\n')}</pre>`,
+    `<button class="btn btn--ghost" id="twoFaCopy">${t('twofa.copy')}</button>
+     ${IS_TAURI ? '' : `<button class="btn btn--ghost" id="twoFaDownload">${t('twofa.download')}</button>`}
+     <button class="btn btn--primary" id="twoFaDone">${t('twofa.done')}</button>`);
+  document.getElementById('twoFaCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(text); logOut(t('twofa.copied')); } catch (_) { /* select by hand */ }
+  });
+  document.getElementById('twoFaDownload')?.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([`Sowling – ${t('twofa.recoveryTitle')}\n\n${text}\n`], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sowling-wiederherstellungscodes.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  document.getElementById('twoFaDone').addEventListener('click', () => { closeModal(); loadTwoFactorStatus(); });
+}
+
+function openTwoFactorDisable() {
+  showTwoFactorModal(`
+    <p>${escapeHtml(t('twofa.disableText'))}</p>
+    <div class="form-group">
+      <label class="form-label" for="twoFaPw">${t('settings.currentPassword')}</label>
+      <input id="twoFaPw" type="password" class="form-input" autocomplete="current-password" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="twoFaOffCode">${t('twofa.loginCode')}</label>
+      <input id="twoFaOffCode" class="form-input" inputmode="numeric" autocomplete="one-time-code" maxlength="20" />
+      <div class="form-hint">${escapeHtml(t('twofa.loginHint'))}</div>
+    </div>
+    <div id="twoFaError" class="form-error" style="display:none;"></div>`,
+    `<button class="btn btn--ghost" id="twoFaCancel">${t('action.cancel')}</button>
+     <button class="btn btn--danger" id="twoFaOffConfirm">${t('twofa.disable')}</button>`);
+  document.getElementById('twoFaCancel').addEventListener('click', closeModal);
+  const button = document.getElementById('twoFaOffConfirm');
+  button.addEventListener('click', async () => {
+    const password = document.getElementById('twoFaPw').value;
+    const code = document.getElementById('twoFaOffCode').value.trim();
+    if (!password || !code) { twoFactorShowError(t('twofa.disableNeeds')); return; }
+    button.disabled = true;
+    try {
+      await invoke('two_factor_disable', { password, code });
+      closeModal();
+      loadTwoFactorStatus();
+    } catch (err) {
+      twoFactorShowError(twoFactorError(err));
+      button.disabled = false;
+    }
+  });
+  document.getElementById('twoFaPw').focus();
+}
+
+async function loadTwoFactorStatus() {
+  const box = document.getElementById('twoFactorStatus');
+  if (!box) return;
+  let s;
+  try {
+    s = await invoke('two_factor_status');
+  } catch (err) {
+    box.innerHTML = `<div class="settings-info">${escapeHtml(twoFactorError(err))}</div>`;
+    return;
+  }
+  box.innerHTML = s?.enabled ? `
+    <div class="settings-info"><span class="badge-on">${escapeHtml(t('twofa.on'))}</span> ${escapeHtml(t('twofa.isOn'))}</div>
+    <div class="settings-info">${escapeHtml(t('twofa.recoveryLeft', s.recovery_codes_left))}${s.recovery_codes_left <= 2 ? ` ${escapeHtml(t('twofa.recoveryLow'))}` : ''}</div>
+    <div class="settings-actions"><button type="button" class="btn btn--ghost btn--sm" id="twoFaOff">${t('twofa.disable')}</button></div>`
+    : `
+    <div class="settings-info">${escapeHtml(t('twofa.isOff'))}</div>
+    <div class="settings-actions"><button type="button" class="btn btn--primary btn--sm" id="twoFaOn">${t('twofa.enable')}</button></div>`;
+  document.getElementById('twoFaOn')?.addEventListener('click', () => openTwoFactorSetup());
+  document.getElementById('twoFaOff')?.addEventListener('click', openTwoFactorDisable);
+}
+
 function friendlyAuthError(err) {
   const msg = String(err?.message || err);
   if (msg.includes("Connection refused") || msg.includes("error sending request") || msg.includes("tcp connect"))
@@ -8928,6 +9171,7 @@ startupSession
     // The browser has no local database, so it needs an account to store anything.
     if (!IS_TAURI && !webSignedIn && !webGuest) openModal('auth');
     if (!IS_TAURI) maybeJumpToDesktopCard();
+    showPendingVoucher();
   }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
@@ -9281,6 +9525,7 @@ async function startGuestMode() {
 async function afterSignIn() {
   await refreshWebSessionState();
   await refreshAll({ autoReminderReason: 'auth_change' });
+  showPendingVoucher();
   hideAppBanner('guestBanner');
   if (IS_TAURI) {
     if (licenseGateOpen) await unlockWithAccount();

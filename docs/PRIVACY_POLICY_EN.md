@@ -41,7 +41,8 @@ in the account settings, with effect for the future (Art. 7(3) GDPR).
 ## 3. Account and garden data
 
 **Data:** e-mail address, password (Argon2 hash only), language, time zone,
-plan, creation date, time of last sign-in; your plants, tasks, logs (notes,
+plan, creation date, time of last sign-in, with two-factor sign-in on its key
+and the hashes of the recovery codes; your plants, tasks, logs (notes,
 measurements, harvests), locations and seasons.
 
 We use the time of the last sign-in for usage statistics (number of active

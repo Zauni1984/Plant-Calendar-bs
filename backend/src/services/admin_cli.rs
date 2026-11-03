@@ -56,7 +56,7 @@ async fn set_secret(state: &AppState, email: &str, reset: bool) -> anyhow::Resul
     .bind(&secret)
     .execute(&state.pg)
     .await?;
-    let uri = totp::provisioning_uri(&secret, email);
+    let uri = totp::provisioning_uri(&secret, email, "Sowling Admin");
     let qr = QrCode::new(uri.as_bytes())?
         .render::<unicode::Dense1x2>()
         .dark_color(unicode::Dense1x2::Light)

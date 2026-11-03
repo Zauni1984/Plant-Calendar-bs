@@ -108,8 +108,9 @@ export async function api(path, opts = {}) {
 }
 
 /** Sign in or register; on success the session is held in memory + cookie. */
-export async function authenticate(kind, email, password) {
-  const r = await rawFetch(`/auth/${kind}`, { method: "POST", body: { email, password }, auth: false });
+export async function authenticate(kind, email, password, totpCode = null) {
+  const body = totpCode ? { email, password, totp_code: totpCode } : { email, password };
+  const r = await rawFetch(`/auth/${kind}`, { method: "POST", body, auth: false });
   if (!r.ok) throw await readError(r);
   return adoptAuthResponse(await r.json());
 }
