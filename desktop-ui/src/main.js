@@ -7,6 +7,7 @@ import { invoke, convertFileSrc, openDialog as tauriOpenDialog, saveDialog as ta
 // bundle. The other nine are separate chunks loaded on demand: bundling all
 // ten put ~660 KB of JSON into startup, of which a visitor needs one.
 import { FERTILIZERS, FEED_UNITS } from './fertilizers.js';
+import { LABEL_FORMATS, labelSheet, printLabels, defaultTraceCode } from './labels.js';
 import localeDe from './locales/de.json';
 const LOCALE_LOADERS = import.meta.glob(['./locales/*.json', '!./locales/de.json'], { import: 'default' });
 
@@ -267,6 +268,7 @@ root.innerHTML = `
           <option value="phase">${t('plant.phase')}</option><option value="week_desc">${t('plant.week')}</option>
         </select>
         <button id="resetPlantFilters" class="btn btn--ghost btn--sm">${t('plants.resetFilters')}</button>
+        <button id="printLabelsBtn" class="btn btn--sm" type="button" title="${t('labels.title')}">🏷️ ${t('labels.button')}</button>
         <span id="plantsFilterStatus" style="color:${TC.textDim};font-size:12px;margin-left:auto;"></span>
       </div>
       <div id="selectedPlantLabel" style="color:${TC.textMuted};font-size:13px;margin-bottom:10px;"></div>
@@ -6838,6 +6840,7 @@ function renderPlants() {
           <button data-action="advance" data-plant-id="${plant.plant_id}">${t('plant.advanceWeek')}</button>
           <button data-action="prepare-task" data-plant-id="${plant.plant_id}">${t('task.title')}</button>
           <button data-action="prepare-log" data-plant-id="${plant.plant_id}">Log</button>
+          <button data-action="label" data-plant-id="${plant.plant_id}" title="${t('labels.title')}">🏷️ ${t('labels.single')}</button>
           <button data-action="toggle-archive" data-plant-id="${plant.plant_id}" ${isPlantArchived(plant) && !canActivateMorePlants() ? 'data-blocked-reactivate="1"' : ''}>${isPlantArchived(plant) ? t('plant.reactivate') : t('plant.archiveBtn')}</button>
           ${isPerennial(plant) ? `<button data-action="start-season" data-plant-id="${plant.plant_id}">${t('plant.newSeason')}</button>` : ''}
           <button data-action="end-run" data-plant-id="${plant.plant_id}" ${!isPlantActive(plant) ? "disabled" : ""}>${t('plant.endRun')}</button>
@@ -6931,6 +6934,10 @@ function renderPlants() {
       }
       if (action === "prepare-log") {
         await prepareLogFromHome(plantId, {});
+        return;
+      }
+      if (action === "label") {
+        openLabelDialog([plantId]);
         return;
       }
       try {
@@ -8993,6 +9000,173 @@ function openFeedingLogFromTask(task) {
   });
 }
 
+// --- Plant labels with QR code (labels.js) ----------------------------------------
+
+function labelVariety(plant) {
+  const entry = plant.catalog_id ? catalogById(plant.catalog_id) : null;
+  if (!entry) return '';
+  const name = currentLang === 'de' ? entry.name_de : (entry.name_en || entry.name_de);
+  return name && name !== plant.name ? name : '';
+}
+
+function openLabelDialog(preselect = null) {
+  const list = plants.filter(p => plantStatusValue(p) !== 'deleted')
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const chosen = new Set(preselect || list.filter(isPlantActive).map(p => p.plant_id));
+  const formats = Object.keys(LABEL_FORMATS);
+  let format = (() => { try { return localStorage.getItem('pc_label_format') || 'a4-24'; } catch (_) { return 'a4-24'; } })();
+  // Plant passport settings stay on this device (registration number, origin).
+  const pp = (() => { try { return JSON.parse(localStorage.getItem('pc_plant_passport') || '{}'); } catch (_) { return {}; } })();
+  if (!formats.includes(format)) format = 'a4-24';
+  activeModal = 'labels';
+  document.getElementById('modalTitle').textContent = t('labels.title');
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label" for="labelFormat">${t('labels.format')}</label>
+      <select id="labelFormat" class="form-select">${formats.map(f => `<option value="${f}" ${f === format ? 'selected' : ''}>${escapeHtml(t(`labels.fmt.${f}`))}</option>`).join('')}</select>
+    </div>
+    ${currentPlan === 'nursery' ? `
+    <div class="form-group" style="padding:10px;border-radius:10px;border:1px solid rgba(${TC.accentRgb},0.2);">
+      <label class="form-check" style="font-weight:600;"><input type="checkbox" id="ppEnabled" ${pp.enabled ? 'checked' : ''} /> 🇪🇺 ${t('pp.toggle')}</label>
+      <div id="ppFields" style="display:${pp.enabled ? 'grid' : 'none'};gap:8px;margin-top:8px;">
+        <div class="form-hint">${escapeHtml(t('pp.hint'))}</div>
+        <label class="form-label" for="ppReg">B · ${t('pp.reg')}</label>
+        <input id="ppReg" class="form-input" maxlength="40" placeholder="DE-BY-0123456" value="${escapeHtml(pp.reg || '')}" />
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="ppOrigin">D · ${t('pp.origin')}</label><input id="ppOrigin" class="form-input" maxlength="20" value="${escapeHtml(pp.origin || 'DE')}" /></div>
+          <div class="form-group"><label class="form-label" for="ppTrace">C · ${t('pp.trace')}</label><input id="ppTrace" class="form-input" maxlength="40" placeholder="${escapeHtml(t('pp.traceAuto'))}" /></div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">
+          <label class="form-check"><input type="checkbox" id="ppQr" ${pp.qr !== false ? 'checked' : ''} /> ${t('pp.qr')}</label>
+          <label class="form-check"><input type="checkbox" id="ppMono" ${pp.mono ? 'checked' : ''} /> ${t('pp.mono')}</label>
+        </div>
+        <div id="ppNoLatin" class="form-hint" style="color:${TC.warning};"></div>
+      </div>
+    </div>` : `<div class="form-hint" style="margin-bottom:10px;">🇪🇺 ${escapeHtml(t('pp.onlyNursery'))}</div>`}
+    <div class="form-group" id="labelContentGroup">
+      <div class="form-label">${t('labels.content')}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">
+        <label class="form-check"><input type="checkbox" data-label-show="variety" checked /> ${t('labels.variety')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="started" checked /> ${t('labels.showStarted')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="location" checked /> ${t('labels.location')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="brand" checked /> ${t('labels.brand')}</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span class="form-label" style="margin:0;">${t('labels.plants')}</span>
+        <span style="display:flex;gap:6px;"><button type="button" class="btn btn--ghost btn--sm" data-label-all>${t('labels.all')}</button><button type="button" class="btn btn--ghost btn--sm" data-label-none>${t('labels.none')}</button></span>
+      </div>
+      <div id="labelPlantList" style="max-height:240px;overflow:auto;display:grid;gap:4px;margin-top:6px;padding:8px;border-radius:10px;background:${TC.surface};">
+        ${list.map(p => `<label class="form-check" style="font-size:13px;"><input type="checkbox" data-label-plant="${p.plant_id}" ${chosen.has(p.plant_id) ? 'checked' : ''} /> ${escapeHtml(p.name)}${labelVariety(p) ? ` <span style="color:${TC.textDim};">· ${escapeHtml(labelVariety(p))}</span>` : ''}</label>`).join('') || `<span style="color:${TC.textMuted};">${t('plants.empty') || ''}</span>`}
+      </div>
+    </div>
+    <div id="labelCount" style="font-size:12px;color:${TC.textMuted};"></div>
+    <div class="form-hint" style="margin-top:6px;">${escapeHtml(t('labels.hint'))}</div>
+    <div id="labelError" class="form-error" style="display:none;"></div>`;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn--ghost" id="labelCancel">${t('action.cancel')}</button>
+    <button class="btn btn--primary" id="labelPrintBtn">🖨️ ${t('labels.print')}</button>`;
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.style.display = '';
+  const body = document.getElementById('modalBody');
+  const selected = () => [...body.querySelectorAll('[data-label-plant]:checked')].map(i => i.dataset.labelPlant);
+  const show = () => Object.fromEntries([...body.querySelectorAll('[data-label-show]')].map(i => [i.dataset.labelShow, i.checked]));
+  const passportOn = () => currentPlan === 'nursery' && !!body.querySelector('#ppEnabled')?.checked;
+  const passport = () => passportOn() ? {
+    reg: body.querySelector('#ppReg').value.trim(),
+    origin: body.querySelector('#ppOrigin').value.trim() || 'DE',
+    qr: body.querySelector('#ppQr').checked,
+    mono: body.querySelector('#ppMono').checked,
+  } : null;
+  const build = () => {
+    const ids = new Set(selected());
+    const trace = body.querySelector('#ppTrace')?.value.trim();
+    const items = list.filter(p => ids.has(p.plant_id)).map(p => ({
+      latin: (p.catalog_id && catalogById(p.catalog_id)?.name_latin) || '',
+      trace: trace || defaultTraceCode(p),
+      id: p.plant_id,
+      name: p.name,
+      variety: labelVariety(p),
+      started: p.created_at ? t('labels.started', new Date(p.created_at).toLocaleDateString(localeTag())) : '',
+      location: locations.find(l => l.location_id === p.location_id)?.name || '',
+    }));
+    return labelSheet({
+      items, format: body.querySelector('#labelFormat').value, show: show(), passport: passport(),
+      texts: { footer: t('labels.footer'), title: t('labels.title'), passport: currentLang === 'de' ? 'Pflanzenpass / Plant Passport' : 'Plant Passport' },
+    });
+  };
+  const updateCount = () => {
+    const sheet = build();
+    document.getElementById('labelCount').textContent = t('labels.count', sheet.count, sheet.pages);
+    const on = passportOn();
+    const fields = body.querySelector('#ppFields');
+    if (fields) fields.style.display = on ? 'grid' : 'none';
+    const content = body.querySelector('#labelContentGroup');
+    if (content) content.style.display = on ? 'none' : '';
+    const noLatin = body.querySelector('#ppNoLatin');
+    if (noLatin) {
+      const ids = new Set(selected());
+      const missing = list.filter(p => ids.has(p.plant_id) && !(p.catalog_id && catalogById(p.catalog_id)?.name_latin)).length;
+      noLatin.textContent = on && missing ? t('pp.noLatin', missing) : '';
+    }
+  };
+  body.addEventListener('input', updateCount);
+  body.addEventListener('change', updateCount);
+  body.querySelector('[data-label-all]').addEventListener('click', () => { body.querySelectorAll('[data-label-plant]').forEach(i => { i.checked = true; }); updateCount(); });
+  body.querySelector('[data-label-none]').addEventListener('click', () => { body.querySelectorAll('[data-label-plant]').forEach(i => { i.checked = false; }); updateCount(); });
+  document.getElementById('labelCancel').addEventListener('click', closeModal);
+  document.getElementById('labelPrintBtn').addEventListener('click', () => {
+    const sheet = build();
+    const err = document.getElementById('labelError');
+    if (!sheet.count) { err.textContent = t('labels.empty'); err.style.display = 'block'; return; }
+    const ppNow = passport();
+    if (passportOn() && !ppNow.reg) { err.textContent = t('pp.regRequired'); err.style.display = 'block'; body.querySelector('#ppReg').focus(); return; }
+    try {
+      localStorage.setItem('pc_label_format', body.querySelector('#labelFormat').value);
+      if (currentPlan === 'nursery') localStorage.setItem('pc_plant_passport', JSON.stringify({ enabled: passportOn(), ...(ppNow || { reg: pp.reg, origin: pp.origin, qr: pp.qr, mono: pp.mono }) }));
+    } catch (_) {}
+    closeModal();
+    printLabels(sheet);
+  });
+  updateCount();
+}
+
+// A scanned label (?pflanze=<id>) opens that plant, after sign-in if needed.
+const PENDING_PLANT_KEY = 'pc_pending_plant';
+let pendingPlantId = (() => {
+  if (IS_TAURI) return '';
+  try {
+    const url = new URL(window.location.href);
+    const fromLink = (url.searchParams.get('pflanze') || url.searchParams.get('plant') || '').trim();
+    if (/^[0-9a-f-]{36}$/i.test(fromLink)) {
+      sessionStorage.setItem(PENDING_PLANT_KEY, fromLink);
+      url.searchParams.delete('pflanze');
+      url.searchParams.delete('plant');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+    return sessionStorage.getItem(PENDING_PLANT_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+})();
+
+async function showPendingPlant() {
+  if (!pendingPlantId || IS_TAURI || !webSignedIn) return;
+  const id = pendingPlantId;
+  pendingPlantId = '';
+  try { sessionStorage.removeItem(PENDING_PLANT_KEY); } catch (_) {}
+  if (!plants.some(p => p.plant_id === id)) {
+    window.alert(t('labels.notFound'));
+    return;
+  }
+  switchPageView('plants');
+  await focusPlantFromHome(id);
+  setTimeout(() => {
+    document.querySelector(`#plantsList [data-plant-id="${CSS.escape(id)}"]`)?.closest('.entity-row, .plant-card, [class*="card"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 300);
+}
+
 // --- Checkout consent (right of withdrawal, § 356 BGB) ----------------------------
 // Before a paid checkout the buyer must tick that the service starts now
 // (subscription) or is supplied now (desktop app). The backend refuses the
@@ -9197,6 +9371,7 @@ function friendlyAuthError(err) {
 
 // Auth modal button
 $("openAuthModal")?.addEventListener("click", () => openModal('auth'));
+$("printLabelsBtn")?.addEventListener("click", () => openLabelDialog());
 $("webLogout")?.addEventListener("click", async () => {
   try {
     await invoke("web_logout");
@@ -9495,6 +9670,7 @@ startupSession
     if (!IS_TAURI && !webSignedIn && !webGuest) openModal('auth');
     if (!IS_TAURI) maybeJumpToDesktopCard();
     showPendingVoucher();
+    showPendingPlant();
   }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
@@ -9849,6 +10025,7 @@ async function afterSignIn() {
   await refreshWebSessionState();
   await refreshAll({ autoReminderReason: 'auth_change' });
   showPendingVoucher();
+  showPendingPlant();
   hideAppBanner('guestBanner');
   if (IS_TAURI) {
     if (licenseGateOpen) await unlockWithAccount();
