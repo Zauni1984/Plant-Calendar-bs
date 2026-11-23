@@ -5156,6 +5156,14 @@ function openModal(type, prefill = {}) {
     body.innerHTML = renderPlantFormHTML(prefill);
     footer.innerHTML = `<button class="btn btn--ghost" id="modalCancel">${t('action.cancel')}</button><button class="btn btn--primary" id="modalSubmitPlant">${t('plant.create')}</button>`;
     document.getElementById('modalSubmitPlant')?.addEventListener('click', handleCreatePlant);
+    document.getElementById('catalogKind')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-kind]');
+      const select = document.getElementById('plantCatalogSelect');
+      if (!btn || !select) return;
+      document.querySelectorAll('#catalogKind [data-kind]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      select.innerHTML = `<option value="">${t('plant.ownPlant')}</option>${catalogOptionsHtml(btn.dataset.kind)}`;
+      select.dispatchEvent(new Event('change'));
+    });
     document.getElementById('plantCatalogSelect')?.addEventListener('change', (e) => {
       const entry = catalogById(e.target.value);
       const preview = document.getElementById('catalogInfoPreview');
@@ -5185,7 +5193,7 @@ function openModal(type, prefill = {}) {
           <div style="margin-top:8px; padding:10px; border-radius:10px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10); font-size:12px; color:${TC.textMuted};">
             <div style="color:${TC.textMuted}; margin-bottom:4px; font-weight:600;">${t('catalog.info', escapeHtml(entry.name_de))}</div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:3px 12px;">
-              <div>${t('catalog.sowIndoor')} ${sowIn}</div><div>${t('catalog.sowOutdoor')} ${sowOut}</div>
+              ${isTreeEntry(entry) ? `<div>${t('catalog.plantingTime')} ${sowOut}</div><div></div>` : `<div>${t('catalog.sowIndoor')} ${sowIn}</div><div>${t('catalog.sowOutdoor')} ${sowOut}</div>`}
               <div>${t('catalog.harvest')} ${harv}</div><div>${t('catalog.spacing')} ${entry.spacing_cm} cm</div>
               <div>${t('catalog.sun')} ${sunLabel}</div><div>${t('catalog.water')} ${waterLabel}</div>
             </div>
@@ -5404,23 +5412,37 @@ function closeModal() {
   after?.();
 }
 
-function renderPlantFormHTML(prefill = {}) {
-  const categories = {
-    gemuese: t('plant.category.vegetables'),
-    kraeuter: t('plant.category.herbs'),
-    obst: t('plant.category.fruit'),
-    beeren: t('plant.category.berries'),
-    blumen: t('plant.category.flowers'),
-  };
-  const catalogOptions = Object.entries(categories).map(([cat, label]) => {
+// Catalog groups; trees are planted, not sown, and get their own switch.
+const TREE_CATEGORIES = ['obstbaeume', 'baeume'];
+const isTreeEntry = (entry) => TREE_CATEGORIES.includes(entry?.category);
+
+function catalogOptionsHtml(kind) {
+  const categories = kind === 'trees'
+    ? { obstbaeume: t('plant.category.fruitTrees'), baeume: t('plant.category.trees') }
+    : {
+      gemuese: t('plant.category.vegetables'),
+      kraeuter: t('plant.category.herbs'),
+      obst: t('plant.category.fruit'),
+      beeren: t('plant.category.berries'),
+      blumen: t('plant.category.flowers'),
+    };
+  return Object.entries(categories).map(([cat, label]) => {
     const entries = plantCatalog.filter(e => e.category === cat);
     if (!entries.length) return '';
-    return `<optgroup label="${label}">${entries.map(e => `<option value="${e.id}">${e.emoji ? e.emoji + ' ' : ''}${e.name_de}</option>`).join('')}</optgroup>`;
+    return `<optgroup label="${escapeHtml(label)}">${entries.map(e => `<option value="${escapeHtml(e.id)}">${e.emoji ? e.emoji + ' ' : ''}${escapeHtml(e.name_de)}</option>`).join('')}</optgroup>`;
   }).join('');
+}
+
+function renderPlantFormHTML(prefill = {}) {
+  const catalogOptions = catalogOptionsHtml('plants');
 
   return `
     <div class="form-group">
       <label class="form-label">${t('plant.catalog')} (optional)</label>
+      <div class="seg-switch" id="catalogKind" role="group" aria-label="${escapeHtml(t('plant.catalog'))}">
+        <button type="button" data-kind="plants" aria-pressed="true">${t('plant.kind.plants')}</button>
+        <button type="button" data-kind="trees" aria-pressed="false">${t('plant.kind.trees')}</button>
+      </div>
       <select id="plantCatalogSelect" class="form-select">
         <option value="">${t('plant.ownPlant')}</option>
         ${catalogOptions}
@@ -7544,8 +7566,8 @@ function renderCatalogInfo(plant) {
     <div style="margin-top:10px; padding:10px; border-radius:10px; background:${TC.surface}; border:1px solid rgba(${TC.accentRgb},0.10);">
       <div style="font-size:12px; color:${TC.textMuted}; margin-bottom:6px;">${t('catalog.info', '').replace(/\s*:\s*$/,'')}</div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:12px; color:${TC.textMuted};">
-        <div>${t('catalog.sowIndoor')} ${sowIndoor}</div>
-        <div>${t('catalog.sowOutdoor')} ${sowOutdoor}</div>
+        ${isTreeEntry(entry) ? `<div>${t('catalog.plantingTime')} ${sowOutdoor}</div><div></div>` : `<div>${t('catalog.sowIndoor')} ${sowIndoor}</div>
+        <div>${t('catalog.sowOutdoor')} ${sowOutdoor}</div>`}
         <div>${t('catalog.harvest')} ${harvest}</div>
         <div>${t('catalog.spacing')} ${entry.spacing_cm} cm</div>
         <div>${t('catalog.sun')} ${sunLabel}</div>

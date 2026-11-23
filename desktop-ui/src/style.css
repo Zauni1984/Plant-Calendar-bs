@@ -467,6 +467,11 @@
   margin: 0 0 20px;
 }
 
+/* ── Segmented switch (catalog: plants | trees) ── */
+.seg-switch { display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 8px; border-radius: 10px; background: var(--input-bg); border: 1px solid rgba(var(--accent-rgb),0.15); }
+.seg-switch button { border: 0; background: transparent; color: var(--text-muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; }
+.seg-switch button[aria-pressed="true"] { background: rgba(var(--accent-rgb),0.16); color: var(--accent); font-weight: 600; }
+
 /* ── Fertilizer rows ── */
 .feed-editor { display: grid; gap: 6px; margin-bottom: 10px; }
 .feed-row { display: grid; grid-template-columns: 1.1fr 1.4fr 0.7fr 0.8fr auto; gap: 6px; align-items: center; }
