@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "Solicito expresamente que mi suscripción comience de inmediato. Sé que, si desisto en un plazo de 14 días, pagaré la parte proporcional del tiempo utilizado.",
   "checkout.consent.desktop": "Acepto expresamente que la app de escritorio se entregue de inmediato. Sé que con ello pierdo mi derecho de desistimiento.",
   "checkout.consent.link": "Leer la política de desistimiento",
+  "checkout.consent.terms": "Se aplican nuestras",
+  "checkout.consent.termsLink": "condiciones",
   "checkout.consent.continue": "Continuar al pago",
   "checkout.consent.desktopTitle": "Comprar la app de escritorio",
   "checkout.consent.desktopText": "Tras el pago recibirás tu clave de licencia al instante por correo y en tu cuenta.",

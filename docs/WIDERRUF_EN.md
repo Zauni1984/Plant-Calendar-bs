@@ -23,11 +23,11 @@ The withdrawal period is fourteen days from the day the contract is concluded.
 
 To exercise the right of withdrawal, you must inform us
 
-BlockSocial UG (haftungsbeschränkt)
-Kratzmühlstr. 14
-92339 Beilngries
+BlockSocial UG (haftungsbeschränkt)  
+Kratzmühlstr. 14  
+92339 Beilngries  
 Germany
-Phone: +49 176 8327 5353
+Phone: +49 176 8327 5353  
 E-mail: service@sowling.com
 
 of your decision to withdraw from this contract by an unequivocal statement

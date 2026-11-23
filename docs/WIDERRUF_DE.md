@@ -22,11 +22,11 @@ Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses.
 
 Um Ihr Widerrufsrecht auszuüben, müssen Sie uns
 
-BlockSocial UG (haftungsbeschränkt)
-Kratzmühlstr. 14
-92339 Beilngries
+BlockSocial UG (haftungsbeschränkt)  
+Kratzmühlstr. 14  
+92339 Beilngries  
 Deutschland
-Telefon: +49 176 8327 5353
+Telefon: +49 176 8327 5353  
 E-Mail: service@sowling.com
 
 mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief

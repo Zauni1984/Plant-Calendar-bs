@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "I expressly request that my subscription starts immediately. I understand that if I withdraw within 14 days, I pay a pro-rata amount for the time used until then.",
   "checkout.consent.desktop": "I expressly agree that the desktop app is supplied immediately. I understand that I thereby lose my right of withdrawal.",
   "checkout.consent.link": "Read the withdrawal policy",
+  "checkout.consent.terms": "Our",
+  "checkout.consent.termsLink": "terms apply",
   "checkout.consent.continue": "Continue to payment",
   "checkout.consent.desktopTitle": "Buy the desktop app",
   "checkout.consent.desktopText": "After payment you get your licence key immediately by e-mail and in your account.",

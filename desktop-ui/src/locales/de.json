@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "Ich verlange ausdrücklich, dass mein Abo sofort beginnt. Mir ist bekannt, dass ich bei einem Widerruf innerhalb von 14 Tagen einen anteiligen Betrag für die bis dahin genutzte Zeit zahle.",
   "checkout.consent.desktop": "Ich stimme ausdrücklich zu, dass die Desktop-App sofort bereitgestellt wird. Mir ist bekannt, dass ich dadurch mein Widerrufsrecht verliere.",
   "checkout.consent.link": "Widerrufsbelehrung lesen",
+  "checkout.consent.terms": "Es gelten unsere",
+  "checkout.consent.termsLink": "AGB",
   "checkout.consent.continue": "Weiter zur Zahlung",
   "checkout.consent.desktopTitle": "Desktop-App kaufen",
   "checkout.consent.desktopText": "Nach der Zahlung erhältst du sofort deinen Lizenzschlüssel per E-Mail und im Konto.",
