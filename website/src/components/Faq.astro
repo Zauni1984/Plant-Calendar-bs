@@ -1,0 +1,15 @@
+---
+// Questions as <details> (works without JavaScript). The page adds the
+// FAQPage structured data from the same list (see faqJsonLd).
+interface Props { items: { q: string; a: string }[]; title?: string }
+const { items, title } = Astro.props;
+---
+<div class="faq">
+  {title && <h2>{title}</h2>}
+  {items.map((item) => (
+    <details>
+      <summary>{item.q}</summary>
+      <div><p set:html={item.a} /></div>
+    </details>
+  ))}
+</div>

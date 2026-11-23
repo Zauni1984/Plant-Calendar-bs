@@ -1,0 +1,211 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+import Plans from "../components/Plans.astro";
+import Faq from "../components/Faq.astro";
+import Cta from "../components/Cta.astro";
+import { getCollection } from "astro:content";
+import { APP_URL, PAGES, T, path, sectionPath } from "../i18n.js";
+import { appJsonLd, faqJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const t = T[lang];
+
+const c = de ? {
+  title: "Sowling – Pflanzenkalender & Garten-App für Gießplan und Dünger",
+  description: "Pflanzenkalender für Garten, Balkon und Gärtnerei: Gieß- und Düngeplan, Erinnerungen, Wetter, Ernte und über 100 Pflanzen und Obstbäume. Kostenlos starten.",
+  eyebrow: "Pflanzenkalender & Garten-App",
+  h1: "Jede Pflanze im Blick. Gießen, düngen, ernten – zur richtigen Zeit.",
+  lead: "Sowling plant für dich, wann deine Pflanzen Wasser, Dünger oder Pflege brauchen, erinnert dich rechtzeitig und hält alles in einem Tagebuch fest. Für Balkon, Hochbeet, Gewächshaus, Obstgarten und Gärtnerei.",
+  points: ["Kostenlos starten, ohne Kreditkarte", "Im Browser auf Handy, Tablet und PC", "Deutsch, Englisch und 8 weitere Sprachen"],
+  secondary: "Funktionen ansehen",
+  heroAlt: "Pflanzenübersicht in Sowling mit Phasen, Aussaat- und Erntemonaten und Gießstatus",
+  why: "Warum Sowling?",
+  whyLead: "Ein Gartenkalender, der mitdenkt: Er kennt deine Pflanzen, das Wetter an deinem Standort und deine Gewohnheiten.",
+  cards: [
+    ["📅", "Kalender & Erinnerungen", "Wiederkehrende Aufgaben für Gießen, Düngen und Pflege, mit Erinnerung per Push-Nachricht. Auf Wunsch mit Mondkalender und Bauernregeln."],
+    ["🧪", "Dünger-Log mit Marke & Menge", "Halte fest, welchen Dünger du wann gegeben hast – Marke, Produkt, ml pro Liter. Dünger-Aufgaben übernehmen den Plan automatisch ins Log."],
+    ["💧", "Intelligenter Gießplan", "Der Gieß-Kalkulator berücksichtigt Wetter, Topfgröße, Substrat und Pflanzenart. Die Ampel zeigt dir, wer heute Durst hat."],
+    ["🌳", "Über 100 Pflanzen und Bäume", "Gemüse, Kräuter, Beeren, Blumen und Obstbäume nach Sorte – mit Aussaat-, Pflanz- und Erntemonaten, Abständen und Pflegetipps."],
+    ["🌦️", "Wetter pro Standort", "7-Tage-Vorhersage und Wetterverlauf für jedes Beet, jeden Balkon und jedes Gewächshaus."],
+    ["📊", "Messwerte & Ernte", "pH, EC, Temperatur, Luftfeuchte, VPD, PPFD, CO₂ und Bodenfeuchte. Ernte in kg, Stück und Qualität."],
+  ],
+  featureTitle1: "Dünger und Messwerte, sauber dokumentiert",
+  featureText1: "Wähle beim Log einfach „Dünger“: Marke und Produkt werden vorgeschlagen, mehrere Dünger pro Gabe sind möglich. Das Formular zeigt nur die Felder, die zum Eintrag passen.",
+  featureList1: ["Vorschläge für über 25 Düngermarken", "pH, EC und Wassermenge direkt dazu", "Dünger-Aufgabe abhaken = fertiges Log"],
+  featureAlt1: "Dünger-Log in Sowling mit zwei Düngern, Menge und pH-Wert",
+  featureTitle2: "Obstbäume nach Sorte",
+  featureText2: "Vom Apfel ‘Elstar’ bis zur Sauerkirsche ‘Schattenmorelle’: Sowling kennt Pflanzzeit, Erntemonate, Befruchtersorten und Schnitt-Tipps – und warnt bei giftigen Pflanzen für Katzen und Hunde.",
+  featureList2: ["57 Obstbäume und Sorten, 14 Zier- und Laubbäume", "Hinweise zu Befruchtung und Schnitt", "Warnungen für Haustiere und Allergiker"],
+  featureAlt2: "Baumkatalog in Sowling mit Apfel 'Elstar', Pflanzzeit und Ernte",
+  phoneAlt: "Sowling auf dem Smartphone: Pflanzen mit Gießstatus",
+  who: "Für wen ist Sowling?",
+  whoCards: [
+    ["Balkon & Hochbeet", "Tomaten, Kräuter und Erdbeeren im Griff – auch im Urlaub mit dem Urlaubsmodus."],
+    ["Garten & Obstgarten", "Gemüsebeete, Mischkultur und Obstbäume über viele Jahre mit Saisonverlauf."],
+    ["Gewächshaus & Indoor", "Klimawerte, Lichtstärke (PPFD) und Düngeplan pro Pflanze und Standort."],
+    ["Gärtnereien & Vereine", "Unbegrenzt viele Pflanzen, Team-Profile, Rechnungen mit Umsatzsteuer."],
+  ],
+  pricing: "Einfache Preise",
+  pricingLead: "Starte kostenlos mit einer Pflanze. Größere Setups wechseln jederzeit in einen bezahlten Tarif – monatlich kündbar.",
+  guides: "Anleitungen & Ratgeber",
+  guidesLead: "Schritt für Schritt zur ersten Pflanze – und Gartenwissen, das du sofort anwenden kannst.",
+  faq: [
+    { q: "Ist Sowling kostenlos?", a: "Ja. Im Tarif Free verwaltest du eine aktive Pflanze mit allen Grundfunktionen. Für mehr Pflanzen gibt es Basic (3), Pro (100) und Gärtnerei (unbegrenzt)." },
+    { q: "Brauche ich eine App aus dem Store?", a: "Nein. Sowling läuft im Browser auf Handy, Tablet und Computer und lässt sich wie eine App auf dem Startbildschirm installieren. Eine Desktop-App für Windows und eine Android-App sind in Vorbereitung." },
+    { q: "Was passiert mit meinen Daten?", a: "Deine Daten gehören dir. Fotos werden verkleinert und von Standortdaten (EXIF/GPS) befreit, du kannst alles exportieren und dein Konto jederzeit löschen. Auf Wunsch schützt du dein Konto mit Zwei-Faktor-Anmeldung." },
+  ],
+} : {
+  title: "Sowling – Plant Calendar & Garden App for Watering and Feeding",
+  description: "Plant calendar for gardens, balconies and nurseries: watering and feeding plans, reminders, weather, harvests and 100+ plants and fruit trees. Start free.",
+  eyebrow: "Plant calendar & garden app",
+  h1: "Every plant in view. Water, feed and harvest at the right time.",
+  lead: "Sowling plans when your plants need water, fertilizer or care, reminds you in time and keeps everything in one diary. For balconies, raised beds, greenhouses, orchards and nurseries.",
+  points: ["Start free, no credit card", "In the browser on phone, tablet and PC", "English, German and 8 more languages"],
+  secondary: "See the features",
+  heroAlt: "Plant overview in Sowling with phases, sowing and harvest months and watering status",
+  why: "Why Sowling?",
+  whyLead: "A garden calendar that thinks along: it knows your plants, the weather where they grow and your routines.",
+  cards: [
+    ["📅", "Calendar & reminders", "Recurring tasks for watering, feeding and care, with push reminders. Optional moon calendar and old farmer's sayings."],
+    ["🧪", "Fertilizer log with brand & dose", "Record which fertilizer you gave and when – brand, product, ml per litre. Feeding tasks carry the plan straight into the log."],
+    ["💧", "Smart watering plan", "The watering calculator considers weather, pot size, substrate and plant type. A traffic light shows who is thirsty today."],
+    ["🌳", "100+ plants and trees", "Vegetables, herbs, berries, flowers and fruit trees by variety – with sowing, planting and harvest months, spacing and care tips."],
+    ["🌦️", "Weather per location", "7-day forecast and weather history for every bed, balcony and greenhouse."],
+    ["📊", "Measurements & harvests", "pH, EC, temperature, humidity, VPD, PPFD, CO₂ and soil moisture. Harvests in kg, pieces and quality."],
+  ],
+  featureTitle1: "Fertilizer and measurements, neatly documented",
+  featureText1: "Pick “Fertilizer” as the log type: brand and product are suggested, and one feeding can hold several products. The form only shows the fields that fit the entry.",
+  featureList1: ["Suggestions for 25+ fertilizer brands", "pH, EC and water volume alongside", "Tick off a feeding task = finished log"],
+  featureAlt1: "Fertilizer log in Sowling with two products, dose and pH",
+  featureTitle2: "Fruit trees by variety",
+  featureText2: "From apple ‘Elstar’ to sour cherry ‘Morello’: Sowling knows planting time, harvest months, pollination partners and pruning tips – and warns about plants toxic to cats and dogs.",
+  featureList2: ["57 fruit trees and varieties, 14 shade and ornamental trees", "Pollination and pruning hints", "Warnings for pets and allergy sufferers"],
+  featureAlt2: "Tree catalogue in Sowling with apple 'Elstar', planting time and harvest",
+  phoneAlt: "Sowling on a smartphone: plants with watering status",
+  who: "Who is Sowling for?",
+  whoCards: [
+    ["Balcony & raised bed", "Tomatoes, herbs and strawberries under control – even on holiday with vacation mode."],
+    ["Garden & orchard", "Vegetable beds, companion planting and fruit trees over many years with season history."],
+    ["Greenhouse & indoor", "Climate values, light intensity (PPFD) and feeding plan per plant and location."],
+    ["Nurseries & clubs", "Unlimited plants, team profiles, VAT invoices."],
+  ],
+  pricing: "Simple pricing",
+  pricingLead: "Start free with one plant. Bigger setups switch to a paid plan at any time – cancel monthly.",
+  guides: "Guides & blog",
+  guidesLead: "Step by step to your first plant – and gardening know-how you can use right away.",
+  faq: [
+    { q: "Is Sowling free?", a: "Yes. The Free plan manages one active plant with all core features. For more plants there are Basic (3), Pro (100) and Nursery (unlimited)." },
+    { q: "Do I need an app from a store?", a: "No. Sowling runs in the browser on phone, tablet and computer and can be installed to the home screen like an app. A Windows desktop app and an Android app are in preparation." },
+    { q: "What happens to my data?", a: "Your data is yours. Photos are resized and stripped of location data (EXIF/GPS), you can export everything and delete your account at any time. Optionally protect your account with two-factor sign-in." },
+  ],
+};
+
+const guides = (await getCollection("anleitungen", (e) => e.data.lang === lang)).sort((a, b) => a.data.order - b.data.order).slice(0, 3);
+const posts = (await getCollection("ratgeber", (e) => e.data.lang === lang)).slice(0, 3);
+const slug = (e) => e.id.split("/").pop();
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES.home} jsonLd={[...appJsonLd(lang, c.description), ...faqJsonLd(c.faq)]}>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">{c.eyebrow}</span>
+        <h1>{c.h1}</h1>
+        <p class="lead">{c.lead}</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href={APP_URL}>{t.startFree}</a>
+          <a class="btn btn-ghost" href={path("features", lang)}>{c.secondary}</a>
+        </div>
+        <ul class="hero-points">{c.points.map((p) => <li>{p}</li>)}</ul>
+      </div>
+      <div class="shot-pair">
+        <Shot name="plants" lang={lang} alt={c.heroAlt} eager />
+        <Shot name="phone-plants" lang={lang} alt={c.phoneAlt} phone eager />
+      </div>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="section-head center center-text">
+        <h2 class="center">{c.why}</h2>
+        <p class="lead center" style="margin:0 auto">{c.whyLead}</p>
+      </div>
+      <div class="grid grid-3">
+        {c.cards.map(([icon, h, p]) => (
+          <div class="card"><span class="icon" aria-hidden="true">{icon}</span><h3>{h}</h3><p>{p}</p></div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="feature-row">
+        <div>
+          <h2>{c.featureTitle1}</h2>
+          <p>{c.featureText1}</p>
+          <ul>{c.featureList1.map((x) => <li>{x}</li>)}</ul>
+        </div>
+        <Shot name="feeding-log" lang={lang} alt={c.featureAlt1} />
+      </div>
+      <div class="feature-row reverse">
+        <div>
+          <h2>{c.featureTitle2}</h2>
+          <p>{c.featureText2}</p>
+          <ul>{c.featureList2.map((x) => <li>{x}</li>)}</ul>
+        </div>
+        <Shot name="tree-catalog" lang={lang} alt={c.featureAlt2} />
+      </div>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <h2 class="center">{c.who}</h2>
+      <div class="grid grid-4" style="margin-top:28px">
+        {c.whoCards.map(([h, p], i) => (
+          <a class="card card-link" href={i === 3 ? path("nurseries", lang) : path("features", lang)}><h3>{h}</h3><p>{p}</p></a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head center" style="text-align:center">
+        <h2>{c.pricing}</h2>
+        <p class="lead" style="margin:0 auto">{c.pricingLead}</p>
+      </div>
+      <Plans lang={lang} />
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>{c.guides}</h2>
+        <p class="lead">{c.guidesLead}</p>
+      </div>
+      <div class="grid grid-3">
+        {guides.map((g) => (
+          <a class="card card-link" href={sectionPath("guides", lang, slug(g))}><span class="icon" aria-hidden="true">{g.data.icon}</span><h3>{g.data.title}</h3><p>{g.data.description}</p></a>
+        ))}
+        {posts.map((p) => (
+          <a class="card card-link" href={sectionPath("blog", lang, slug(p))}><h3>{p.data.title}</h3><p>{p.data.description}</p><span class="muted">{t.minutes(p.data.readingMinutes)}</span></a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap prose" style="margin:0 auto">
+      <Faq items={c.faq} title={t.faqTitle} />
+      <p style="margin-top:16px"><a href={path("faq", lang)}>{de ? "Alle Fragen und Antworten" : "All questions and answers"} →</a></p>
+    </div>
+  </section>
+
+  <Cta lang={lang} />
+</Base>

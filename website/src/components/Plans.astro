@@ -1,0 +1,24 @@
+---
+import { PLANS, APP_URL, formatPrice } from "../i18n.js";
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const features = {
+  free: de ? ["1 aktive Pflanze", "Kalender, Aufgaben und Erinnerungen", "Logs, Messwerte, Dünger", "Wetter und Pflanzenkatalog"] : ["1 active plant", "Calendar, tasks and reminders", "Logs, measurements, fertilizer", "Weather and plant catalogue"],
+  basic: de ? ["3 aktive Pflanzen", "Alles aus Free", "Foto-Tagebuch in der Cloud", "Desktop-App für Windows inklusive"] : ["3 active plants", "Everything in Free", "Cloud photo diary", "Windows desktop app included"],
+  pro: de ? ["100 aktive Pflanzen", "Alles aus Basic", "Für große Gärten, Hochbeete und Gewächshäuser"] : ["100 active plants", "Everything in Basic", "For large gardens, raised beds and greenhouses"],
+  nursery: de ? ["Unbegrenzt aktive Pflanzen", "Alles aus Pro", "Für Gärtnereien, Vereine und Teams", "Rechnung mit USt; EU-Firmen mit USt-IdNr.: Reverse Charge"] : ["Unlimited active plants", "Everything in Pro", "For nurseries, clubs and teams", "VAT invoice; EU businesses with VAT ID: reverse charge"],
+};
+---
+<div class="plans">
+  {PLANS.map((p) => (
+    <div class={p.highlight ? "plan highlight" : "plan"}>
+      {p.highlight && <span class="badge">{de ? "Beliebt" : "Popular"}</span>}
+      <h3>{p.name[lang]}</h3>
+      <div class="price">{formatPrice(p.price, lang)}</div>
+      <div class="per">{p.price ? (de ? "pro Monat, inkl. MwSt." : "per month, incl. VAT") : (de ? "für immer kostenlos" : "free forever")}</div>
+      <ul>{features[p.id].map((f) => <li>{f}</li>)}</ul>
+      <a class={p.highlight ? "btn btn-primary" : "btn btn-ghost"} href={APP_URL}>{p.price ? (de ? `${p.name[lang]} wählen` : `Choose ${p.name[lang]}`) : (de ? "Kostenlos starten" : "Start for free")}</a>
+    </div>
+  ))}
+</div>

@@ -1,0 +1,61 @@
+---
+// One how-to (HowTo structured data, numbered steps) or one article
+// (Article structured data). The other language is found via translationKey.
+import Base from "../layouts/Base.astro";
+import Faq from "../components/Faq.astro";
+import Cta from "../components/Cta.astro";
+import { getCollection, render } from "astro:content";
+import { PAGES, T, sectionPath } from "../i18n.js";
+import { articleJsonLd, faqJsonLd, howToJsonLd } from "../lib/seo.js";
+
+interface Props { entry: any; section: "guides" | "blog" }
+const { entry, section } = Astro.props;
+const d = entry.data;
+const lang = d.lang;
+const de = lang === "de";
+const t = T[lang];
+const isGuide = section === "guides";
+const collection = isGuide ? "anleitungen" : "ratgeber";
+const slug = (e) => e.id.split("/").pop();
+const all = await getCollection(collection);
+const alternates = Object.fromEntries(
+  all.filter((e) => e.data.translationKey === d.translationKey).map((e) => [e.data.lang, sectionPath(section, e.data.lang, slug(e))]),
+);
+const url = alternates[lang];
+const related = all.filter((e) => e.data.lang === lang && e.id !== entry.id).slice(0, 3);
+const { Content } = await render(entry);
+const date = (v) => v.toLocaleDateString(de ? "de-DE" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+const jsonLd = [
+  ...(isGuide
+    ? howToJsonLd({ title: d.title, description: d.description, url, minutes: d.minutes, steps: d.steps, lang })
+    : articleJsonLd({ title: d.title, description: d.description, url, lang, published: d.published, updated: d.updated })),
+  ...faqJsonLd(d.faq),
+];
+---
+<Base lang={lang} title={d.title} description={d.description} alternates={alternates} ogType={isGuide ? "website" : "article"} jsonLd={jsonLd}
+  breadcrumbs={[{ name: t.nav[section], url: PAGES[section][lang] }, { name: d.title, url }]}>
+  <article class="wrap prose" style="padding-top:32px">
+    <h1>{d.title}</h1>
+    <p class="article-meta">
+      {isGuide ? (de ? `${d.minutes} Min. · ` : `${d.minutes} min · `) : `${t.minutes(d.readingMinutes)} · `}
+      {t.updated} <time datetime={d.updated.toISOString().slice(0, 10)}>{date(d.updated)}</time>
+    </p>
+    {isGuide && <p class="lead">{d.description}</p>}
+    {isGuide && (
+      <ol class="steps">
+        {d.steps.map((s, i) => (
+          <li id={`step-${i + 1}`}><h2 style="font-size:1.15rem;margin:0 0 4px">{s.name}</h2><p set:html={s.text} /></li>
+        ))}
+      </ol>
+    )}
+    <Content />
+    {d.faq.length > 0 && <Faq items={d.faq} title={t.faqTitle} />}
+    {related.length > 0 && (
+      <>
+        <h2>{t.related}</h2>
+        <ul>{related.map((e) => <li><a href={sectionPath(section, lang, slug(e))}>{e.data.title}</a></li>)}</ul>
+      </>
+    )}
+  </article>
+  <Cta lang={lang} />
+</Base>

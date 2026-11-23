@@ -1,0 +1,20 @@
+{
+  "name": "Sowling",
+  "short_name": "Sowling",
+  "start_url": "https://app.sowling.com/",
+  "display": "browser",
+  "background_color": "#fbf8f1",
+  "theme_color": "#2c4a2a",
+  "icons": [
+    {
+      "src": "/icons/sowling-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/sowling-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

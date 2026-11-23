@@ -1,0 +1,87 @@
+---
+import Base from "../layouts/Base.astro";
+import Faq from "../components/Faq.astro";
+import Cta from "../components/Cta.astro";
+import { PAGES, T, APP_URL } from "../i18n.js";
+import { faqJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const P = PAGES;
+
+const groups = de ? [
+  ["Allgemein", [
+    { q: "Was ist Sowling?", a: "Sowling ist ein Pflanzenkalender und Garten-Tagebuch. Du legst deine Pflanzen an, planst Gießen, Düngen und Pflege als Aufgaben mit Erinnerung und hältst Messwerte, Dünger, Ernte und Fotos fest." },
+    { q: "Für wen ist Sowling gedacht?", a: "Für Hobbygärtner mit Balkon, Hochbeet oder Garten, für Gewächshaus und Indoor-Anbau sowie für Gärtnereien, Vereine und Betriebe mit vielen Pflanzen." },
+    { q: "Auf welchen Geräten läuft Sowling?", a: "Im Browser auf Handy, Tablet und Computer – Android, iPhone, Windows, Mac und Linux. Die Web-App lässt sich auf dem Startbildschirm installieren. Eine Windows-Desktop-App und eine Android-App sind in Vorbereitung." },
+    { q: "In welchen Sprachen gibt es Sowling?", a: "Deutsch, Englisch, Spanisch, Französisch, Italienisch, Niederländisch, Polnisch, Portugiesisch, Türkisch und Latein. Du wechselst die Sprache in den Einstellungen." },
+  ]],
+  ["Funktionen", [
+    { q: "Welche Pflanzen kennt Sowling?", a: "Über 100 Einträge: Gemüse, Kräuter, Beeren, Blumen, Obstbäume nach Sorte (z. B. Apfel ‘Elstar’, Birne ‘Conference’, Zwetschge ‘Hauszwetschge’) und Laub- und Zierbäume. Eigene Pflanzen ohne Katalog sind jederzeit möglich." },
+    { q: "Kann ich festhalten, welchen Dünger ich verwende?", a: `Ja. Im Log-Typ „Dünger“ trägst du Marke, Produkt, Menge und Einheit ein, auch mehrere Dünger pro Gabe. Dünger-Aufgaben übernehmen den geplanten Dünger beim Abhaken ins Log. Siehe <a href="${P.guides.de}duenger-dokumentieren/">Anleitung</a>.` },
+    { q: "Welche Messwerte kann ich erfassen?", a: "pH, EC, Temperatur, Luftfeuchte, VPD, PPFD, CO₂, Wassertemperatur und Bodenfeuchte – dazu Wassermenge, Ernte in kg und Stück sowie Notizen und Fotos." },
+    { q: "Woher kommen die Wetterdaten?", a: "Von Open-Meteo, einem freien Wetterdienst. Gesendet werden nur die gerundeten Koordinaten deines Standorts, und nur wenn du Wetterdaten erlaubst." },
+    { q: "Erinnert mich Sowling an Aufgaben?", a: "Ja, per Push-Nachricht im Browser oder in der installierten App, wenn du Benachrichtigungen erlaubst. Wiederkehrende Aufgaben laufen bis zu einem Enddatum weiter." },
+    { q: "Warnt Sowling vor giftigen Pflanzen?", a: "Ja. Katalogpflanzen zeigen, ob sie für Katzen, Hunde oder Menschen giftig sind oder als Allergen gelten – zum Beispiel Eibe, Thuja, Tomatenblätter oder Holunder." },
+  ]],
+  ["Konto & Sicherheit", [
+    { q: "Brauche ich ein Konto?", a: "Zum Ausprobieren nicht: Mit „Ohne Konto ausprobieren“ bleiben die Daten im Browser. Für Synchronisation zwischen Geräten und Fotos in der Cloud legst du ein kostenloses Konto an." },
+    { q: "Wie schütze ich mein Konto zusätzlich?", a: `Mit der Zwei-Faktor-Anmeldung: Beim Login fragt Sowling dann nach einem Code aus einer App wie Google Authenticator. Siehe <a href="${P.guides.de}zwei-faktor-anmeldung/">Anleitung</a>.` },
+    { q: "Was passiert mit meinen Fotos?", a: "Fotos werden auf höchstens 1000 × 1000 Pixel verkleinert, als WebP gespeichert und von Metadaten wie EXIF und GPS befreit. In der Web-App sind Foto-Uploads Teil von Basic, Pro und Gärtnerei." },
+    { q: "Kann ich meine Daten exportieren oder löschen?", a: "Ja. Unter Einstellungen exportierst du alle Daten als JSON oder CSV und kannst dein Konto jederzeit vollständig löschen." },
+  ]],
+  ["Abo & Bezahlung", [
+    { q: "Was kosten die Tarife?", a: `Free ist kostenlos (1 aktive Pflanze). Basic kostet 0,99 €, Pro 5,99 € und Gärtnerei 50 € im Monat, jeweils inklusive MwSt. Mehr auf der <a href="${P.pricing.de}">Preisseite</a>.` },
+    { q: "Wie kündige ich mein Abo?", a: "In der App unter Abo über das Kundenportal von Stripe. Das Abo endet zum Ende des bezahlten Zeitraums; deine Pflanzen bleiben erhalten." },
+    { q: "Bekomme ich eine Rechnung?", a: "Ja, für jede Zahlung als PDF per E-Mail und im Konto unter Abo → Rechnungen. Firmen tragen dort Name, Adresse und USt-IdNr. ein." },
+    { q: "Wie löse ich einen Gutschein ein?", a: `In der App unter Abo → Gutschein einlösen. Hast du einen QR-Code, öffnet er die App mit dem Code schon im Feld. Siehe <a href="${P.guides.de}gutschein-einloesen/">Anleitung</a>.` },
+  ]],
+] : [
+  ["General", [
+    { q: "What is Sowling?", a: "Sowling is a plant calendar and garden diary. You add your plants, plan watering, feeding and care as tasks with reminders, and record measurements, fertilizer, harvests and photos." },
+    { q: "Who is Sowling for?", a: "For hobby gardeners with a balcony, raised bed or garden, for greenhouse and indoor growing, and for nurseries, clubs and businesses with many plants." },
+    { q: "Which devices does Sowling run on?", a: "In the browser on phone, tablet and computer – Android, iPhone, Windows, Mac and Linux. The web app can be installed to the home screen. A Windows desktop app and an Android app are in preparation." },
+    { q: "Which languages does Sowling support?", a: "English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Turkish and Latin. Switch the language in the settings." },
+  ]],
+  ["Features", [
+    { q: "Which plants does Sowling know?", a: "Over 100 entries: vegetables, herbs, berries, flowers, fruit trees by variety (e.g. apple ‘Elstar’, pear ‘Conference’, plum) and shade and ornamental trees. Your own plants without a catalogue entry are always possible." },
+    { q: "Can I record which fertilizer I use?", a: `Yes. With the log type “Fertilizer” you enter brand, product, amount and unit, even several products per feeding. Feeding tasks carry the planned fertilizer into the log when you tick them off. See the <a href="${P.guides.en}fertilizer-log/">guide</a>.` },
+    { q: "Which measurements can I record?", a: "pH, EC, temperature, humidity, VPD, PPFD, CO₂, water temperature and soil moisture – plus water volume, harvest in kg and pieces, notes and photos." },
+    { q: "Where does the weather data come from?", a: "From Open-Meteo, a free weather service. Only the rounded coordinates of your location are sent, and only if you allow weather data." },
+    { q: "Does Sowling remind me of tasks?", a: "Yes, with push notifications in the browser or the installed app if you allow notifications. Recurring tasks continue until an end date." },
+    { q: "Does Sowling warn about toxic plants?", a: "Yes. Catalogue plants show whether they are toxic to cats, dogs or humans or count as allergens – for example yew, thuja, tomato leaves or elder." },
+  ]],
+  ["Account & security", [
+    { q: "Do I need an account?", a: "Not to try it: with “Try without an account” your data stays in the browser. For sync between devices and cloud photos, create a free account." },
+    { q: "How do I protect my account further?", a: `With two-factor sign-in: Sowling then asks for a code from an app such as Google Authenticator when you sign in. See the <a href="${P.guides.en}two-factor-sign-in/">guide</a>.` },
+    { q: "What happens to my photos?", a: "Photos are resized to at most 1000 × 1000 pixels, stored as WebP and stripped of metadata such as EXIF and GPS. In the web app, photo uploads are part of Basic, Pro and Nursery." },
+    { q: "Can I export or delete my data?", a: "Yes. In the settings you export all data as JSON or CSV and can delete your account completely at any time." },
+  ]],
+  ["Subscription & payment", [
+    { q: "What do the plans cost?", a: `Free costs nothing (1 active plant). Basic is €0.99, Pro €5.99 and Nursery €50 per month, VAT included. More on the <a href="${P.pricing.en}">pricing page</a>.` },
+    { q: "How do I cancel?", a: "In the app under Plan via the Stripe customer portal. The subscription ends with the paid period; your plants are kept." },
+    { q: "Do I get an invoice?", a: "Yes, for every payment as a PDF by e-mail and in the app under Plan → Invoices. Businesses enter name, address and VAT ID there." },
+    { q: "How do I redeem a voucher?", a: `In the app under Plan → Redeem voucher. A QR code opens the app with the code already filled in. See the <a href="${P.guides.en}redeem-voucher/">guide</a>.` },
+  ]],
+];
+const all = groups.flatMap(([, items]) => items);
+const title = de ? "FAQ: Häufige Fragen zum Pflanzenkalender Sowling" : "FAQ: Frequently Asked Questions about Sowling";
+const description = de
+  ? "Antworten zu Sowling: Geräte, Pflanzenkatalog, Dünger-Log, Messwerte, Wetter, Erinnerungen, Datenschutz, Zwei-Faktor-Anmeldung, Preise, Rechnungen und Gutscheine."
+  : "Answers about Sowling: devices, plant catalogue, fertilizer log, measurements, weather, reminders, privacy, two-factor sign-in, pricing, invoices and vouchers.";
+---
+<Base lang={lang} title={title} description={description} alternates={PAGES.faq} breadcrumbs={[{ name: "FAQ", url: PAGES.faq[lang] }]} jsonLd={faqJsonLd(all)}>
+  <section class="page-head">
+    <div class="wrap prose">
+      <h1>{T[lang].faqTitle}</h1>
+      <p class="lead">{de ? "Deine Frage ist nicht dabei? Schreib uns an " : "Your question is not here? Write to "}<a href="mailto:service@sowling.com">service@sowling.com</a>.</p>
+    </div>
+  </section>
+  <section style="padding-top:16px">
+    <div class="wrap prose">
+      {groups.map(([h, items]) => (<><h2>{h}</h2><Faq items={items} /></>))}
+    </div>
+  </section>
+  <Cta lang={lang} />
+</Base>

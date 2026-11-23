@@ -1,0 +1,24 @@
+---
+import { APP_URL, T, path } from "../i18n.js";
+interface Props { lang: "de" | "en"; title?: string; text?: string }
+const { lang } = Astro.props;
+const de = lang === "de";
+const title = Astro.props.title ?? (de ? "Starte heute mit deiner ersten Pflanze" : "Start with your first plant today");
+const text = Astro.props.text ?? (de
+  ? "Kostenlos, ohne Kreditkarte. Im Browser auf Handy, Tablet und Computer."
+  : "Free, no credit card. In the browser on phone, tablet and computer.");
+---
+<section>
+  <div class="wrap">
+    <div class="cta-box">
+      <div>
+        <h2>{title}</h2>
+        <p>{text}</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn-primary" href={APP_URL}>{T[lang].startFree}</a>
+        <a class="btn btn-ghost" style="border-color:#cfe0c8;color:#fff" href={path("pricing", lang)}>{T[lang].nav.pricing}</a>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,71 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+import Faq from "../components/Faq.astro";
+import Cta from "../components/Cta.astro";
+import { PAGES, T, APP_URL, path } from "../i18n.js";
+import { faqJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const c = de ? {
+  title: "Desktop-App für Windows: Pflanzenkalender auch offline",
+  description: "Die Sowling Desktop-App für Windows arbeitet offline, synchronisiert mit deinem Konto und speichert Fotos lokal. In Basic, Pro und Gärtnerei enthalten.",
+  h1: "Sowling für Windows – auch ohne Internet",
+  lead: "Die Desktop-App bringt alle Funktionen der Web-App auf deinen PC, mit eigener lokaler Datenbank. Ideal für Gewächshaus, Werkstatt oder Gärtnerei-Büro.",
+  status: "Die Desktop-App ist in Vorbereitung. Bis dahin nutzt du Sowling im Browser – deine Daten werden später automatisch übernommen.",
+  points: [
+    ["📴", "Offline-fähig", "Pflanzen, Aufgaben und Logs liegen lokal auf dem PC. Ohne Verbindung arbeitest du einfach weiter."],
+    ["🔄", "Synchronisation", "Mit deinem Konto angemeldet, gleicht die App alles mit Web-App und Handy ab."],
+    ["🖼️", "Fotos lokal", "Fotos bleiben auf deinem Computer – ohne Speicherlimit in der Cloud."],
+    ["🔑", "Einfach freischalten", "Mit Basic, Pro oder Gärtnerei per Anmeldung; alternativ per Einmalkauf mit Lizenzschlüssel für bis zu 3 Geräte."],
+  ],
+  shotAlt: "Sowling Pflanzenübersicht, wie sie auch in der Desktop-App aussieht",
+  faq: [
+    { q: "Welche Systeme werden unterstützt?", a: "Zum Start Windows 10 und 11. Auf Mac, Linux, Android und iPhone nutzt du die Web-App im Browser, die sich auch auf dem Startbildschirm installieren lässt." },
+    { q: "Brauche ich ein Abo?", a: "Nein. Mit einem Abo (Basic, Pro, Gärtnerei) ist die Desktop-App enthalten. Ohne Abo wird es einen Einmalkauf mit Lizenzschlüssel geben." },
+    { q: "Auf wie vielen Computern läuft eine Lizenz?", a: "Auf bis zu 3 Geräten. Einen Platz gibst du frei, indem du die Lizenz in der App von einem Computer entfernst." },
+  ],
+} : {
+  title: "Desktop App for Windows: Plant Calendar That Works Offline",
+  description: "The Sowling desktop app for Windows works offline with a local database, syncs with your account and keeps photos on your PC. Included in Basic, Pro and Nursery.",
+  h1: "Sowling for Windows – even without internet",
+  lead: "The desktop app brings every feature of the web app to your PC, with its own local database. Ideal for greenhouse, workshop or nursery office.",
+  status: "The desktop app is in preparation. Until then, use Sowling in the browser – your data will carry over automatically.",
+  points: [
+    ["📴", "Works offline", "Plants, tasks and logs are stored on your PC. Without a connection you simply keep working."],
+    ["🔄", "Sync", "Signed in with your account, the app keeps web app and phone in sync."],
+    ["🖼️", "Photos stay local", "Photos stay on your computer – no cloud storage limit."],
+    ["🔑", "Easy to unlock", "With Basic, Pro or Nursery by signing in; or with a one-time purchase and licence key for up to 3 devices."],
+  ],
+  shotAlt: "Sowling plant overview as it also looks in the desktop app",
+  faq: [
+    { q: "Which systems are supported?", a: "Windows 10 and 11 at launch. On Mac, Linux, Android and iPhone use the web app in the browser, which can also be installed to the home screen." },
+    { q: "Do I need a subscription?", a: "No. A subscription (Basic, Pro, Nursery) includes the desktop app. Without one, there will be a one-time purchase with a licence key." },
+    { q: "On how many computers does a licence work?", a: "On up to 3 devices. Free a slot by removing the licence from a computer in the app." },
+  ],
+};
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES.desktop} breadcrumbs={[{ name: T[lang].nav.desktop, url: PAGES.desktop[lang] }]} jsonLd={faqJsonLd(c.faq)}>
+  <section class="page-head">
+    <div class="wrap feature-row" style="padding-top:0">
+      <div>
+        <h1>{c.h1}</h1>
+        <p class="lead">{c.lead}</p>
+        <p class="note">{c.status}</p>
+        <div class="btn-row"><a class="btn btn-primary" href={APP_URL}>{T[lang].openApp}</a><a class="btn btn-ghost" href={path("pricing", lang)}>{T[lang].nav.pricing}</a></div>
+      </div>
+      <Shot name="plants" lang={lang} alt={c.shotAlt} eager />
+    </div>
+  </section>
+  <section class="alt">
+    <div class="wrap grid grid-4">
+      {c.points.map(([icon, h, p]) => <div class="card"><span class="icon" aria-hidden="true">{icon}</span><h3>{h}</h3><p>{p}</p></div>)}
+    </div>
+  </section>
+  <section>
+    <div class="wrap prose" style="margin:0 auto"><Faq items={c.faq} title={T[lang].faqTitle} /></div>
+  </section>
+  <Cta lang={lang} />
+</Base>

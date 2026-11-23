@@ -1,6 +1,6 @@
 # Privacy Policy – Sowling
 
-**Last updated: 1 November 2026**
+**Last updated: 23 November 2026**
 
 <!-- The German version is authoritative; a legal review before launch is
      recommended. -->
@@ -189,11 +189,25 @@ Voucher codes themselves are stored only as a hash. When the voucher ends, your
 account returns to your paid subscription or to Free; for photos the 90-day
 period from 4.1 then applies.
 
+### 4.11 Website sowling.com
+
+When you visit our website sowling.com, the web server processes technically
+necessary data: IP address, time, requested page, amount of data transferred,
+referrer, browser and operating system (Art. 6(1)(f) GDPR – delivering the site
+securely and reliably). These server logs are kept by our host Hostinger and
+deleted after 30 days at the latest.
+
+The website sets **no cookies**, uses **no analytics or tracking services** and
+loads **no third-party content** – the fonts are served from our own web space
+too. Links to the app (app.sowling.com) lead to the features described in this
+policy.
+
 ## 5. Recipients and processors
 
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Cyprus – operating the server and database on our
   behalf (Art. 28 GDPR), server location Germany (Frankfurt am Main); also
-  sending the e-mails described in 4.9 (Hostinger Mail).
+  sending the e-mails described in 4.9 (Hostinger Mail) and hosting the
+  website sowling.com (4.11).
 - **Haufe-Lexware GmbH & Co. KG** (Freiburg, Germany) – Lexware Office,
   creating and keeping invoices on our behalf (Art. 28 GDPR).
 - **European Commission (VIES)** – only for companies from another EU country

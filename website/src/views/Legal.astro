@@ -1,0 +1,16 @@
+---
+// Legal texts. The Markdown sources live in ../docs and are shared with the app.
+import Base from "../layouts/Base.astro";
+import { PAGES, T } from "../i18n.js";
+
+interface Props { lang: "de" | "en"; page: "imprint" | "privacy" | "withdrawal"; title: string; description: string }
+const { lang, page, title, description } = Astro.props;
+---
+<Base lang={lang} title={title} description={description} alternates={PAGES[page]} breadcrumbs={[{ name: T[lang].footer[page], url: PAGES[page][lang] }]}>
+  <article class="wrap prose legal" style="padding-top:32px">
+    <slot />
+  </article>
+</Base>
+<style>
+  .legal :global(h1) { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+</style>

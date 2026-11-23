@@ -1,0 +1,50 @@
+---
+// Overview of the how-tos (section "guides") or the articles ("blog").
+import Base from "../layouts/Base.astro";
+import Cta from "../components/Cta.astro";
+import { getCollection } from "astro:content";
+import { PAGES, T, sectionPath } from "../i18n.js";
+
+interface Props { lang: "de" | "en"; section: "guides" | "blog" }
+const { lang, section } = Astro.props;
+const de = lang === "de";
+const t = T[lang];
+const isGuides = section === "guides";
+const entries = (await getCollection(isGuides ? "anleitungen" : "ratgeber", (e) => e.data.lang === lang))
+  .sort((a, b) => (isGuides ? a.data.order - b.data.order : a.data.title.localeCompare(b.data.title)));
+const slug = (e) => e.id.split("/").pop();
+
+const c = isGuides
+  ? (de
+    ? { title: "Anleitungen: Sowling Schritt für Schritt", description: "Anleitungen für Sowling: erste Pflanze anlegen, Aufgaben und Erinnerungen, Dünger dokumentieren, Wetter, App installieren, Zwei-Faktor-Anmeldung, Gutscheine.", h1: "Anleitungen", lead: "Kurze Schritt-für-Schritt-Anleitungen für alles, was du in Sowling brauchst." }
+    : { title: "Guides: Sowling Step by Step", description: "Step-by-step guides for Sowling: add your first plant, tasks and reminders, record fertilizer, weather, install the app, two-factor sign-in and vouchers.", h1: "Guides", lead: "Short step-by-step guides for everything you need in Sowling." })
+  : (de
+    ? { title: "Ratgeber: Gießen, Düngen, Aussaat und Obstbaumschnitt", description: "Gartenwissen kompakt: Gießplan, richtig düngen, Aussaatkalender, Mischkultur, Obstbaum schneiden und giftige Pflanzen für Katzen und Hunde.", h1: "Ratgeber", lead: "Gartenwissen, das du sofort anwenden kannst – vom Gießplan bis zum Obstbaumschnitt." }
+    : { title: "Blog: Watering, Feeding, Sowing and Pruning Guides", description: "Practical gardening know-how: watering schedule, how to fertilize, sowing calendar, companion planting, pruning fruit trees and plants toxic to cats and dogs.", h1: "Blog", lead: "Gardening know-how you can use right away – from watering schedules to pruning fruit trees." });
+const key = isGuides ? "guides" : "blog";
+const list = {
+  "@type": "ItemList",
+  itemListElement: entries.map((e, i) => ({ "@type": "ListItem", position: i + 1, url: new URL(sectionPath(key, lang, slug(e)), "https://sowling.com").href, name: e.data.title })),
+};
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES[key]} breadcrumbs={[{ name: t.nav[key], url: PAGES[key][lang] }]} jsonLd={[list]}>
+  <section class="page-head">
+    <div class="wrap">
+      <h1>{c.h1}</h1>
+      <p class="lead">{c.lead}</p>
+    </div>
+  </section>
+  <section style="padding-top:16px">
+    <div class="wrap grid grid-3">
+      {entries.map((e) => (
+        <a class="card card-link" href={sectionPath(key, lang, slug(e))}>
+          {isGuides && <span class="icon" aria-hidden="true">{e.data.icon}</span>}
+          <h2 style="font-size:1.2rem">{e.data.title}</h2>
+          <p>{e.data.description}</p>
+          <span class="muted">{isGuides ? (de ? `${e.data.minutes} Min.` : `${e.data.minutes} min`) : t.minutes(e.data.readingMinutes)}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+  <Cta lang={lang} />
+</Base>

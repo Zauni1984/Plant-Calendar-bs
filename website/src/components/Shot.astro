@@ -1,0 +1,26 @@
+---
+// App screenshot from src/assets/screens/<lang>/<name>.png, served as
+// responsive WebP. Falls back to a neutral placeholder while a screenshot
+// does not exist yet.
+import { Image } from "astro:assets";
+
+interface Props { name: string; lang: "de" | "en"; alt: string; phone?: boolean; eager?: boolean; caption?: string }
+const { name, lang, alt, phone = false, eager = false, caption } = Astro.props;
+const all = import.meta.glob<{ default: ImageMetadata }>("/src/assets/screens/**/*.png", { eager: true });
+const img = all[`/src/assets/screens/${lang}/${name}.png`]?.default;
+const widths = phone ? [300, 600] : [640, 960, 1440];
+const sizes = phone ? "300px" : "(max-width: 900px) 100vw, 640px";
+---
+<figure>
+  {img ? (
+    <Image src={img} alt={alt} widths={widths} sizes={sizes} format="webp" quality={82}
+      class={phone ? "shot shot-phone" : "shot"} loading={eager ? "eager" : "lazy"} fetchpriority={eager ? "high" : "auto"} />
+  ) : (
+    <div class={phone ? "shot shot-phone placeholder" : "shot placeholder"} role="img" aria-label={alt}></div>
+  )}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+<style>
+  .placeholder { aspect-ratio: 16 / 10; background: linear-gradient(135deg, #12241d, #1f3a2c); }
+  .shot-phone.placeholder { aspect-ratio: 9 / 19.5; }
+</style>
