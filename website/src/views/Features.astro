@@ -1,0 +1,88 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+import Cta from "../components/Cta.astro";
+import { PAGES, T } from "../i18n.js";
+import { appJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+
+const c = de ? {
+  title: "Funktionen: Gießplan, Düngeplan und Pflanzen-Tagebuch",
+  description: "Alle Funktionen von Sowling: Kalender mit Erinnerungen, Gieß-Kalkulator, Dünger-Log, Messwerte (pH, EC, VPD, PPFD), Wetter, Obstbäume und Foto-Tagebuch.",
+  h1: "Alles, was dein Garten braucht – in einer App",
+  lead: "Sowling verbindet Kalender, Pflanzenwissen, Wetter und Tagebuch. Hier siehst du, was die App kann.",
+  rows: [
+    { shot: "calendar-month", alt: "Monatskalender mit Aufgaben in Sowling", h: "Kalender & Aufgaben", p: "Der Kalender ist dein Startbildschirm: Monat, Woche oder Tag, mit allen fälligen Aufgaben und Einträgen.", li: ["Wiederkehrende Aufgaben mit Enddatum (z. B. alle 2 Tage gießen bis Ende September)", "Kategorien Gießen, Düngen, Kontrolle, Training und Notiz", "Erinnerungen per Push-Nachricht im Browser", "8 Kalendermodi, darunter Mondkalender und Bauernkalender"] },
+    { shot: "feeding-log", alt: "Dünger-Log mit Marke, Produkt und Menge", h: "Dünger-Log & Düngeplan", p: "Dokumentiere jede Düngergabe mit Marke, Produkt, Menge und Einheit – mehrere Dünger pro Gabe sind möglich.", li: ["Vorschläge für über 25 Marken, von BioBizz bis Compo und Hanfjack", "Eigene Dünger werden gemerkt und wieder vorgeschlagen", "Dünger-Aufgaben mit geplantem Dünger; Abhaken öffnet das fertige Log", "Wassermenge, pH, EC und Wassertemperatur direkt dazu"] },
+    { shot: "plants", alt: "Pflanzenübersicht mit Phasen und Standorten", h: "Pflanzen, Phasen & Standorte", p: "Lege Pflanzen aus dem Katalog an oder frei. Ordne sie Standorten wie Hochbeet, Balkon, Gewächshaus oder Zelt zu.", li: ["Phasen von Keimling bis Ernte, mit Woche", "Mehrjährige Pflanzen und Obstbäume mit Saisonverlauf", "Topfgröße und Substrat für den Gieß-Kalkulator", "Status aktiv, beendet oder archiviert"] },
+    { shot: "tree-catalog", alt: "Pflanzenkatalog mit Obstbaum-Sorten", h: "Katalog mit über 100 Pflanzen und Bäumen", p: "Gemüse, Kräuter, Beeren, Blumen sowie Obstbäume nach Sorte und Laub- und Zierbäume.", li: ["Aussaat-, Pflanz- und Erntemonate, Abstand, Sonne und Wasser", "Gute und schlechte Nachbarn (Mischkultur)", "Warnungen: giftig für Katzen, Hunde oder Menschen, Allergene", "Vermehrung: Samen, Stecklinge, Ableger, Veredelung"] },
+    { shot: "weather", alt: "Wetteransicht mit Vorhersage pro Standort", h: "Wetter & intelligenter Gießplan", p: "Echte Wetterdaten pro Standort fließen in den Gieß-Kalkulator ein. Die Ampel zeigt dir, welche Pflanze jetzt Wasser braucht.", li: ["24-Stunden- und 7-Tage-Vorhersage", "Wetterverlauf mit Diagrammen", "Urlaubsmodus verlängert Gießintervalle automatisch", "Wetterdaten über Open-Meteo, ohne Tracking"] },
+    { shot: "tips", alt: "Tipps und Auswertungen in Sowling", h: "Messwerte, Ernte & Auswertung", p: "Alles, was du misst, landet im Pflanzen-Tagebuch – und wird ausgewertet.", li: ["pH, EC, Temperatur, Luftfeuchte, VPD, PPFD, CO₂, Wassertemperatur, Bodenfeuchte", "Ernte in kg, Stück und Qualität; Ernteprognose aus Katalogdaten", "90-Tage-Aktivitätsübersicht und Pflege-Hinweise", "Foto-Tagebuch mit Wachstumsverlauf"] },
+  ],
+  more: "Und außerdem",
+  extras: [
+    ["🔐", "Sicher", "Zwei-Faktor-Anmeldung mit Google Authenticator & Co., verschlüsselte Verbindung, Passwörter nur als Hash."],
+    ["🌍", "10 Sprachen", "Deutsch, Englisch, Spanisch, Französisch, Italienisch, Niederländisch, Polnisch, Portugiesisch, Türkisch und Latein."],
+    ["📤", "Deine Daten", "CSV-Import und -Export, vollständiger Datenexport nach DSGVO, Konto jederzeit löschbar."],
+    ["🎨", "8 Farbthemen", "Von Forest bis Arctic – und Hinweistöne, die du ein- und ausschalten kannst."],
+    ["👥", "Team-Profile", "Mehrere Personen pflegen gemeinsam – ideal für Familien, Vereine und Gärtnereien."],
+    ["🎁", "Gutscheine", "Abos verschenken oder Codes einlösen, z. B. aus Aktionen und Bestellungen."],
+  ],
+} : {
+  title: "Features: Watering Plan, Feeding Schedule, Plant Diary",
+  description: "All Sowling features: calendar with reminders, watering calculator, fertilizer log, measurements (pH, EC, VPD, PPFD), weather, fruit trees and photo diary.",
+  h1: "Everything your garden needs – in one app",
+  lead: "Sowling combines a calendar, plant knowledge, weather and a diary. Here is what the app can do.",
+  rows: [
+    { shot: "calendar-month", alt: "Monthly calendar with tasks in Sowling", h: "Calendar & tasks", p: "The calendar is your home screen: month, week or day, with every task and entry that is due.", li: ["Recurring tasks with an end date (e.g. water every 2 days until the end of September)", "Categories water, feed, check, training and note", "Push reminders in the browser", "8 calendar modes, including moon and farmer's calendar"] },
+    { shot: "feeding-log", alt: "Fertilizer log with brand, product and dose", h: "Fertilizer log & feeding schedule", p: "Record every feeding with brand, product, amount and unit – several products per feeding are possible.", li: ["Suggestions for 25+ brands, from BioBizz to Compo and Hanfjack", "Your own products are remembered and suggested again", "Feeding tasks with planned fertilizer; ticking one off opens the finished log", "Water volume, pH, EC and water temperature alongside"] },
+    { shot: "plants", alt: "Plant overview with phases and locations", h: "Plants, phases & locations", p: "Add plants from the catalogue or freely. Assign them to locations such as raised bed, balcony, greenhouse or tent.", li: ["Phases from seedling to harvest, with week", "Perennials and fruit trees with season history", "Pot size and substrate for the watering calculator", "Status active, finished or archived"] },
+    { shot: "tree-catalog", alt: "Plant catalogue with fruit tree varieties", h: "Catalogue with 100+ plants and trees", p: "Vegetables, herbs, berries, flowers plus fruit trees by variety and shade and ornamental trees.", li: ["Sowing, planting and harvest months, spacing, sun and water", "Good and bad neighbours (companion planting)", "Warnings: toxic to cats, dogs or humans, allergens", "Propagation: seed, cuttings, layering, grafting"] },
+    { shot: "weather", alt: "Weather view with forecast per location", h: "Weather & smart watering", p: "Real weather data per location feeds the watering calculator. A traffic light shows which plant needs water now.", li: ["24-hour and 7-day forecast", "Weather history with charts", "Vacation mode extends watering intervals automatically", "Weather from Open-Meteo, no tracking"] },
+    { shot: "tips", alt: "Tips and insights in Sowling", h: "Measurements, harvests & insights", p: "Everything you measure ends up in the plant diary – and gets analysed.", li: ["pH, EC, temperature, humidity, VPD, PPFD, CO₂, water temperature, soil moisture", "Harvest in kg, pieces and quality; harvest forecast from catalogue data", "90-day activity overview and care hints", "Photo diary with growth timeline"] },
+  ],
+  more: "And also",
+  extras: [
+    ["🔐", "Secure", "Two-factor sign-in with Google Authenticator & co., encrypted connections, passwords stored only as hashes."],
+    ["🌍", "10 languages", "English, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Turkish and Latin."],
+    ["📤", "Your data", "CSV import and export, full GDPR data export, delete your account at any time."],
+    ["🎨", "8 colour themes", "From Forest to Arctic – plus sounds you can switch on and off."],
+    ["👥", "Team profiles", "Several people care for plants together – great for families, clubs and nurseries."],
+    ["🎁", "Vouchers", "Give a subscription as a gift or redeem codes from promotions and orders."],
+  ],
+};
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES.features} breadcrumbs={[{ name: T[lang].nav.features, url: PAGES.features[lang] }]} jsonLd={appJsonLd(lang, c.description)}>
+  <section class="page-head">
+    <div class="wrap">
+      <h1>{c.h1}</h1>
+      <p class="lead">{c.lead}</p>
+    </div>
+  </section>
+  <section style="padding-top:8px">
+    <div class="wrap">
+      {c.rows.map((r, i) => (
+        <div class={i % 2 ? "feature-row reverse" : "feature-row"} id={r.shot}>
+          <div>
+            <h2>{r.h}</h2>
+            <p>{r.p}</p>
+            <ul>{r.li.map((x) => <li>{x}</li>)}</ul>
+          </div>
+          <Shot name={r.shot} lang={lang} alt={r.alt} eager={i === 0} />
+        </div>
+      ))}
+    </div>
+  </section>
+  <section class="alt">
+    <div class="wrap">
+      <h2>{c.more}</h2>
+      <div class="grid grid-3">
+        {c.extras.map(([icon, h, p]) => <div class="card"><span class="icon" aria-hidden="true">{icon}</span><h3>{h}</h3><p>{p}</p></div>)}
+      </div>
+    </div>
+  </section>
+  <Cta lang={lang} />
+</Base>

@@ -1,6 +1,6 @@
 # Datenschutzerklärung – Sowling
 
-**Stand: 01.11.2026**
+**Stand: 23.11.2026**
 
 <!-- Eine anwaltliche Prüfung vor dem Livegang wird empfohlen. -->
 
@@ -201,11 +201,25 @@ eingelöst hat, wann, sowie den freigeschalteten Tarif und dessen Laufzeit
 Nach Ablauf fällt Ihr Konto auf Ihr bezahltes Abo bzw. auf Free zurück; für
 Fotos gilt dann die 90-Tage-Frist aus 4.1.
 
+### 4.11 Webseite sowling.com
+
+Beim Aufruf unserer Webseite sowling.com verarbeitet der Webserver technisch
+notwendige Daten: IP-Adresse, Zeitpunkt, aufgerufene Seite, übertragene
+Datenmenge, Referrer sowie Browser und Betriebssystem (Art. 6 Abs. 1 lit. f
+DSGVO – sichere und stabile Auslieferung der Seite). Diese Server-Protokolle
+führt unser Hoster Hostinger; sie werden nach spätestens 30 Tagen gelöscht.
+
+Die Webseite setzt **keine Cookies**, verwendet **keine Analyse- oder
+Tracking-Dienste** und lädt **keine Inhalte von Drittanbietern** – auch die
+Schriftarten liegen auf unserem eigenen Webspace. Links zur App
+(app.sowling.com) führen zu den in dieser Erklärung beschriebenen Funktionen.
+
 ## 5. Empfänger und Auftragsverarbeiter
 
 - **Hosting:** Hostinger International Ltd., 61 Lordou Vironos str., 6023 Larnaca, Zypern – Betrieb von Server und Datenbank im
   Auftrag (Art. 28 DSGVO), Serverstandort Deutschland (Frankfurt am Main);
-  außerdem Versand der E-Mails aus 4.9 (Hostinger Mail).
+  außerdem Versand der E-Mails aus 4.9 (Hostinger Mail) und Bereitstellung der
+  Webseite sowling.com (Webhosting, 4.11).
 - **Haufe-Lexware GmbH & Co. KG** (Freiburg, Deutschland) – Lexware Office,
   Erstellung und Aufbewahrung der Rechnungen im Auftrag (Art. 28 DSGVO).
 - **Europäische Kommission (VIES)** – nur bei Firmen aus einem anderen EU-Land

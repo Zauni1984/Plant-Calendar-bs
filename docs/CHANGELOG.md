@@ -69,7 +69,7 @@
 - Mini-Wetter-Widget in Kalender-Toolbar
 
 ### Pflanzen-Katalog
-- 34 Eintraege: 16 Gemuese, 7 Kraeuter, 5 Obst/Beeren, 3 Blumen, Cannabis
+- 34 Eintraege: Gemuese, Kraeuter, Obst/Beeren, Blumen
 - Companion Planting mit good/bad_neighbors
 - Emojis fuer alle Sorten
 - Aussaat-/Erntemonate, Abstand, Sonne/Wasser

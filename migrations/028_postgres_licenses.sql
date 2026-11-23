@@ -4,7 +4,7 @@
 -- operator (tests, beta testers, loyal customers). It can be used with a key,
 -- and/or belongs to an account: by user_id (purchases) or by e-mail address
 -- (operator grants, so the person only has to sign in with that address).
--- Subscriptions (Basic/Pro/CSC) give access without any row here.
+-- Subscriptions (Basic/Pro/Nursery) give access without any row here.
 CREATE TABLE IF NOT EXISTS licenses (
   license_id UUID PRIMARY KEY,
   kind TEXT NOT NULL CHECK (kind IN ('purchase', 'complimentary')),

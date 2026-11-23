@@ -1,0 +1,75 @@
+---
+import Base from "../layouts/Base.astro";
+import Plans from "../components/Plans.astro";
+import Faq from "../components/Faq.astro";
+import Shot from "../components/Shot.astro";
+import Cta from "../components/Cta.astro";
+import { PAGES, T, path } from "../i18n.js";
+import { appJsonLd, faqJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const c = de ? {
+  title: "Preise: Pflanzenkalender kostenlos oder ab 0,99 € im Monat",
+  description: "Sowling kostenlos mit einer Pflanze nutzen oder Basic (0,99 €), Pro (5,99 €) und Gärtnerei (50 €) im Monat wählen. Inkl. MwSt., monatlich kündbar, Rechnung per E-Mail.",
+  h1: "Preise, die mit deinem Garten wachsen",
+  lead: "Alle Funktionen gibt es in jedem Tarif. Der Unterschied ist, wie viele Pflanzen gleichzeitig aktiv sind.",
+  notes: [
+    ["Monatlich kündbar", "Abos laufen monatlich und lassen sich jederzeit zum Ende des Zeitraums kündigen. Beendete und archivierte Pflanzen zählen nicht zum Limit."],
+    ["Rechnung für jede Zahlung", "Du bekommst für jede Zahlung eine PDF-Rechnung per E-Mail und findest sie im Konto. Unternehmen aus der EU mit gültiger USt-IdNr. erhalten Rechnungen ohne Umsatzsteuer (Reverse Charge)."],
+    ["Sichere Zahlung", "Bezahlt wird über Stripe mit Karte und weiteren Zahlarten. Wir speichern keine Kartendaten."],
+    ["Gutscheine", "Du hast einen Gutscheincode? Löse ihn in der App unter Abo → Gutschein einlösen ein."],
+  ],
+  shotAlt: "Tarifübersicht in der Sowling-App",
+  faq: [
+    { q: "Was zählt als aktive Pflanze?", a: "Jede Pflanze mit Status „aktiv“. Beendete (z. B. abgeerntete) und archivierte Pflanzen bleiben mit allen Einträgen erhalten, zählen aber nicht zum Limit." },
+    { q: "Was passiert beim Wechsel in einen kleineren Tarif?", a: "Deine Pflanzen bleiben erhalten. Liegen mehr aktive Pflanzen über dem neuen Limit, kannst du keine weiteren anlegen, bis du welche beendest oder archivierst." },
+    { q: "Sind die Preise inklusive Mehrwertsteuer?", a: "Ja, für Privatkunden enthalten alle Preise 19 % deutsche Umsatzsteuer. Unternehmen aus anderen EU-Ländern mit gültiger USt-IdNr. zahlen ohne Umsatzsteuer (Reverse Charge)." },
+    { q: "Ist die Desktop-App im Abo enthalten?", a: "Ja, Basic, Pro und Gärtnerei schalten die Windows-Desktop-App mit frei, sobald sie erscheint. Alternativ wird es einen Einmalkauf geben." },
+    { q: "Kann ich widerrufen?", a: `Als Verbraucher hast du ein gesetzliches Widerrufsrecht von 14 Tagen. Details findest du in der <a href="${PAGES.withdrawal.de}">Widerrufsbelehrung</a>.` },
+  ],
+} : {
+  title: "Pricing: Free Plant Calendar or from €0.99 a Month",
+  description: "Use Sowling free with one plant or choose Basic (€0.99), Pro (€5.99) or Nursery (€50) per month. VAT included, cancel monthly, invoice by e-mail.",
+  h1: "Pricing that grows with your garden",
+  lead: "Every plan includes every feature. The difference is how many plants are active at the same time.",
+  notes: [
+    ["Cancel monthly", "Subscriptions run monthly and can be cancelled at any time for the end of the period. Finished and archived plants do not count towards the limit."],
+    ["An invoice for every payment", "You get a PDF invoice by e-mail for every payment and can find it in your account. EU businesses with a valid VAT ID receive invoices without VAT (reverse charge)."],
+    ["Secure payment", "Payments are handled by Stripe with cards and other methods. We never store card details."],
+    ["Vouchers", "Got a voucher code? Redeem it in the app under Plan → Redeem voucher."],
+  ],
+  shotAlt: "Plan overview in the Sowling app",
+  faq: [
+    { q: "What counts as an active plant?", a: "Every plant with the status “active”. Finished (e.g. harvested) and archived plants keep all their entries but do not count towards the limit." },
+    { q: "What happens if I switch to a smaller plan?", a: "Your plants are kept. If you have more active plants than the new limit, you cannot add more until you finish or archive some." },
+    { q: "Do prices include VAT?", a: "Yes, for consumers all prices include 19 % German VAT. Businesses in other EU countries with a valid VAT ID pay without VAT (reverse charge)." },
+    { q: "Is the desktop app included?", a: "Yes, Basic, Pro and Nursery unlock the Windows desktop app as soon as it is released. A one-time purchase will be available as well." },
+    { q: "Can I withdraw?", a: `As a consumer you have a statutory right of withdrawal of 14 days. See the <a href="${PAGES.withdrawal.en}">withdrawal policy</a>.` },
+  ],
+};
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES.pricing} breadcrumbs={[{ name: T[lang].nav.pricing, url: PAGES.pricing[lang] }]} jsonLd={[...appJsonLd(lang, c.description), ...faqJsonLd(c.faq)]}>
+  <section class="page-head">
+    <div class="wrap">
+      <h1>{c.h1}</h1>
+      <p class="lead">{c.lead}</p>
+    </div>
+  </section>
+  <section style="padding-top:16px">
+    <div class="wrap"><Plans lang={lang} /></div>
+  </section>
+  <section class="alt">
+    <div class="wrap feature-row">
+      <div class="grid grid-2">
+        {c.notes.map(([h, p]) => <div class="card"><h3>{h}</h3><p>{p}</p></div>)}
+      </div>
+      <Shot name="plans" lang={lang} alt={c.shotAlt} />
+    </div>
+  </section>
+  <section>
+    <div class="wrap prose" style="margin:0 auto"><Faq items={c.faq} title={T[lang].faqTitle} /></div>
+  </section>
+  <Cta lang={lang} />
+</Base>

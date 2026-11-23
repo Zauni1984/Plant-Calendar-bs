@@ -1,0 +1,167 @@
+---
+// Page shell: SEO head (canonical, hreflang, Open Graph, JSON-LD), header with
+// navigation and language switch, footer. Every page uses it.
+import "@fontsource-variable/inter";
+import "../styles/site.css";
+import { T, PAGES, SITE, APP_URL, COMPANY, path } from "../i18n.js";
+
+interface Props {
+  lang: "de" | "en";
+  title: string;
+  description: string;
+  /** Root-relative URLs of this page per language, e.g. { de: "/preise/", en: "/en/pricing/" }. */
+  alternates: { de?: string; en?: string };
+  image?: string;
+  ogType?: string;
+  jsonLd?: object[];
+  breadcrumbs?: { name: string; url: string }[];
+  noindex?: boolean;
+}
+
+const { lang, title, description, alternates, image = "/og/sowling.png", ogType = "website", jsonLd = [], breadcrumbs = [], noindex = false } = Astro.props;
+const t = T[lang];
+const self = alternates[lang] ?? Astro.url.pathname;
+const canonical = new URL(self, SITE).href;
+const other = lang === "de" ? "en" : "de";
+const otherUrl = alternates[other] ?? PAGES.home[other];
+const fullTitle = title.includes("Sowling") ? title : `${title} | Sowling`;
+
+const nav = [
+  ["features", t.nav.features],
+  ["pricing", t.nav.pricing],
+  ["guides", t.nav.guides],
+  ["blog", t.nav.blog],
+  ["faq", t.nav.faq],
+];
+const current = Astro.url.pathname;
+const isActive = (key) => current === path(key, lang) || (key !== "home" && current.startsWith(path(key, lang)));
+
+const org = {
+  "@type": "Organization",
+  "@id": `${SITE}/#org`,
+  name: "Sowling",
+  legalName: COMPANY,
+  url: SITE,
+  logo: `${SITE}/icons/sowling-512.png`,
+  email: "info@blocksocial.eu",
+  address: { "@type": "PostalAddress", streetAddress: "Kratzmühlstr. 14", postalCode: "92339", addressLocality: "Beilngries", addressCountry: "DE" },
+};
+const website = { "@type": "WebSite", "@id": `${SITE}/#website`, url: SITE, name: "Sowling", inLanguage: ["de", "en"], publisher: { "@id": `${SITE}/#org` } };
+const crumbs = breadcrumbs.length
+  ? [{
+      "@type": "BreadcrumbList",
+      itemListElement: [{ name: t.breadcrumbHome, url: PAGES.home[lang] }, ...breadcrumbs].map((c, i) => ({
+        "@type": "ListItem", position: i + 1, name: c.name, item: new URL(c.url, SITE).href,
+      })),
+    }]
+  : [];
+const graph = { "@context": "https://schema.org", "@graph": [org, website, ...crumbs, ...jsonLd] };
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+    {alternates.de && <link rel="alternate" hreflang="de" href={new URL(alternates.de, SITE).href} />}
+    {alternates.en && <link rel="alternate" hreflang="en" href={new URL(alternates.en, SITE).href} />}
+    {alternates.de && <link rel="alternate" hreflang="x-default" href={new URL(alternates.de, SITE).href} />}
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="Sowling" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(image, SITE).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content={t.locale} />
+    <meta property="og:locale:alternate" content={T[other].locale} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#2c4a2a" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json" set:html={JSON.stringify(graph)} />
+  </head>
+  <body>
+    <a class="skip" href="#main">{t.skip}</a>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href={PAGES.home[lang]} aria-label="Sowling">
+          <img src="/icons/sowling-64.png" width="36" height="36" alt="" />
+          <span>Sowling</span>
+        </a>
+        <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" />
+        <label for="nav-toggle" class="nav-burger" aria-label={t.menu}><span></span></label>
+        <nav class="main-nav" aria-label={t.menu}>
+          <ul>
+            {nav.map(([key, label]) => (
+              <li><a href={path(key, lang)} aria-current={isActive(key) ? "page" : undefined}>{label}</a></li>
+            ))}
+          </ul>
+          <a class="lang-switch" href={otherUrl} hreflang={other} lang={other}>{t.otherLang}</a>
+          <a class="btn btn-primary btn-sm" href={APP_URL}>{t.openApp}</a>
+        </nav>
+      </div>
+    </header>
+
+    {breadcrumbs.length > 0 && (
+      <nav class="wrap breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+          <li><a href={PAGES.home[lang]}>{t.breadcrumbHome}</a></li>
+          {breadcrumbs.map((c, i) => (
+            <li>{i === breadcrumbs.length - 1 ? <span aria-current="page">{c.name}</span> : <a href={c.url}>{c.name}</a>}</li>
+          ))}
+        </ol>
+      </nav>
+    )}
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-grid">
+        <div>
+          <a class="brand brand-footer" href={PAGES.home[lang]}>
+            <img src="/icons/sowling-64.png" width="32" height="32" alt="" loading="lazy" />
+            <span>Sowling</span>
+          </a>
+          <p>{t.footer.tagline}</p>
+          <p class="muted">© {new Date().getFullYear()} {COMPANY}. {t.footer.madeIn}</p>
+        </div>
+        <div>
+          <h2>{t.footer.product}</h2>
+          <ul>
+            <li><a href={path("features", lang)}>{t.nav.features}</a></li>
+            <li><a href={path("pricing", lang)}>{t.nav.pricing}</a></li>
+            <li><a href={path("desktop", lang)}>{t.nav.desktop}</a></li>
+            <li><a href={path("nurseries", lang)}>{t.nav.nurseries}</a></li>
+            <li><a href={APP_URL}>{t.openApp}</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>{t.footer.help}</h2>
+          <ul>
+            <li><a href={path("guides", lang)}>{t.nav.guides}</a></li>
+            <li><a href={path("blog", lang)}>{t.nav.blog}</a></li>
+            <li><a href={path("faq", lang)}>{t.nav.faq}</a></li>
+            <li><a href="mailto:service@sowling.com">service@sowling.com</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>{t.footer.legal}</h2>
+          <ul>
+            <li><a href={path("imprint", lang)}>{t.footer.imprint}</a></li>
+            <li><a href={path("privacy", lang)}>{t.footer.privacy}</a></li>
+            <li><a href={path("withdrawal", lang)}>{t.footer.withdrawal}</a></li>
+            <li><a href={otherUrl} hreflang={other} lang={other}>{t.otherLang}</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

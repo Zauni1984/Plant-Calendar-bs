@@ -43,6 +43,17 @@
         "preview"
       ],
       "port": 4173
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "website",
+        "run",
+        "preview"
+      ],
+      "port": 4321
     }
   ]
 }

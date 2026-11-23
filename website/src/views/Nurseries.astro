@@ -1,0 +1,77 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+import Faq from "../components/Faq.astro";
+import Cta from "../components/Cta.astro";
+import { PAGES, T, APP_URL } from "../i18n.js";
+import { faqJsonLd } from "../lib/seo.js";
+
+interface Props { lang: "de" | "en" }
+const { lang } = Astro.props;
+const de = lang === "de";
+const c = de ? {
+  title: "Pflanzenkalender für Gärtnereien, Vereine und Betriebe",
+  description: "Sowling Gärtnerei: unbegrenzt viele Pflanzen, Team-Profile, Standorte, Düngepläne und Messwerte für Gärtnereien und Vereine. 50 € im Monat inkl. MwSt.",
+  h1: "Sowling für Gärtnereien, Vereine und Betriebe",
+  lead: "Hunderte Pflanzen, mehrere Standorte, ein Team: Mit dem Tarif Gärtnerei planst und dokumentierst du Anzucht, Pflege und Düngung zentral – ohne Pflanzenlimit.",
+  points: [
+    ["♾️", "Ohne Pflanzenlimit", "Unbegrenzt viele aktive Pflanzen, Chargen und Kulturen."],
+    ["📍", "Standorte", "Gewächshäuser, Freiland, Folientunnel und Lager getrennt führen, jeweils mit eigenem Wetter."],
+    ["👥", "Team-Profile", "Mehrere Personen arbeiten mit einem Konto; jede sieht ihre Aufgaben."],
+    ["🧪", "Düngepläne & Messwerte", "Dünger mit Marke, Produkt und Menge, dazu pH, EC, VPD, PPFD und CO₂ – lückenlos dokumentiert."],
+    ["📤", "Export", "CSV-Export für Auswertung und Dokumentation, vollständiger Datenexport jederzeit."],
+    ["🧾", "Rechnung mit USt", "PDF-Rechnung für jede Zahlung; EU-Unternehmen mit USt-IdNr. ohne Umsatzsteuer (Reverse Charge)."],
+  ],
+  soon: "In Arbeit: Pflanzenetiketten mit QR-Code zum Ausdrucken. Scannen öffnet die Pflanze direkt in der App – ideal für Beete, Tische und Gewächshäuser.",
+  shotAlt: "Pflanzenübersicht mit mehreren Standorten in Sowling",
+  faq: [
+    { q: "Was kostet der Tarif Gärtnerei?", a: "50 € im Monat inklusive Umsatzsteuer, monatlich kündbar. Unternehmen aus anderen EU-Ländern mit gültiger USt-IdNr. erhalten die Rechnung ohne Umsatzsteuer." },
+    { q: "Können mehrere Mitarbeitende mit einem Konto arbeiten?", a: "Ja, über Team-Profile. Jede Person hat ein eigenes Profil mit eigener Farbe und eigenem Avatar." },
+    { q: "Gibt es einen Testzeitraum?", a: "Du kannst Sowling kostenlos mit einer Pflanze testen. Für einen längeren Test mit mehr Pflanzen schreib uns an service@sowling.com – wir stellen gern einen Testzugang aus." },
+  ],
+} : {
+  title: "Plant Calendar for Nurseries, Clubs and Growing Businesses",
+  description: "Sowling Nursery: unlimited plants, team profiles, locations, feeding plans and measurements for nurseries and clubs. €50 per month incl. VAT.",
+  h1: "Sowling for nurseries, clubs and businesses",
+  lead: "Hundreds of plants, several locations, one team: with the Nursery plan you plan and document propagation, care and feeding in one place – without a plant limit.",
+  points: [
+    ["♾️", "No plant limit", "Unlimited active plants, batches and crops."],
+    ["📍", "Locations", "Keep greenhouses, open field, poly tunnels and storage apart, each with its own weather."],
+    ["👥", "Team profiles", "Several people work with one account; everyone sees their tasks."],
+    ["🧪", "Feeding plans & measurements", "Fertilizer with brand, product and dose, plus pH, EC, VPD, PPFD and CO₂ – fully documented."],
+    ["📤", "Export", "CSV export for analysis and records, full data export at any time."],
+    ["🧾", "VAT invoices", "PDF invoice for every payment; EU businesses with a VAT ID without VAT (reverse charge)."],
+  ],
+  soon: "In the works: printable plant labels with QR codes. Scanning opens the plant right in the app – ideal for beds, benches and greenhouses.",
+  shotAlt: "Plant overview with several locations in Sowling",
+  faq: [
+    { q: "What does the Nursery plan cost?", a: "€50 per month including VAT, cancel monthly. Businesses in other EU countries with a valid VAT ID receive the invoice without VAT." },
+    { q: "Can several employees use one account?", a: "Yes, with team profiles. Each person has their own profile with its own colour and avatar." },
+    { q: "Is there a trial?", a: "You can try Sowling for free with one plant. For a longer trial with more plants, write to service@sowling.com – we are happy to set up a trial account." },
+  ],
+};
+---
+<Base lang={lang} title={c.title} description={c.description} alternates={PAGES.nurseries} breadcrumbs={[{ name: T[lang].nav.nurseries, url: PAGES.nurseries[lang] }]} jsonLd={faqJsonLd(c.faq)}>
+  <section class="page-head">
+    <div class="wrap feature-row" style="padding-top:0">
+      <div>
+        <h1>{c.h1}</h1>
+        <p class="lead">{c.lead}</p>
+        <div class="btn-row"><a class="btn btn-primary" href={APP_URL}>{T[lang].startFree}</a><a class="btn btn-ghost" href="mailto:service@sowling.com">service@sowling.com</a></div>
+      </div>
+      <Shot name="plants" lang={lang} alt={c.shotAlt} eager />
+    </div>
+  </section>
+  <section class="alt">
+    <div class="wrap">
+      <div class="grid grid-3">
+        {c.points.map(([icon, h, p]) => <div class="card"><span class="icon" aria-hidden="true">{icon}</span><h3>{h}</h3><p>{p}</p></div>)}
+      </div>
+      <p class="note" style="margin-top:24px">{c.soon}</p>
+    </div>
+  </section>
+  <section>
+    <div class="wrap prose" style="margin:0 auto"><Faq items={c.faq} title={T[lang].faqTitle} /></div>
+  </section>
+  <Cta lang={lang} />
+</Base>

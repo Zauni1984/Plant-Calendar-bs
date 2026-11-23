@@ -1,0 +1,19 @@
+---
+import Base from "../layouts/Base.astro";
+import { APP_URL } from "../i18n.js";
+---
+<Base lang="de" title="Seite nicht gefunden" description="Diese Seite gibt es nicht (mehr). Zurück zur Startseite, zu den Anleitungen oder zum Ratgeber von Sowling." alternates={{}} noindex>
+  <section class="page-head">
+    <div class="wrap prose">
+      <h1>Seite nicht gefunden</h1>
+      <p class="lead">Diese Seite gibt es nicht (mehr). Vielleicht hilft dir einer dieser Links weiter.</p>
+      <p lang="en" class="muted">This page does not exist. Try one of these links.</p>
+      <ul>
+        <li><a href="/">Startseite</a> · <a href="/en/">Home (English)</a></li>
+        <li><a href="/anleitungen/">Anleitungen</a> · <a href="/en/guides/">Guides</a></li>
+        <li><a href="/ratgeber/">Ratgeber</a> · <a href="/en/blog/">Blog</a></li>
+        <li><a href={APP_URL}>Sowling öffnen / Open the app</a></li>
+      </ul>
+    </div>
+  </section>
+</Base>

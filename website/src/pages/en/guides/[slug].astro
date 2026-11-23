@@ -1,0 +1,11 @@
+---
+import Entry from "../../../views/Entry.astro";
+import { getCollection } from "astro:content";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("anleitungen", (e) => e.data.lang === "en");
+  return entries.map((entry) => ({ params: { slug: entry.id.split("/").pop() }, props: { entry } }));
+}
+const { entry } = Astro.props;
+---
+<Entry entry={entry} section="guides" />
