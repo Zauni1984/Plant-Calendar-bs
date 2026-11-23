@@ -4,6 +4,11 @@ use hmac::{Hmac, Mac};
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// Shown above the pay button: what the buyer agreed to in the app
+/// (checkout consent, see api::record_withdrawal_consent).
+pub const SUBSCRIPTION_NOTE: &str = "Du hast verlangt, dass dein Abo sofort beginnt. Bei einem Widerruf innerhalb von 14 Tagen zahlst du nur den Anteil bis dahin. Widerrufsbelehrung: https://sowling.com/widerruf/ · You asked for the subscription to start now; if you withdraw within 14 days you pay only for the time used.";
+pub const DESKTOP_NOTE: &str = "Du hast zugestimmt, dass die Desktop-App sofort bereitgestellt wird, und weißt, dass dein Widerrufsrecht damit erlischt. Widerrufsbelehrung: https://sowling.com/widerruf/ · You agreed to immediate supply and acknowledged that you thereby lose your right of withdrawal.";
+
 pub struct StripeClient {
     secret_key: String,
     client: Client,
@@ -32,6 +37,7 @@ impl StripeClient {
         plan: &str,
         success_url: &str,
         cancel_url: &str,
+        submit_note: &str,
     ) -> Result<String, String> {
         let user_id = user_id.to_string();
         let resp = self
@@ -45,6 +51,7 @@ impl StripeClient {
                 ("metadata[plan]", plan),
                 ("subscription_data[metadata][plan]", plan),
                 ("billing_address_collection", "required"),
+                ("custom_text[submit][message]", submit_note),
                 ("line_items[0][price]", price_id),
                 ("line_items[0][quantity]", "1"),
                 ("success_url", success_url),
@@ -79,6 +86,7 @@ impl StripeClient {
         kind: &str,
         success_url: &str,
         cancel_url: &str,
+        submit_note: &str,
     ) -> Result<String, String> {
         let user_id = user_id.to_string();
         let resp = self
@@ -91,6 +99,7 @@ impl StripeClient {
                 ("client_reference_id", user_id.as_str()),
                 ("metadata[kind]", kind),
                 ("billing_address_collection", "required"),
+                ("custom_text[submit][message]", submit_note),
                 ("line_items[0][price]", price_id),
                 ("line_items[0][quantity]", "1"),
                 ("success_url", success_url),

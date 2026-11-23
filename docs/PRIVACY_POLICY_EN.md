@@ -133,6 +133,14 @@ we check it with the European Commission's **VIES** system, sending your VAT ID
 and ours. We keep the result and the consultation number as proof for the
 VAT-free invoice (Art. 6(1)(c) GDPR).
 
+**Consent to an immediate start.** Before a paid subscription or buying the
+desktop app, you confirm in the app that the service should start immediately
+(right of withdrawal, § 356 German Civil Code). We store your e-mail address,
+the type of purchase, the plan, the time and the version of the text shown as
+proof (Art. 6(1)(c) and (f) GDPR), also beyond an account deletion until the end
+of the statutory limitation period (usually three years from the end of the
+year).
+
 ### 4.6 Desktop licenses
 
 The desktop app is included in a subscription (Basic, Pro, Nursery) or available as

@@ -142,6 +142,13 @@ USt-IdNr. an, prüfen wir sie über das System **VIES der EU-Kommission**; dabei
 Abfragenummer speichern wir als Nachweis für die steuerfreie Rechnung
 (Art. 6 Abs. 1 lit. c DSGVO).
 
+**Zustimmung zum sofortigen Beginn.** Vor einem bezahlten Abo oder dem Kauf der
+Desktop-App bestätigen Sie in der App, dass die Leistung sofort beginnen soll
+(Widerrufsrecht, § 356 BGB). Wir speichern dazu E-Mail-Adresse, Art des Kaufs,
+Tarif, Zeitpunkt und die Fassung des angezeigten Textes als Nachweis
+(Art. 6 Abs. 1 lit. c und f DSGVO), auch über eine Kontolöschung hinaus bis zum
+Ende der gesetzlichen Verjährungsfrist (in der Regel drei Jahre zum Jahresende).
+
 ### 4.6 Desktop-Lizenzen
 
 Die Desktop-App ist im Abo (Basic, Pro, Gärtnerei) enthalten oder als Einmalkauf

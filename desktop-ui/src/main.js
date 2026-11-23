@@ -7,6 +7,7 @@ import { invoke, convertFileSrc, openDialog as tauriOpenDialog, saveDialog as ta
 // bundle. The other nine are separate chunks loaded on demand: bundling all
 // ten put ~660 KB of JSON into startup, of which a visitor needs one.
 import { FERTILIZERS, FEED_UNITS } from './fertilizers.js';
+import { LABEL_FORMATS, labelSheet, printLabels, defaultTraceCode } from './labels.js';
 import localeDe from './locales/de.json';
 const LOCALE_LOADERS = import.meta.glob(['./locales/*.json', '!./locales/de.json'], { import: 'default' });
 
@@ -267,6 +268,7 @@ root.innerHTML = `
           <option value="phase">${t('plant.phase')}</option><option value="week_desc">${t('plant.week')}</option>
         </select>
         <button id="resetPlantFilters" class="btn btn--ghost btn--sm">${t('plants.resetFilters')}</button>
+        <button id="printLabelsBtn" class="btn btn--sm" type="button" title="${t('labels.title')}">🏷️ ${t('labels.button')}</button>
         <span id="plantsFilterStatus" style="color:${TC.textDim};font-size:12px;margin-left:auto;"></span>
       </div>
       <div id="selectedPlantLabel" style="color:${TC.textMuted};font-size:13px;margin-bottom:10px;"></div>
@@ -3563,7 +3565,7 @@ function planPreviewFor(targetPlan) {
   const plantWord = remainingSlots === 1 ? t('plant.singular') : t('plant.plural');
   const summary = overAfterChange
     ? t('plan.switch.warnOver', currentActive, title, limitStr, limitStr)
-    : t('plan.switch.warnOk', title, slotsStr, plantWord);
+    : remainingSlots === null ? t('plan.switch.unlimited', title) : t('plan.switch.warnOk', title, slotsStr, plantWord);
   const cleanupHint = overAfterChange
     ? t('plan.switch.cleanupHint')
     : t('plan.switch.preserveHint');
@@ -4660,7 +4662,7 @@ function renderCalendarToolbar() {
   if (timelineMode === 'year') periodLabel = `${focusDate.getFullYear()}`;
   else if (timelineMode === 'month') periodLabel = `${getMonthName(focusDate.getMonth() + 1)} ${focusDate.getFullYear()}`;
   else if (timelineMode === 'week') periodLabel = `${t('cal.kw')} ${getISOWeek(focusDate)} \u00b7 ${focusDate.getFullYear()}`;
-  else periodLabel = formatDate(focusDate);
+  else periodLabel = focusDate.toLocaleDateString(localeTag(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
   toolbar.innerHTML = `
     <div class="cal-toolbar-group">
@@ -5071,7 +5073,7 @@ function openPlantStatPopup(plant, kind) {
         <h3 style="margin:0; color:${TC.accent};">${escapeHtml(title)}</h3>
         <button id="plantStatPopupClose">✕</button>
       </div>
-      <div style="font-size:13px; color:${TC.textMuted};">${t('popup.countEntries', items.length)}</div>
+      <div style="font-size:13px; color:${TC.textMuted};">${countEntries(items.length)}</div>
       <div style="overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:6px;">
         ${rowsHtml}
       </div>
@@ -5981,8 +5983,8 @@ function renderTimelinePanel() {
       type: "task",
       id: task.task_id,
       title: task.title,
-      subtitle: `${task.category} · ${task.notification_enabled ? "Reminder an" : "Reminder aus"}`,
-      badge: task.status === "done" ? t('task.done') : task.status === "skipped" ? "Skipped" : t('task.open'),
+      subtitle: `${taskCategoryLabel(task.category)} · ${task.notification_enabled ? t('task.reminderOn') : t('task.reminderOff')}`,
+      badge: taskStatusLabel(task.status),
       sortAt: task.due_at || task.updated_at || task.created_at,
       dateKey: normalizeDateKey(task.due_at || task.updated_at || task.created_at),
     }));
@@ -5991,10 +5993,10 @@ function renderTimelinePanel() {
     .map((log) => {
       let badge = log.metrics ? `pH ${log.metrics.ph ?? '-'} \u00b7 EC ${log.metrics.ec ?? '-'}` : t('misc.entry');
       if (log.metrics?.harvest_kg || log.metrics?.harvest_count) {
-        badge = `\u{1F33E} ${log.metrics.harvest_kg ? log.metrics.harvest_kg + ' kg' : ''}${log.metrics.harvest_count ? ' ' + log.metrics.harvest_count + ' Stk' : ''}`;
+        badge = `\u{1F33E} ${log.metrics.harvest_kg ? log.metrics.harvest_kg + ' kg' : ''}${log.metrics.harvest_count ? ' ' + log.metrics.harvest_count + ' ' + t('unit.pieces') : ''}`;
       }
       if (log.metrics?.water_liters) {
-        const method = log.metrics.water_method ? ' (' + log.metrics.water_method + ')' : '';
+        const method = log.metrics.water_method ? ' (' + waterMethodLabel(log.metrics.water_method) + ')' : '';
         badge = `\u{1F4A7} ${log.metrics.water_liters} L${method}`;
       }
       if (log.metrics?.feeds?.length) {
@@ -6003,8 +6005,8 @@ function renderTimelinePanel() {
       return {
         type: "log",
         id: log.log_id,
-        title: log.log_type,
-        subtitle: log.text || t('misc.noText'),
+        title: logTypeLabel(log.log_type),
+        subtitle: log.text || metricsSummary(log.metrics) || '',
         badge,
         sortAt: log.created_at,
         dateKey: normalizeDateKey(log.created_at),
@@ -6362,7 +6364,7 @@ function renderTimelinePanel() {
           <div style="padding:12px; border-radius:12px; background:rgba(11,23,20,0.5); border:1px solid rgba(107,255,188,0.12);">
             <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px;">
               <span style="font-weight:700; color:var(--text);">${key === 'ohne-datum' ? t('timeline.noDate') : dateLabelFromKey(key)}</span>
-              <span style="font-size:12px; color:${TC.textDim};">${t('popup.countEntries', grouped.get(key).length)}</span>
+              <span style="font-size:12px; color:${TC.textDim};">${countEntries(grouped.get(key).length)}</span>
             </div>
             <div style="display:grid; gap:6px;">
               ${grouped.get(key).map((item) => {
@@ -6838,6 +6840,7 @@ function renderPlants() {
           <button data-action="advance" data-plant-id="${plant.plant_id}">${t('plant.advanceWeek')}</button>
           <button data-action="prepare-task" data-plant-id="${plant.plant_id}">${t('task.title')}</button>
           <button data-action="prepare-log" data-plant-id="${plant.plant_id}">Log</button>
+          <button data-action="label" data-plant-id="${plant.plant_id}" title="${t('labels.title')}">🏷️ ${t('labels.single')}</button>
           <button data-action="toggle-archive" data-plant-id="${plant.plant_id}" ${isPlantArchived(plant) && !canActivateMorePlants() ? 'data-blocked-reactivate="1"' : ''}>${isPlantArchived(plant) ? t('plant.reactivate') : t('plant.archiveBtn')}</button>
           ${isPerennial(plant) ? `<button data-action="start-season" data-plant-id="${plant.plant_id}">${t('plant.newSeason')}</button>` : ''}
           <button data-action="end-run" data-plant-id="${plant.plant_id}" ${!isPlantActive(plant) ? "disabled" : ""}>${t('plant.endRun')}</button>
@@ -6931,6 +6934,10 @@ function renderPlants() {
       }
       if (action === "prepare-log") {
         await prepareLogFromHome(plantId, {});
+        return;
+      }
+      if (action === "label") {
+        openLabelDialog([plantId]);
         return;
       }
       try {
@@ -7075,7 +7082,7 @@ function renderTasks() {
       <div style="display:flex; justify-content:space-between; gap:8px;">
         <div style="flex:1;">
           <div style="font-weight:700;">${escapeHtml(task.title)}</div>
-          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(task.category)} · ${escapeHtml(task.status)} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · ${t('task.everyHours', task.repeat_interval_hours)}` : ''}${task.repeat_until ? ` ${t('task.until', new Date(task.repeat_until).toLocaleDateString(localeTag()))}` : ''}</div>
+          <div style="font-size:12px; color:${TC.textMuted};">${escapeHtml(taskCategoryLabel(task.category))} · ${escapeHtml(taskStatusLabel(task.status))} · ${t('task.dueOn', formatDate(task.due_at))}${task.repeat_interval_hours ? ` · ${t('task.everyHours', task.repeat_interval_hours)}` : ''}${task.repeat_until ? ` ${t('task.until', new Date(task.repeat_until).toLocaleDateString(localeTag()))}` : ''}</div>
           ${task.feeds?.length ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${task.feeds.map(f => `<span class="cal-badge feed-badge">\u{1F9EA} ${escapeHtml(formatFeed(f))}</span>`).join('')}</div>` : ''}
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
@@ -7213,13 +7220,13 @@ function renderLogs() {
   logsList.innerHTML = visible.map((log) => {
     const isEditing = editingLogId === log.log_id;
     const harvestInfo = (log.metrics?.harvest_kg || log.metrics?.harvest_count)
-      ? `<span class="cal-badge" style="background:rgba(255,200,100,0.15);color:${TC.warning};">&#127806; ${log.metrics.harvest_kg ? log.metrics.harvest_kg + ' kg' : ''} ${log.metrics.harvest_count ? log.metrics.harvest_count + ' Stk' : ''}</span>`
+      ? `<span class="cal-badge" style="background:rgba(255,200,100,0.15);color:${TC.warning};">&#127806; ${log.metrics.harvest_kg ? log.metrics.harvest_kg + ' kg' : ''} ${log.metrics.harvest_count ? log.metrics.harvest_count + ' ' + t('unit.pieces') : ''}</span>`
       : '';
     const qualityInfo = log.metrics?.harvest_quality
       ? `<span class="cal-badge" style="background:rgba(255,200,100,0.10);color:#d4a84b;">${escapeHtml(log.metrics.harvest_quality)}</span>`
       : '';
     const waterInfo = log.metrics?.water_liters
-      ? `<span class="cal-badge" style="background:rgba(100,180,255,0.15);color:${TC.info};">&#128167; ${log.metrics.water_liters} L${log.metrics.water_method ? ' (' + escapeHtml(log.metrics.water_method) + ')' : ''}</span>`
+      ? `<span class="cal-badge" style="background:rgba(100,180,255,0.15);color:${TC.info};">&#128167; ${log.metrics.water_liters} L${log.metrics.water_method ? ' (' + escapeHtml(waterMethodLabel(log.metrics.water_method)) + ')' : ''}</span>`
       : '';
     return `
     <div class="entity-row" style="padding:12px; border-radius:14px; border:1px solid rgba(${TC.accentRgb},0.15); background:${TC.cardSolid};">
@@ -7414,23 +7421,18 @@ function catalogById(id) {
 
 // ── Feature: Safety Badges (Allergie- & Haustier-Check) ──
 function renderSafetyBadges(plant) {
-  const entry = catalogById(plant.catalog_id);
-  if (!entry) return '';
-  const badges = [];
-  if (entry.toxic_cats) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.12);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#128049; Giftig</span>`);
-  if (entry.toxic_dogs) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.12);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#128054; Giftig</span>`);
-  if (entry.allergen) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,200,100,0.12);color:${TC.warning};font-size:10px;">&#9888;&#65039; Allergen</span>`);
-  if (entry.toxic_humans) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.15);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#9888;&#65039; Giftig (roh)</span>`);
-  return badges.join(' ');
+  return renderSafetyBadgesFromEntry(catalogById(plant.catalog_id));
 }
 
 function renderSafetyBadgesFromEntry(entry) {
   if (!entry) return '';
+  const badge = (bg, color, text, note = true) =>
+    `<span style="padding:2px 6px;border-radius:6px;background:${bg};color:${color};font-size:10px;"${note ? ` title="${escapeHtml(entry.safety_note)}"` : ''}>${text}</span>`;
   const badges = [];
-  if (entry.toxic_cats) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.12);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#128049; Giftig</span>`);
-  if (entry.toxic_dogs) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.12);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#128054; Giftig</span>`);
-  if (entry.allergen) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,200,100,0.12);color:${TC.warning};font-size:10px;">&#9888;&#65039; Allergen</span>`);
-  if (entry.toxic_humans) badges.push(`<span style="padding:2px 6px;border-radius:6px;background:rgba(255,100,100,0.15);color:${TC.danger};font-size:10px;" title="${escapeHtml(entry.safety_note)}">&#9888;&#65039; Giftig (roh)</span>`);
+  if (entry.toxic_cats) badges.push(badge('rgba(255,100,100,0.12)', TC.danger, `&#128049; ${escapeHtml(t('safety.toxicCats'))}`));
+  if (entry.toxic_dogs) badges.push(badge('rgba(255,100,100,0.12)', TC.danger, `&#128054; ${escapeHtml(t('safety.toxicDogs'))}`));
+  if (entry.allergen) badges.push(badge('rgba(255,200,100,0.12)', TC.warning, `&#9888;&#65039; ${escapeHtml(t('safety.allergen'))}`, false));
+  if (entry.toxic_humans) badges.push(badge('rgba(255,100,100,0.15)', TC.danger, `&#9888;&#65039; ${escapeHtml(t('safety.toxicRaw'))}`));
   return badges.join(' ');
 }
 
@@ -8240,12 +8242,12 @@ function renderPlantingCalendar(plant) {
         if (isSowOutdoor) { bg = 'rgba(107,255,188,0.2)'; color = '#6bffbc'; }
         if (isHarvest) { bg = 'rgba(255,200,100,0.2)'; color = TC.warning; }
 
-        return `<div style="flex:1; text-align:center; padding:4px 0; border-radius:4px; background:${bg}; color:${color}; font-size:10px; font-weight:${isCurrent ? '700' : '400'}; border:${isCurrent ? '1px solid ' + color : '1px solid transparent'};" title="${isSowIndoor ? t('catalog.month.sowIndoor') : ''} ${isSowOutdoor ? t('catalog.month.sowOutdoor') : ''} ${isHarvest ? t('catalog.month.harvest') : ''}">${label}</div>`;
+        return `<div style="flex:1; text-align:center; padding:4px 0; border-radius:4px; background:${bg}; color:${color}; font-size:10px; font-weight:${isCurrent ? '700' : '400'}; border:${isCurrent ? '1px solid ' + color : '1px solid transparent'};" title="${isSowIndoor ? t('catalog.month.sowIndoor') : ''} ${isSowOutdoor ? t(isTreeEntry(entry) ? 'catalog.month.planting' : 'catalog.month.sowOutdoor') : ''} ${isHarvest ? t('catalog.month.harvest') : ''}">${label}</div>`;
       }).join('')}
     </div>
     <div style="display:flex; gap:8px; margin-top:4px; font-size:10px; color:${TC.textDim};">
-      <span style="color:${TC.info};">&#9632; ${t('catalog.month.sowIndoor')}</span>
-      <span style="color:#6bffbc;">&#9632; ${t('catalog.month.sowOutdoor')}</span>
+      ${isTreeEntry(entry) ? `<span style="color:#6bffbc;">&#9632; ${t('catalog.month.planting')}</span>` : `<span style="color:${TC.info};">&#9632; ${t('catalog.month.sowIndoor')}</span>
+      <span style="color:#6bffbc;">&#9632; ${t('catalog.month.sowOutdoor')}</span>`}
       <span style="color:${TC.warning};">&#9632; ${t('catalog.month.harvest')}</span>
     </div>
   `;
@@ -8845,6 +8847,15 @@ async function refreshAll(options = {}) {
   }
 }
 
+// --- Display names for stored keys (log type, watering method, task) -------------
+// Stored values stay as they are (sync, older clients); only the UI translates.
+const WATER_METHOD_KEYS = { giessen: 'water.pour', tropf: 'water.drip', spruehen: 'water.spray', regen: 'water.rain' };
+const logTypeLabel = (type) => { const k = `log.${type}`; const v = t(k); return v === k ? String(type || '') : v; };
+const waterMethodLabel = (m) => (WATER_METHOD_KEYS[m] ? t(WATER_METHOD_KEYS[m]) : String(m || ''));
+const taskCategoryLabel = (c) => { const k = `cat.${c}`; const v = t(k); return v === k ? String(c || '') : v; };
+const taskStatusLabel = (s) => (s === 'done' ? t('task.done') : s === 'skipped' ? t('task.skipped') : t('task.open'));
+const countEntries = (n) => (n === 1 ? t('popup.countEntry') : t('popup.countEntries', n));
+
 // --- Fertilizer entries (feeding logs and feed tasks) ---------------------------------
 
 /** Brands and products for the suggestion lists: catalog plus what was used before. */
@@ -8990,6 +9001,206 @@ function openFeedingLogFromTask(task) {
     feeds: task.feeds || [],
     text: task.title,
     fromTask: true,
+  });
+}
+
+// --- Plant labels with QR code (labels.js) ----------------------------------------
+
+function labelVariety(plant) {
+  const entry = plant.catalog_id ? catalogById(plant.catalog_id) : null;
+  if (!entry) return '';
+  const name = currentLang === 'de' ? entry.name_de : (entry.name_en || entry.name_de);
+  return name && name !== plant.name ? name : '';
+}
+
+function openLabelDialog(preselect = null) {
+  const list = plants.filter(p => plantStatusValue(p) !== 'deleted')
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const chosen = new Set(preselect || list.filter(isPlantActive).map(p => p.plant_id));
+  const formats = Object.keys(LABEL_FORMATS);
+  let format = (() => { try { return localStorage.getItem('pc_label_format') || 'a4-24'; } catch (_) { return 'a4-24'; } })();
+  // Plant passport settings stay on this device (registration number, origin).
+  const pp = (() => { try { return JSON.parse(localStorage.getItem('pc_plant_passport') || '{}'); } catch (_) { return {}; } })();
+  if (!formats.includes(format)) format = 'a4-24';
+  activeModal = 'labels';
+  document.getElementById('modalTitle').textContent = t('labels.title');
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label" for="labelFormat">${t('labels.format')}</label>
+      <select id="labelFormat" class="form-select">${formats.map(f => `<option value="${f}" ${f === format ? 'selected' : ''}>${escapeHtml(t(`labels.fmt.${f}`))}</option>`).join('')}</select>
+    </div>
+    ${currentPlan === 'nursery' ? `
+    <div class="form-group" style="padding:10px;border-radius:10px;border:1px solid rgba(${TC.accentRgb},0.2);">
+      <label class="form-check" style="font-weight:600;"><input type="checkbox" id="ppEnabled" ${pp.enabled ? 'checked' : ''} /> 🇪🇺 ${t('pp.toggle')}</label>
+      <div id="ppFields" style="display:${pp.enabled ? 'grid' : 'none'};gap:8px;margin-top:8px;">
+        <div class="form-hint">${escapeHtml(t('pp.hint'))}</div>
+        <label class="form-label" for="ppReg">B · ${t('pp.reg')}</label>
+        <input id="ppReg" class="form-input" maxlength="40" placeholder="DE-BY-0123456" value="${escapeHtml(pp.reg || '')}" />
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="ppOrigin">D · ${t('pp.origin')}</label><input id="ppOrigin" class="form-input" maxlength="20" value="${escapeHtml(pp.origin || 'DE')}" /></div>
+          <div class="form-group"><label class="form-label" for="ppTrace">C · ${t('pp.trace')}</label><input id="ppTrace" class="form-input" maxlength="40" placeholder="${escapeHtml(t('pp.traceAuto'))}" /></div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">
+          <label class="form-check"><input type="checkbox" id="ppQr" ${pp.qr !== false ? 'checked' : ''} /> ${t('pp.qr')}</label>
+          <label class="form-check"><input type="checkbox" id="ppMono" ${pp.mono ? 'checked' : ''} /> ${t('pp.mono')}</label>
+        </div>
+        <div id="ppNoLatin" class="form-hint" style="color:${TC.warning};"></div>
+      </div>
+    </div>` : `<div class="form-hint" style="margin-bottom:10px;">🇪🇺 ${escapeHtml(t('pp.onlyNursery'))}</div>`}
+    <div class="form-group" id="labelContentGroup">
+      <div class="form-label">${t('labels.content')}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">
+        <label class="form-check"><input type="checkbox" data-label-show="variety" checked /> ${t('labels.variety')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="started" checked /> ${t('labels.showStarted')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="location" checked /> ${t('labels.location')}</label>
+        <label class="form-check"><input type="checkbox" data-label-show="brand" checked /> ${t('labels.brand')}</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span class="form-label" style="margin:0;">${t('labels.plants')}</span>
+        <span style="display:flex;gap:6px;"><button type="button" class="btn btn--ghost btn--sm" data-label-all>${t('labels.all')}</button><button type="button" class="btn btn--ghost btn--sm" data-label-none>${t('labels.none')}</button></span>
+      </div>
+      <div id="labelPlantList" style="max-height:240px;overflow:auto;display:grid;gap:4px;margin-top:6px;padding:8px;border-radius:10px;background:${TC.surface};">
+        ${list.map(p => `<label class="form-check" style="font-size:13px;"><input type="checkbox" data-label-plant="${p.plant_id}" ${chosen.has(p.plant_id) ? 'checked' : ''} /> ${escapeHtml(p.name)}${labelVariety(p) ? ` <span style="color:${TC.textDim};">· ${escapeHtml(labelVariety(p))}</span>` : ''}</label>`).join('') || `<span style="color:${TC.textMuted};">${t('plants.empty') || ''}</span>`}
+      </div>
+    </div>
+    <div id="labelCount" style="font-size:12px;color:${TC.textMuted};"></div>
+    <div class="form-hint" style="margin-top:6px;">${escapeHtml(t('labels.hint'))}</div>
+    <div id="labelError" class="form-error" style="display:none;"></div>`;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn--ghost" id="labelCancel">${t('action.cancel')}</button>
+    <button class="btn btn--primary" id="labelPrintBtn">🖨️ ${t('labels.print')}</button>`;
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.style.display = '';
+  const body = document.getElementById('modalBody');
+  const selected = () => [...body.querySelectorAll('[data-label-plant]:checked')].map(i => i.dataset.labelPlant);
+  const show = () => Object.fromEntries([...body.querySelectorAll('[data-label-show]')].map(i => [i.dataset.labelShow, i.checked]));
+  const passportOn = () => currentPlan === 'nursery' && !!body.querySelector('#ppEnabled')?.checked;
+  const passport = () => passportOn() ? {
+    reg: body.querySelector('#ppReg').value.trim(),
+    origin: body.querySelector('#ppOrigin').value.trim() || 'DE',
+    qr: body.querySelector('#ppQr').checked,
+    mono: body.querySelector('#ppMono').checked,
+  } : null;
+  const build = () => {
+    const ids = new Set(selected());
+    const trace = body.querySelector('#ppTrace')?.value.trim();
+    const items = list.filter(p => ids.has(p.plant_id)).map(p => ({
+      latin: (p.catalog_id && catalogById(p.catalog_id)?.name_latin) || '',
+      trace: trace || defaultTraceCode(p),
+      id: p.plant_id,
+      name: p.name,
+      variety: labelVariety(p),
+      started: p.created_at ? t('labels.started', new Date(p.created_at).toLocaleDateString(localeTag())) : '',
+      location: locations.find(l => l.location_id === p.location_id)?.name || '',
+    }));
+    return labelSheet({
+      items, format: body.querySelector('#labelFormat').value, show: show(), passport: passport(),
+      texts: { footer: t('labels.footer'), title: t('labels.title'), passport: currentLang === 'de' ? 'Pflanzenpass / Plant Passport' : 'Plant Passport' },
+    });
+  };
+  const updateCount = () => {
+    const sheet = build();
+    document.getElementById('labelCount').textContent = t('labels.count', sheet.count, sheet.pages);
+    const on = passportOn();
+    const fields = body.querySelector('#ppFields');
+    if (fields) fields.style.display = on ? 'grid' : 'none';
+    const content = body.querySelector('#labelContentGroup');
+    if (content) content.style.display = on ? 'none' : '';
+    const noLatin = body.querySelector('#ppNoLatin');
+    if (noLatin) {
+      const ids = new Set(selected());
+      const missing = list.filter(p => ids.has(p.plant_id) && !(p.catalog_id && catalogById(p.catalog_id)?.name_latin)).length;
+      noLatin.textContent = on && missing ? t('pp.noLatin', missing) : '';
+    }
+  };
+  body.addEventListener('input', updateCount);
+  body.addEventListener('change', updateCount);
+  body.querySelector('[data-label-all]').addEventListener('click', () => { body.querySelectorAll('[data-label-plant]').forEach(i => { i.checked = true; }); updateCount(); });
+  body.querySelector('[data-label-none]').addEventListener('click', () => { body.querySelectorAll('[data-label-plant]').forEach(i => { i.checked = false; }); updateCount(); });
+  document.getElementById('labelCancel').addEventListener('click', closeModal);
+  document.getElementById('labelPrintBtn').addEventListener('click', () => {
+    const sheet = build();
+    const err = document.getElementById('labelError');
+    if (!sheet.count) { err.textContent = t('labels.empty'); err.style.display = 'block'; return; }
+    const ppNow = passport();
+    if (passportOn() && !ppNow.reg) { err.textContent = t('pp.regRequired'); err.style.display = 'block'; body.querySelector('#ppReg').focus(); return; }
+    try {
+      localStorage.setItem('pc_label_format', body.querySelector('#labelFormat').value);
+      if (currentPlan === 'nursery') localStorage.setItem('pc_plant_passport', JSON.stringify({ enabled: passportOn(), ...(ppNow || { reg: pp.reg, origin: pp.origin, qr: pp.qr, mono: pp.mono }) }));
+    } catch (_) {}
+    closeModal();
+    printLabels(sheet);
+  });
+  updateCount();
+}
+
+// A scanned label (?pflanze=<id>) opens that plant, after sign-in if needed.
+const PENDING_PLANT_KEY = 'pc_pending_plant';
+let pendingPlantId = (() => {
+  if (IS_TAURI) return '';
+  try {
+    const url = new URL(window.location.href);
+    const fromLink = (url.searchParams.get('pflanze') || url.searchParams.get('plant') || '').trim();
+    if (/^[0-9a-f-]{36}$/i.test(fromLink)) {
+      sessionStorage.setItem(PENDING_PLANT_KEY, fromLink);
+      url.searchParams.delete('pflanze');
+      url.searchParams.delete('plant');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+    return sessionStorage.getItem(PENDING_PLANT_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+})();
+
+async function showPendingPlant() {
+  if (!pendingPlantId || IS_TAURI || !webSignedIn) return;
+  const id = pendingPlantId;
+  pendingPlantId = '';
+  try { sessionStorage.removeItem(PENDING_PLANT_KEY); } catch (_) {}
+  if (!plants.some(p => p.plant_id === id)) {
+    window.alert(t('labels.notFound'));
+    return;
+  }
+  switchPageView('plants');
+  await focusPlantFromHome(id);
+  setTimeout(() => {
+    document.querySelector(`#plantsList [data-plant-id="${CSS.escape(id)}"]`)?.closest('.entity-row, .plant-card, [class*="card"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 300);
+}
+
+// --- Checkout consent (right of withdrawal, § 356 BGB) ----------------------------
+// Before a paid checkout the buyer must tick that the service starts now
+// (subscription) or is supplied now (desktop app). The backend refuses the
+// checkout without it and stores the consent as proof.
+
+function confirmCheckoutConsent({ title, lines = [], kind }) {
+  return new Promise((resolve) => {
+    activeModal = 'checkoutConsent';
+    const policy = currentLang === 'de' ? 'https://sowling.com/widerruf/' : 'https://sowling.com/en/withdrawal/';
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = `
+      ${lines.filter(Boolean).map((l) => `<p style="margin:0 0 8px;">${escapeHtml(l)}</p>`).join('')}
+      <label class="form-check" style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border-radius:10px;background:${TC.surface};border:1px solid rgba(${TC.accentRgb},0.15);cursor:pointer;">
+        <input type="checkbox" id="checkoutConsentBox" style="margin-top:3px;" />
+        <span>${escapeHtml(t(kind === 'desktop' ? 'checkout.consent.desktop' : 'checkout.consent.subscription'))}</span>
+      </label>
+      <div style="margin-top:8px;font-size:12px;"><a href="${policy}" target="_blank" rel="noopener">${escapeHtml(t('checkout.consent.link'))}</a></div>`;
+    document.getElementById('modalFooter').innerHTML = `
+      <button class="btn btn--ghost" id="checkoutConsentCancel">${t('action.cancel')}</button>
+      <button class="btn btn--primary" id="checkoutConsentOk" disabled>${t('checkout.consent.continue')}</button>`;
+    const overlay = document.getElementById('modalOverlay');
+    if (overlay) overlay.style.display = '';
+    const box = document.getElementById('checkoutConsentBox');
+    const ok = document.getElementById('checkoutConsentOk');
+    box.addEventListener('change', () => { ok.disabled = !box.checked; });
+    const finish = (value) => { modalOnClose = null; closeModal(); resolve(value); };
+    // Closing the dialog any other way counts as "no".
+    modalOnClose = () => resolve(false);
+    ok.addEventListener('click', () => finish(box.checked));
+    document.getElementById('checkoutConsentCancel').addEventListener('click', () => finish(false));
   });
 }
 
@@ -9164,6 +9375,7 @@ function friendlyAuthError(err) {
 
 // Auth modal button
 $("openAuthModal")?.addEventListener("click", () => openModal('auth'));
+$("printLabelsBtn")?.addEventListener("click", () => openLabelDialog());
 $("webLogout")?.addEventListener("click", async () => {
   try {
     await invoke("web_logout");
@@ -9336,21 +9548,28 @@ subscriptionPanel?.addEventListener("click", async (event) => {
     return;
   }
   const preview = planPreviewFor(plan);
-  const confirmed = window.confirm([
-    `${t('billing.confirmCheckout.title', preview.title)}${preview.price ? ` (${preview.price})` : ""}`,
-    "",
-    preview.summary,
-    preview.cleanupHint,
-    "",
-    t('billing.confirmCheckout.question'),
-  ].join("\n"));
+  const paid = plan !== 'free';
+  const confirmed = paid
+    ? await confirmCheckoutConsent({
+      title: `${t('billing.confirmCheckout.title', preview.title)}${preview.price ? ` (${preview.price})` : ""}`,
+      lines: [preview.summary, preview.cleanupHint],
+      kind: 'subscription',
+    })
+    : window.confirm([
+      t('billing.confirmCheckout.title', preview.title),
+      "",
+      preview.summary,
+      preview.cleanupHint,
+      "",
+      t('billing.confirmCheckout.question'),
+    ].join("\n"));
   if (!confirmed) return;
   showLoading(t('billing.checkout.preparing'));
   try {
     setCheckoutState({ status: "idle", plan, message: t('billing.checkout.pending', preview.title), checkoutUrl: null });
     addCheckoutHistoryEntry({ mode: 'checkout', status: 'pending', plan, message: t('billing.checkout.pending', preview.title) });
     renderSubscriptionPanel();
-    const result = await invoke("subscription_checkout_smart", { plan });
+    const result = await invoke("subscription_checkout_smart", { plan, withdrawalConsent: paid });
     setCheckoutState({
       status: "ready",
       plan,
@@ -9455,6 +9674,7 @@ startupSession
     if (!IS_TAURI && !webSignedIn && !webGuest) openModal('auth');
     if (!IS_TAURI) maybeJumpToDesktopCard();
     showPendingVoucher();
+    showPendingPlant();
   }).catch((err) => {
   const statusEl = document.getElementById('status');
   if (statusEl) statusEl.textContent = t('app.initError', err);
@@ -9809,6 +10029,7 @@ async function afterSignIn() {
   await refreshWebSessionState();
   await refreshAll({ autoReminderReason: 'auth_change' });
   showPendingVoucher();
+  showPendingPlant();
   hideAppBanner('guestBanner');
   if (IS_TAURI) {
     if (licenseGateOpen) await unlockWithAccount();
@@ -10038,8 +10259,12 @@ async function renderDesktopAppCard() {
     const msg = card.querySelector('#desktopAppMsg');
     e.currentTarget.disabled = true;
     const button = e.currentTarget;
+    if (!(await confirmCheckoutConsent({ title: t('checkout.consent.desktopTitle'), lines: [t('checkout.consent.desktopText')], kind: 'desktop' }))) {
+      button.disabled = false;
+      return;
+    }
     const buy = async () => {
-      const r = await invoke('web_desktop_checkout');
+      const r = await invoke('web_desktop_checkout', { withdrawalConsent: true });
       if (r?.granted) await renderDesktopAppCard();
     };
     try {

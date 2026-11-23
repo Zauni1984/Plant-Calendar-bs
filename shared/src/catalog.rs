@@ -6,6 +6,9 @@ pub struct CatalogEntry {
     pub id: String,
     pub name_de: String,
     pub name_en: String,
+    /// Botanical name (plant passport field A).
+    #[serde(default)]
+    pub name_latin: String,
     pub category: String,
     pub lifecycle: String,
     pub default_phase: String,
@@ -35,7 +38,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
     vec![
         // -- Gemuese --
         CatalogEntry {
-            id: "tomato".into(), name_de: "Tomate".into(), name_en: "Tomato".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "tomato".into(), name_de: "Tomate".into(), name_en: "Tomato".into(), name_latin: "Solanum lycopersicum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3,4], sow_outdoor_months: vec![5], harvest_months: vec![7,8,9,10],
             sun: "full".into(), water: "high".into(), spacing_cm: 50,
             good_neighbors: vec!["basil".into(),"carrot".into(),"parsley".into(),"marigold".into(),"celery".into()],
@@ -45,7 +48,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into(),"samen".into()], propagation_note: "Geiztriebe als Stecklinge in Wasser bewurzeln (7-14 Tage).".into(),
         },
         CatalogEntry {
-            id: "pepper".into(), name_de: "Paprika".into(), name_en: "Pepper".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "pepper".into(), name_de: "Paprika".into(), name_en: "Pepper".into(), name_latin: "Capsicum annuum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![5,6], harvest_months: vec![7,8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 40,
             good_neighbors: vec!["tomato".into(),"basil".into(),"carrot".into(),"onion".into()],
@@ -55,7 +58,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "cucumber".into(), name_de: "Gurke".into(), name_en: "Cucumber".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "cucumber".into(), name_de: "Gurke".into(), name_en: "Cucumber".into(), name_latin: "Cucumis sativus".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![4], sow_outdoor_months: vec![5,6], harvest_months: vec![7,8,9],
             sun: "full".into(), water: "high".into(), spacing_cm: 40,
             good_neighbors: vec!["bean".into(),"pea".into(),"dill".into(),"lettuce".into(),"sunflower".into()],
@@ -65,7 +68,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "zucchini".into(), name_de: "Zucchini".into(), name_en: "Zucchini".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "zucchini".into(), name_de: "Zucchini".into(), name_en: "Zucchini".into(), name_latin: "Cucurbita pepo".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![4], sow_outdoor_months: vec![5], harvest_months: vec![6,7,8,9],
             sun: "full".into(), water: "high".into(), spacing_cm: 80,
             good_neighbors: vec!["bean".into(),"onion".into(),"corn".into(),"sunflower".into()],
@@ -75,7 +78,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "carrot".into(), name_de: "M\u{00f6}hre".into(), name_en: "Carrot".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "carrot".into(), name_de: "M\u{00f6}hre".into(), name_en: "Carrot".into(), name_latin: "Daucus carota subsp. sativus".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4,5,6], harvest_months: vec![6,7,8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 5,
             good_neighbors: vec!["onion".into(),"tomato".into(),"pea".into(),"lettuce".into(),"radish".into(),"leek".into()],
@@ -85,7 +88,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "lettuce".into(), name_de: "Salat".into(), name_en: "Lettuce".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "lettuce".into(), name_de: "Salat".into(), name_en: "Lettuce".into(), name_latin: "Lactuca sativa".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![3,4,5,6,7,8], harvest_months: vec![4,5,6,7,8,9,10],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 25,
             good_neighbors: vec!["carrot".into(),"radish".into(),"strawberry".into(),"bean".into(),"cucumber".into()],
@@ -95,7 +98,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "bean".into(), name_de: "Bohne".into(), name_en: "Bean".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "bean".into(), name_de: "Bohne".into(), name_en: "Bean".into(), name_latin: "Phaseolus vulgaris".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![5,6,7], harvest_months: vec![7,8,9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 10,
             good_neighbors: vec!["corn".into(),"cucumber".into(),"potato".into(),"strawberry".into(),"celery".into()],
@@ -105,7 +108,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "pea".into(), name_de: "Erbse".into(), name_en: "Pea".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "pea".into(), name_de: "Erbse".into(), name_en: "Pea".into(), name_latin: "Pisum sativum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4,5], harvest_months: vec![6,7,8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 5,
             good_neighbors: vec!["carrot".into(),"radish".into(),"cucumber".into(),"corn".into(),"lettuce".into()],
@@ -115,7 +118,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "potato".into(), name_de: "Kartoffel".into(), name_en: "Potato".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "potato".into(), name_de: "Kartoffel".into(), name_en: "Potato".into(), name_latin: "Solanum tuberosum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![4,5], harvest_months: vec![7,8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 35,
             good_neighbors: vec!["bean".into(),"corn".into(),"spinach".into(),"cabbage".into()],
@@ -125,7 +128,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into(),"teilung".into()], propagation_note: "Saatkartoffeln vorkeimen und pflanzen.".into(),
         },
         CatalogEntry {
-            id: "onion".into(), name_de: "Zwiebel".into(), name_en: "Onion".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "onion".into(), name_de: "Zwiebel".into(), name_en: "Onion".into(), name_latin: "Allium cepa".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![3,4], harvest_months: vec![7,8,9],
             sun: "full".into(), water: "low".into(), spacing_cm: 10,
             good_neighbors: vec!["carrot".into(),"strawberry".into(),"lettuce".into(),"tomato".into(),"beet".into()],
@@ -135,7 +138,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen oder Steckzwiebeln vermehren.".into(),
         },
         CatalogEntry {
-            id: "garlic".into(), name_de: "Knoblauch".into(), name_en: "Garlic".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "garlic".into(), name_de: "Knoblauch".into(), name_en: "Garlic".into(), name_latin: "Allium sativum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10,3], harvest_months: vec![7,8],
             sun: "full".into(), water: "low".into(), spacing_cm: 15,
             good_neighbors: vec!["strawberry".into(),"tomato".into(),"carrot".into(),"beet".into(),"cucumber".into()],
@@ -145,7 +148,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["teilung".into()], propagation_note: "Einzelne Zehen stecken.".into(),
         },
         CatalogEntry {
-            id: "cabbage".into(), name_de: "Kohl".into(), name_en: "Cabbage".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "cabbage".into(), name_de: "Kohl".into(), name_en: "Cabbage".into(), name_latin: "Brassica oleracea".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![4,5], harvest_months: vec![6,7,8,9,10],
             sun: "full".into(), water: "high".into(), spacing_cm: 50,
             good_neighbors: vec!["bean".into(),"celery".into(),"potato".into(),"beet".into(),"lettuce".into()],
@@ -155,7 +158,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "radish".into(), name_de: "Radieschen".into(), name_en: "Radish".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "radish".into(), name_de: "Radieschen".into(), name_en: "Radish".into(), name_latin: "Raphanus sativus var. sativus".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4,5,6,7,8,9], harvest_months: vec![4,5,6,7,8,9,10],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 5,
             good_neighbors: vec!["carrot".into(),"pea".into(),"lettuce".into(),"bean".into(),"spinach".into()],
@@ -165,7 +168,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "spinach".into(), name_de: "Spinat".into(), name_en: "Spinach".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "spinach".into(), name_de: "Spinat".into(), name_en: "Spinach".into(), name_latin: "Spinacia oleracea".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4,5,8,9], harvest_months: vec![4,5,6,9,10,11],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 15,
             good_neighbors: vec!["strawberry".into(),"bean".into(),"potato".into(),"radish".into(),"cabbage".into()],
@@ -175,7 +178,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "corn".into(), name_de: "Mais".into(), name_en: "Corn".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "corn".into(), name_de: "Mais".into(), name_en: "Corn".into(), name_latin: "Zea mays".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![4], sow_outdoor_months: vec![5], harvest_months: vec![8,9,10],
             sun: "full".into(), water: "high".into(), spacing_cm: 30,
             good_neighbors: vec!["bean".into(),"cucumber".into(),"pea".into(),"potato".into(),"zucchini".into()],
@@ -185,7 +188,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "beet".into(), name_de: "Rote Bete".into(), name_en: "Beetroot".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "beet".into(), name_de: "Rote Bete".into(), name_en: "Beetroot".into(), name_latin: "Beta vulgaris subsp. vulgaris".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![4,5,6], harvest_months: vec![7,8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 10,
             good_neighbors: vec!["onion".into(),"garlic".into(),"lettuce".into(),"cabbage".into(),"bean".into()],
@@ -195,7 +198,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "leek".into(), name_de: "Lauch".into(), name_en: "Leek".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "leek".into(), name_de: "Lauch".into(), name_en: "Leek".into(), name_latin: "Allium porrum".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![4,5], harvest_months: vec![9,10,11,12],
             sun: "full".into(), water: "medium".into(), spacing_cm: 15,
             good_neighbors: vec!["carrot".into(),"celery".into(),"strawberry".into(),"tomato".into()],
@@ -205,7 +208,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "celery".into(), name_de: "Sellerie".into(), name_en: "Celery".into(), category: "gemuese".into(), lifecycle: "annual".into(),
+            id: "celery".into(), name_de: "Sellerie".into(), name_en: "Celery".into(), name_latin: "Apium graveolens".into(), category: "gemuese".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![], harvest_months: vec![9,10,11],
             sun: "full".into(), water: "high".into(), spacing_cm: 35,
             good_neighbors: vec!["tomato".into(),"cabbage".into(),"leek".into(),"bean".into()],
@@ -216,7 +219,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
         },
         // -- Kraeuter --
         CatalogEntry {
-            id: "basil".into(), name_de: "Basilikum".into(), name_en: "Basil".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
+            id: "basil".into(), name_de: "Basilikum".into(), name_en: "Basil".into(), name_latin: "Ocimum basilicum".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![3,4], sow_outdoor_months: vec![5,6], harvest_months: vec![6,7,8,9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 20,
             good_neighbors: vec!["tomato".into(),"pepper".into(),"cucumber".into()],
@@ -226,7 +229,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into(),"samen".into()], propagation_note: "Triebspitzen in Wasser stellen, nach 1 Woche Wurzeln.".into(),
         },
         CatalogEntry {
-            id: "parsley".into(), name_de: "Petersilie".into(), name_en: "Parsley".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
+            id: "parsley".into(), name_de: "Petersilie".into(), name_en: "Parsley".into(), name_latin: "Petroselinum crispum".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![4,5], harvest_months: vec![5,6,7,8,9,10],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 15,
             good_neighbors: vec!["tomato".into(),"carrot".into(),"onion".into(),"radish".into()],
@@ -236,7 +239,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "dill".into(), name_de: "Dill".into(), name_en: "Dill".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
+            id: "dill".into(), name_de: "Dill".into(), name_en: "Dill".into(), name_latin: "Anethum graveolens".into(), category: "kraeuter".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![4,5,6,7], harvest_months: vec![5,6,7,8,9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 20,
             good_neighbors: vec!["cucumber".into(),"lettuce".into(),"onion".into(),"cabbage".into()],
@@ -246,7 +249,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "S\u{00e4}t sich gerne selbst aus.".into(),
         },
         CatalogEntry {
-            id: "mint".into(), name_de: "Minze".into(), name_en: "Mint".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
+            id: "mint".into(), name_de: "Minze".into(), name_en: "Mint".into(), name_latin: "Mentha".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![3,4], sow_outdoor_months: vec![5], harvest_months: vec![5,6,7,8,9],
             sun: "partial".into(), water: "high".into(), spacing_cm: 30,
             good_neighbors: vec!["tomato".into(),"cabbage".into()],
@@ -256,7 +259,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["ableger".into(),"teilung".into(),"steckling".into()], propagation_note: "Ausl\u{00e4}ufer teilen oder Stecklinge in Wasser.".into(),
         },
         CatalogEntry {
-            id: "rosemary".into(), name_de: "Rosmarin".into(), name_en: "Rosemary".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
+            id: "rosemary".into(), name_de: "Rosmarin".into(), name_en: "Rosemary".into(), name_latin: "Salvia rosmarinus".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![3,4], sow_outdoor_months: vec![5], harvest_months: vec![1,2,3,4,5,6,7,8,9,10,11,12],
             sun: "full".into(), water: "low".into(), spacing_cm: 40,
             good_neighbors: vec!["bean".into(),"cabbage".into(),"carrot".into()],
@@ -266,7 +269,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Verholzte Triebe im Fr\u{00fc}hjahr schneiden, 4-6 Wochen bewurzeln.".into(),
         },
         CatalogEntry {
-            id: "thyme".into(), name_de: "Thymian".into(), name_en: "Thyme".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
+            id: "thyme".into(), name_de: "Thymian".into(), name_en: "Thyme".into(), name_latin: "Thymus vulgaris".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![3,4], sow_outdoor_months: vec![5], harvest_months: vec![4,5,6,7,8,9,10],
             sun: "full".into(), water: "low".into(), spacing_cm: 25,
             good_neighbors: vec!["cabbage".into(),"strawberry".into(),"tomato".into()],
@@ -276,7 +279,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into(),"teilung".into(),"samen".into()], propagation_note: "Stecklinge oder Teilung im Fr\u{00fc}hjahr.".into(),
         },
         CatalogEntry {
-            id: "chives".into(), name_de: "Schnittlauch".into(), name_en: "Chives".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
+            id: "chives".into(), name_de: "Schnittlauch".into(), name_en: "Chives".into(), name_latin: "Allium schoenoprasum".into(), category: "kraeuter".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![2,3], sow_outdoor_months: vec![4,5], harvest_months: vec![3,4,5,6,7,8,9,10],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 15,
             good_neighbors: vec!["carrot".into(),"tomato".into(),"strawberry".into()],
@@ -287,7 +290,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
         },
         // -- Obst / Beeren --
         CatalogEntry {
-            id: "strawberry".into(), name_de: "Erdbeere".into(), name_en: "Strawberry".into(), category: "beeren".into(), lifecycle: "perennial".into(),
+            id: "strawberry".into(), name_de: "Erdbeere".into(), name_en: "Strawberry".into(), name_latin: "Fragaria × ananassa".into(), category: "beeren".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![7,8], harvest_months: vec![5,6,7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 30,
             good_neighbors: vec!["lettuce".into(),"spinach".into(),"onion".into(),"garlic".into(),"bean".into(),"thyme".into(),"chives".into()],
@@ -297,7 +300,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["ableger".into()], propagation_note: "Ausl\u{00e4}ufer im Sommer direkt in T\u{00f6}pfe leiten.".into(),
         },
         CatalogEntry {
-            id: "raspberry".into(), name_de: "Himbeere".into(), name_en: "Raspberry".into(), category: "beeren".into(), lifecycle: "perennial".into(),
+            id: "raspberry".into(), name_de: "Himbeere".into(), name_en: "Raspberry".into(), name_latin: "Rubus idaeus".into(), category: "beeren".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10,11,3], harvest_months: vec![6,7,8,9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 50,
             good_neighbors: vec!["garlic".into(),"onion".into()],
@@ -307,7 +310,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["ableger".into(),"teilung".into()], propagation_note: "Wurzelausl\u{00e4}ufer im Herbst trennen.".into(),
         },
         CatalogEntry {
-            id: "blueberry".into(), name_de: "Heidelbeere".into(), name_en: "Blueberry".into(), category: "beeren".into(), lifecycle: "perennial".into(),
+            id: "blueberry".into(), name_de: "Heidelbeere".into(), name_en: "Blueberry".into(), name_latin: "Vaccinium corymbosum".into(), category: "beeren".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4,10], harvest_months: vec![7,8,9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 100,
             good_neighbors: vec!["strawberry".into(),"cranberry".into()],
@@ -317,7 +320,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Stecklinge im Sommer schneiden.".into(),
         },
         CatalogEntry {
-            id: "apple".into(), name_de: "Apfelbaum".into(), name_en: "Apple Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple".into(), name_de: "Apfelbaum".into(), name_en: "Apple Tree".into(), name_latin: "Malus domestica".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10,11,3,4], harvest_months: vec![8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -327,7 +330,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage, nicht \u{00fc}ber Samen sortenecht.".into(),
         },
         CatalogEntry {
-            id: "grape".into(), name_de: "Weinrebe".into(), name_en: "Grape Vine".into(), category: "obst".into(), lifecycle: "perennial".into(),
+            id: "grape".into(), name_de: "Weinrebe".into(), name_en: "Grape Vine".into(), name_latin: "Vitis vinifera".into(), category: "obst".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![3,4], harvest_months: vec![9,10],
             sun: "full".into(), water: "low".into(), spacing_cm: 200,
             good_neighbors: vec!["rosemary".into(),"basil".into(),"marigold".into()],
@@ -338,7 +341,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
         },
         // -- Obstbäume, Laub- und Zierbäume --
         CatalogEntry {
-            id: "apple_elstar".into(), name_de: "Apfel 'Elstar'".into(), name_en: "Apple 'Elstar'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_elstar".into(), name_de: "Apfel 'Elstar'".into(), name_en: "Apple 'Elstar'".into(), name_latin: "Malus domestica 'Elstar'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -348,7 +351,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_boskoop".into(), name_de: "Apfel 'Boskoop'".into(), name_en: "Apple 'Boskoop'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_boskoop".into(), name_de: "Apfel 'Boskoop'".into(), name_en: "Apple 'Boskoop'".into(), name_latin: "Malus domestica 'Schöner aus Boskoop'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -358,7 +361,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_gala".into(), name_de: "Apfel 'Gala'".into(), name_en: "Apple 'Gala'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_gala".into(), name_de: "Apfel 'Gala'".into(), name_en: "Apple 'Gala'".into(), name_latin: "Malus domestica 'Gala'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -368,7 +371,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_jonagold".into(), name_de: "Apfel 'Jonagold'".into(), name_en: "Apple 'Jonagold'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_jonagold".into(), name_de: "Apfel 'Jonagold'".into(), name_en: "Apple 'Jonagold'".into(), name_latin: "Malus domestica 'Jonagold'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -378,7 +381,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_braeburn".into(), name_de: "Apfel 'Braeburn'".into(), name_en: "Apple 'Braeburn'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_braeburn".into(), name_de: "Apfel 'Braeburn'".into(), name_en: "Apple 'Braeburn'".into(), name_latin: "Malus domestica 'Braeburn'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10, 11],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -388,7 +391,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_topaz".into(), name_de: "Apfel 'Topaz'".into(), name_en: "Apple 'Topaz'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_topaz".into(), name_de: "Apfel 'Topaz'".into(), name_en: "Apple 'Topaz'".into(), name_latin: "Malus domestica 'Topaz'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -398,7 +401,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_cox".into(), name_de: "Apfel 'Cox Orange'".into(), name_en: "Apple 'Cox's Orange Pippin'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_cox".into(), name_de: "Apfel 'Cox Orange'".into(), name_en: "Apple 'Cox's Orange Pippin'".into(), name_latin: "Malus domestica 'Cox's Orange Pippin'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -408,7 +411,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_golden".into(), name_de: "Apfel 'Golden Delicious'".into(), name_en: "Apple 'Golden Delicious'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_golden".into(), name_de: "Apfel 'Golden Delicious'".into(), name_en: "Apple 'Golden Delicious'".into(), name_latin: "Malus domestica 'Golden Delicious'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -418,7 +421,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_gravensteiner".into(), name_de: "Apfel 'Gravensteiner'".into(), name_en: "Apple 'Gravenstein'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_gravensteiner".into(), name_de: "Apfel 'Gravensteiner'".into(), name_en: "Apple 'Gravenstein'".into(), name_latin: "Malus domestica 'Gravensteiner'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -428,7 +431,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_berlepsch".into(), name_de: "Apfel 'Berlepsch'".into(), name_en: "Apple 'Berlepsch'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_berlepsch".into(), name_de: "Apfel 'Berlepsch'".into(), name_en: "Apple 'Berlepsch'".into(), name_latin: "Malus domestica 'Berlepsch'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -438,7 +441,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_rubinette".into(), name_de: "Apfel 'Rubinette'".into(), name_en: "Apple 'Rubinette'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_rubinette".into(), name_de: "Apfel 'Rubinette'".into(), name_en: "Apple 'Rubinette'".into(), name_latin: "Malus domestica 'Rubinette'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 250,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -448,7 +451,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_pinova".into(), name_de: "Apfel 'Pinova'".into(), name_en: "Apple 'Pinova'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_pinova".into(), name_de: "Apfel 'Pinova'".into(), name_en: "Apple 'Pinova'".into(), name_latin: "Malus domestica 'Pinova'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -458,7 +461,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_idared".into(), name_de: "Apfel 'Idared'".into(), name_en: "Apple 'Idared'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_idared".into(), name_de: "Apfel 'Idared'".into(), name_en: "Apple 'Idared'".into(), name_latin: "Malus domestica 'Idared'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -468,7 +471,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_klarapfel".into(), name_de: "Apfel 'Weißer Klarapfel'".into(), name_en: "Apple 'Yellow Transparent'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_klarapfel".into(), name_de: "Apfel 'Weißer Klarapfel'".into(), name_en: "Apple 'Yellow Transparent'".into(), name_latin: "Malus domestica 'Weißer Klarapfel'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7, 8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -478,7 +481,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_santana".into(), name_de: "Apfel 'Santana'".into(), name_en: "Apple 'Santana'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_santana".into(), name_de: "Apfel 'Santana'".into(), name_en: "Apple 'Santana'".into(), name_latin: "Malus domestica 'Santana'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -488,7 +491,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apple_granny".into(), name_de: "Apfel 'Granny Smith'".into(), name_en: "Apple 'Granny Smith'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apple_granny".into(), name_de: "Apfel 'Granny Smith'".into(), name_en: "Apple 'Granny Smith'".into(), name_latin: "Malus domestica 'Granny Smith'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10, 11],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec!["chives".into(),"nasturtium".into(),"marigold".into()],
@@ -498,7 +501,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "crabapple".into(), name_de: "Zierapfel".into(), name_en: "Crabapple".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "crabapple".into(), name_de: "Zierapfel".into(), name_en: "Crabapple".into(), name_latin: "Malus".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec![],
@@ -508,7 +511,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear".into(), name_de: "Birnbaum".into(), name_en: "Pear Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear".into(), name_de: "Birnbaum".into(), name_en: "Pear Tree".into(), name_latin: "Pyrus communis".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -518,7 +521,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_williams".into(), name_de: "Birne 'Williams Christ'".into(), name_en: "Pear 'Williams Bon Chrétien'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_williams".into(), name_de: "Birne 'Williams Christ'".into(), name_en: "Pear 'Williams Bon Chrétien'".into(), name_latin: "Pyrus communis 'Williams Christ'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -528,7 +531,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_conference".into(), name_de: "Birne 'Conference'".into(), name_en: "Pear 'Conference'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_conference".into(), name_de: "Birne 'Conference'".into(), name_en: "Pear 'Conference'".into(), name_latin: "Pyrus communis 'Conference'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -538,7 +541,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_gute_luise".into(), name_de: "Birne 'Gute Luise'".into(), name_en: "Pear 'Louise Bonne'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_gute_luise".into(), name_de: "Birne 'Gute Luise'".into(), name_en: "Pear 'Louise Bonne'".into(), name_latin: "Pyrus communis 'Gute Luise'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -548,7 +551,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_lucas".into(), name_de: "Birne 'Alexander Lucas'".into(), name_en: "Pear 'Alexander Lucas'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_lucas".into(), name_de: "Birne 'Alexander Lucas'".into(), name_en: "Pear 'Alexander Lucas'".into(), name_latin: "Pyrus communis 'Alexander Lucas'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -558,7 +561,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_gellert".into(), name_de: "Birne 'Gellerts Butterbirne'".into(), name_en: "Pear 'Beurré Hardy'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_gellert".into(), name_de: "Birne 'Gellerts Butterbirne'".into(), name_en: "Pear 'Beurré Hardy'".into(), name_latin: "Pyrus communis 'Gellerts Butterbirne'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -568,7 +571,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "pear_clapp".into(), name_de: "Birne 'Clapps Liebling'".into(), name_en: "Pear 'Clapp's Favourite'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "pear_clapp".into(), name_de: "Birne 'Clapps Liebling'".into(), name_en: "Pear 'Clapp's Favourite'".into(), name_latin: "Pyrus communis 'Clapps Liebling'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -578,7 +581,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "nashi".into(), name_de: "Nashi-Birne".into(), name_en: "Nashi Pear".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "nashi".into(), name_de: "Nashi-Birne".into(), name_en: "Nashi Pear".into(), name_latin: "Pyrus pyrifolia".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -588,7 +591,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum".into(), name_de: "Zwetschgenbaum".into(), name_en: "Plum Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum".into(), name_de: "Zwetschgenbaum".into(), name_en: "Plum Tree".into(), name_latin: "Prunus domestica".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -598,7 +601,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum_hauszwetschge".into(), name_de: "Zwetschge 'Hauszwetschge'".into(), name_en: "Plum 'Common Damson'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum_hauszwetschge".into(), name_de: "Zwetschge 'Hauszwetschge'".into(), name_en: "Plum 'Common Damson'".into(), name_latin: "Prunus domestica 'Hauszwetschge'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -608,7 +611,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum_cacak".into(), name_de: "Zwetschge 'Cacaks Schöne'".into(), name_en: "Plum 'Čačanska lepotica'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum_cacak".into(), name_de: "Zwetschge 'Cacaks Schöne'".into(), name_en: "Plum 'Čačanska lepotica'".into(), name_latin: "Prunus domestica 'Cacaks Schöne'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -618,7 +621,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum_katinka".into(), name_de: "Zwetschge 'Katinka'".into(), name_en: "Plum 'Katinka'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum_katinka".into(), name_de: "Zwetschge 'Katinka'".into(), name_en: "Plum 'Katinka'".into(), name_latin: "Prunus domestica 'Katinka'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7, 8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -628,7 +631,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum_hanita".into(), name_de: "Zwetschge 'Hanita'".into(), name_en: "Plum 'Hanita'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum_hanita".into(), name_de: "Zwetschge 'Hanita'".into(), name_en: "Plum 'Hanita'".into(), name_latin: "Prunus domestica 'Hanita'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -638,7 +641,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "plum_jojo".into(), name_de: "Zwetschge 'Jojo'".into(), name_en: "Plum 'Jojo'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "plum_jojo".into(), name_de: "Zwetschge 'Jojo'".into(), name_en: "Plum 'Jojo'".into(), name_latin: "Prunus domestica 'Jojo'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -648,7 +651,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "mirabelle".into(), name_de: "Mirabelle 'von Nancy'".into(), name_en: "Mirabelle 'de Nancy'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "mirabelle".into(), name_de: "Mirabelle 'von Nancy'".into(), name_en: "Mirabelle 'de Nancy'".into(), name_latin: "Prunus domestica subsp. syriaca 'Mirabelle von Nancy'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -658,7 +661,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "greengage".into(), name_de: "Reneklode 'Große Grüne'".into(), name_en: "Greengage".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "greengage".into(), name_de: "Reneklode 'Große Grüne'".into(), name_en: "Greengage".into(), name_latin: "Prunus domestica subsp. italica 'Große Grüne Reneklode'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -668,7 +671,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_sweet".into(), name_de: "Süßkirsche".into(), name_en: "Sweet Cherry".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_sweet".into(), name_de: "Süßkirsche".into(), name_en: "Sweet Cherry".into(), name_latin: "Prunus avium".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![6, 7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 600,
             good_neighbors: vec![],
@@ -678,7 +681,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_kordia".into(), name_de: "Süßkirsche 'Kordia'".into(), name_en: "Sweet Cherry 'Kordia'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_kordia".into(), name_de: "Süßkirsche 'Kordia'".into(), name_en: "Sweet Cherry 'Kordia'".into(), name_latin: "Prunus avium 'Kordia'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 600,
             good_neighbors: vec![],
@@ -688,7 +691,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_regina".into(), name_de: "Süßkirsche 'Regina'".into(), name_en: "Sweet Cherry 'Regina'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_regina".into(), name_de: "Süßkirsche 'Regina'".into(), name_en: "Sweet Cherry 'Regina'".into(), name_latin: "Prunus avium 'Regina'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 600,
             good_neighbors: vec![],
@@ -698,7 +701,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_burlat".into(), name_de: "Süßkirsche 'Burlat'".into(), name_en: "Sweet Cherry 'Burlat'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_burlat".into(), name_de: "Süßkirsche 'Burlat'".into(), name_en: "Sweet Cherry 'Burlat'".into(), name_latin: "Prunus avium 'Burlat'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![6],
             sun: "full".into(), water: "medium".into(), spacing_cm: 600,
             good_neighbors: vec![],
@@ -708,7 +711,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_lapins".into(), name_de: "Süßkirsche 'Lapins'".into(), name_en: "Sweet Cherry 'Lapins'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_lapins".into(), name_de: "Süßkirsche 'Lapins'".into(), name_en: "Sweet Cherry 'Lapins'".into(), name_latin: "Prunus avium 'Lapins'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -718,7 +721,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_morello".into(), name_de: "Sauerkirsche 'Schattenmorelle'".into(), name_en: "Sour Cherry 'Morello'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_morello".into(), name_de: "Sauerkirsche 'Schattenmorelle'".into(), name_en: "Sour Cherry 'Morello'".into(), name_latin: "Prunus cerasus 'Schattenmorelle'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7, 8],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -728,7 +731,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "cherry_morina".into(), name_de: "Sauerkirsche 'Morina'".into(), name_en: "Sour Cherry 'Morina'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "cherry_morina".into(), name_de: "Sauerkirsche 'Morina'".into(), name_en: "Sour Cherry 'Morina'".into(), name_latin: "Prunus cerasus 'Morina'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -738,7 +741,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "peach_benedicte".into(), name_de: "Pfirsich 'Benedicte'".into(), name_en: "Peach 'Benedicte'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "peach_benedicte".into(), name_de: "Pfirsich 'Benedicte'".into(), name_en: "Peach 'Benedicte'".into(), name_latin: "Prunus persica 'Benedicte'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -748,7 +751,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "peach_redhaven".into(), name_de: "Pfirsich 'Red Haven'".into(), name_en: "Peach 'Redhaven'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "peach_redhaven".into(), name_de: "Pfirsich 'Red Haven'".into(), name_en: "Peach 'Redhaven'".into(), name_latin: "Prunus persica 'Redhaven'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -758,7 +761,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "nectarine".into(), name_de: "Nektarine".into(), name_en: "Nectarine".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "nectarine".into(), name_de: "Nektarine".into(), name_en: "Nectarine".into(), name_latin: "Prunus persica var. nucipersica".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -768,7 +771,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apricot_ungarische".into(), name_de: "Aprikose 'Ungarische Beste'".into(), name_en: "Apricot 'Hungarian Best'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apricot_ungarische".into(), name_de: "Aprikose 'Ungarische Beste'".into(), name_en: "Apricot 'Hungarian Best'".into(), name_latin: "Prunus armeniaca 'Ungarische Beste'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -778,7 +781,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "apricot_bergeron".into(), name_de: "Aprikose 'Bergeron'".into(), name_en: "Apricot 'Bergeron'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "apricot_bergeron".into(), name_de: "Aprikose 'Bergeron'".into(), name_en: "Apricot 'Bergeron'".into(), name_latin: "Prunus armeniaca 'Bergeron'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![7, 8],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -788,7 +791,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "quince_apple".into(), name_de: "Apfelquitte".into(), name_en: "Apple-shaped Quince".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "quince_apple".into(), name_de: "Apfelquitte".into(), name_en: "Apple-shaped Quince".into(), name_latin: "Cydonia oblonga".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -798,7 +801,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "quince_pear".into(), name_de: "Birnenquitte".into(), name_en: "Pear-shaped Quince".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "quince_pear".into(), name_de: "Birnenquitte".into(), name_en: "Pear-shaped Quince".into(), name_latin: "Cydonia oblonga".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -808,7 +811,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "walnut".into(), name_de: "Walnussbaum".into(), name_en: "Walnut Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "walnut".into(), name_de: "Walnussbaum".into(), name_en: "Walnut Tree".into(), name_latin: "Juglans regia".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 1200,
             good_neighbors: vec![],
@@ -818,7 +821,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into(),"samen".into()], propagation_note: "Veredelte Sorten tragen früher als Sämlinge.".into(),
         },
         CatalogEntry {
-            id: "hazelnut".into(), name_de: "Haselnuss".into(), name_en: "Hazelnut".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "hazelnut".into(), name_de: "Haselnuss".into(), name_en: "Hazelnut".into(), name_latin: "Corylus avellana".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -828,7 +831,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["ableger".into(),"samen".into()], propagation_note: "Über Absenker einfach zu vermehren.".into(),
         },
         CatalogEntry {
-            id: "chestnut".into(), name_de: "Esskastanie".into(), name_en: "Sweet Chestnut".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "chestnut".into(), name_de: "Esskastanie".into(), name_en: "Sweet Chestnut".into(), name_latin: "Castanea sativa".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 1000,
             good_neighbors: vec![],
@@ -838,7 +841,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into(),"samen".into()], propagation_note: "Aus Samen möglich, veredelt früher tragend.".into(),
         },
         CatalogEntry {
-            id: "fig".into(), name_de: "Feige 'Brown Turkey'".into(), name_en: "Fig 'Brown Turkey'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "fig".into(), name_de: "Feige 'Brown Turkey'".into(), name_en: "Fig 'Brown Turkey'".into(), name_latin: "Ficus carica 'Brown Turkey'".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec![],
@@ -848,7 +851,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Stecklinge bewurzeln leicht.".into(),
         },
         CatalogEntry {
-            id: "kaki".into(), name_de: "Kaki".into(), name_en: "Persimmon".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "kaki".into(), name_de: "Kaki".into(), name_en: "Persimmon".into(), name_latin: "Diospyros kaki".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10, 11],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -858,7 +861,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "mulberry".into(), name_de: "Maulbeerbaum".into(), name_en: "Mulberry".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "mulberry".into(), name_de: "Maulbeerbaum".into(), name_en: "Mulberry".into(), name_latin: "Morus".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![6, 7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -868,7 +871,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into(),"veredelung".into()], propagation_note: "Steckhölzer im Winter.".into(),
         },
         CatalogEntry {
-            id: "medlar".into(), name_de: "Mispel".into(), name_en: "Medlar".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "medlar".into(), name_de: "Mispel".into(), name_en: "Medlar".into(), name_latin: "Mespilus germanica".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10, 11],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -878,7 +881,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "elder".into(), name_de: "Holunder".into(), name_en: "Elderberry".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "elder".into(), name_de: "Holunder".into(), name_en: "Elderberry".into(), name_latin: "Sambucus nigra".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![8, 9],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec![],
@@ -888,7 +891,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Steckhölzer im Winter.".into(),
         },
         CatalogEntry {
-            id: "olive".into(), name_de: "Olivenbaum".into(), name_en: "Olive Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "olive".into(), name_de: "Olivenbaum".into(), name_en: "Olive Tree".into(), name_latin: "Olea europaea".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![10, 11],
             sun: "full".into(), water: "low".into(), spacing_cm: 150,
             good_neighbors: vec![],
@@ -898,7 +901,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Halbverholzte Stecklinge, langsam.".into(),
         },
         CatalogEntry {
-            id: "lemon".into(), name_de: "Zitronenbaum".into(), name_en: "Lemon Tree".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
+            id: "lemon".into(), name_de: "Zitronenbaum".into(), name_en: "Lemon Tree".into(), name_latin: "Citrus × limon".into(), category: "obstbaeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![4, 5], harvest_months: vec![11, 12, 1, 2, 3],
             sun: "full".into(), water: "medium".into(), spacing_cm: 150,
             good_neighbors: vec![],
@@ -908,7 +911,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into(),"veredelung".into()], propagation_note: "Stecklinge oder Veredelung.".into(),
         },
         CatalogEntry {
-            id: "serviceberry".into(), name_de: "Felsenbirne".into(), name_en: "Serviceberry".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "serviceberry".into(), name_de: "Felsenbirne".into(), name_en: "Serviceberry".into(), name_latin: "Amelanchier".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![6, 7],
             sun: "full".into(), water: "medium".into(), spacing_cm: 300,
             good_neighbors: vec![],
@@ -918,7 +921,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "japanese_maple".into(), name_de: "Fächerahorn".into(), name_en: "Japanese Maple".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "japanese_maple".into(), name_de: "Fächerahorn".into(), name_en: "Japanese Maple".into(), name_latin: "Acer palmatum".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 250,
             good_neighbors: vec![],
@@ -928,7 +931,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into(),"samen".into()], propagation_note: "Sorten werden veredelt.".into(),
         },
         CatalogEntry {
-            id: "globe_maple".into(), name_de: "Kugelahorn".into(), name_en: "Globe Norway Maple".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "globe_maple".into(), name_de: "Kugelahorn".into(), name_en: "Globe Norway Maple".into(), name_latin: "Acer platanoides 'Globosum'".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -938,7 +941,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelt auf Spitzahorn.".into(),
         },
         CatalogEntry {
-            id: "ornamental_cherry".into(), name_de: "Japanische Zierkirsche".into(), name_en: "Japanese Cherry".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "ornamental_cherry".into(), name_de: "Japanische Zierkirsche".into(), name_en: "Japanese Cherry".into(), name_latin: "Prunus serrulata".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -948,7 +951,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["veredelung".into()], propagation_note: "Veredelung auf Unterlage; aus Samen nicht sortenecht.".into(),
         },
         CatalogEntry {
-            id: "magnolia".into(), name_de: "Magnolie".into(), name_en: "Magnolia".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "magnolia".into(), name_de: "Magnolie".into(), name_en: "Magnolia".into(), name_latin: "Magnolia".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 400,
             good_neighbors: vec![],
@@ -958,7 +961,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["ableger".into(),"steckling".into()], propagation_note: "Absenker im Frühjahr.".into(),
         },
         CatalogEntry {
-            id: "birch".into(), name_de: "Birke".into(), name_en: "Birch".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "birch".into(), name_de: "Birke".into(), name_en: "Birch".into(), name_latin: "Betula pendula".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 600,
             good_neighbors: vec![],
@@ -968,7 +971,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Selbstaussaat häufig.".into(),
         },
         CatalogEntry {
-            id: "beech".into(), name_de: "Rotbuche".into(), name_en: "European Beech".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "beech".into(), name_de: "Rotbuche".into(), name_en: "European Beech".into(), name_latin: "Fagus sylvatica".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 800,
             good_neighbors: vec![],
@@ -978,7 +981,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Bucheckern im Herbst säen.".into(),
         },
         CatalogEntry {
-            id: "hornbeam".into(), name_de: "Hainbuche".into(), name_en: "Hornbeam".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "hornbeam".into(), name_de: "Hainbuche".into(), name_en: "Hornbeam".into(), name_latin: "Carpinus betulus".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "partial".into(), water: "medium".into(), spacing_cm: 60,
             good_neighbors: vec![],
@@ -988,7 +991,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Samen brauchen Kälte zum Keimen.".into(),
         },
         CatalogEntry {
-            id: "linden".into(), name_de: "Linde".into(), name_en: "Linden".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "linden".into(), name_de: "Linde".into(), name_en: "Linden".into(), name_latin: "Tilia".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 1200,
             good_neighbors: vec![],
@@ -998,7 +1001,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Über Samen, langsam.".into(),
         },
         CatalogEntry {
-            id: "oak".into(), name_de: "Stieleiche".into(), name_en: "English Oak".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "oak".into(), name_de: "Stieleiche".into(), name_en: "English Oak".into(), name_latin: "Quercus robur".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 1500,
             good_neighbors: vec![],
@@ -1008,7 +1011,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Eicheln direkt im Herbst stecken.".into(),
         },
         CatalogEntry {
-            id: "rowan".into(), name_de: "Eberesche (Vogelbeere)".into(), name_en: "Rowan".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "rowan".into(), name_de: "Eberesche (Vogelbeere)".into(), name_en: "Rowan".into(), name_latin: "Sorbus aucuparia".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![9, 10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 500,
             good_neighbors: vec![],
@@ -1018,7 +1021,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "Samen brauchen Kälte.".into(),
         },
         CatalogEntry {
-            id: "yew".into(), name_de: "Eibe".into(), name_en: "Yew".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "yew".into(), name_de: "Eibe".into(), name_en: "Yew".into(), name_latin: "Taxus baccata".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "shade".into(), water: "medium".into(), spacing_cm: 80,
             good_neighbors: vec![],
@@ -1028,7 +1031,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["steckling".into()], propagation_note: "Stecklinge im Spätsommer.".into(),
         },
         CatalogEntry {
-            id: "thuja".into(), name_de: "Lebensbaum (Thuja)".into(), name_en: "Arborvitae".into(), category: "baeume".into(), lifecycle: "perennial".into(),
+            id: "thuja".into(), name_de: "Lebensbaum (Thuja)".into(), name_en: "Arborvitae".into(), name_latin: "Thuja occidentalis".into(), category: "baeume".into(), lifecycle: "perennial".into(),
             default_phase: "veg".into(), sow_indoor_months: vec![], sow_outdoor_months: vec![10, 11, 3, 4], harvest_months: vec![],
             sun: "full".into(), water: "medium".into(), spacing_cm: 60,
             good_neighbors: vec![],
@@ -1039,7 +1042,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
         },
         // -- Blumen --
         CatalogEntry {
-            id: "sunflower".into(), name_de: "Sonnenblume".into(), name_en: "Sunflower".into(), category: "blumen".into(), lifecycle: "annual".into(),
+            id: "sunflower".into(), name_de: "Sonnenblume".into(), name_en: "Sunflower".into(), name_latin: "Helianthus annuus".into(), category: "blumen".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![4], sow_outdoor_months: vec![5], harvest_months: vec![8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 50,
             good_neighbors: vec!["cucumber".into(),"corn".into(),"zucchini".into()],
@@ -1049,7 +1052,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren.".into(),
         },
         CatalogEntry {
-            id: "marigold".into(), name_de: "Tagetes".into(), name_en: "Marigold".into(), category: "blumen".into(), lifecycle: "annual".into(),
+            id: "marigold".into(), name_de: "Tagetes".into(), name_en: "Marigold".into(), name_latin: "Tagetes".into(), category: "blumen".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![3,4], sow_outdoor_months: vec![5], harvest_months: vec![6,7,8,9,10],
             sun: "full".into(), water: "medium".into(), spacing_cm: 20,
             good_neighbors: vec!["tomato".into(),"pepper".into(),"cabbage".into(),"bean".into(),"apple".into()],
@@ -1059,7 +1062,7 @@ fn build_catalog() -> Vec<CatalogEntry> {
             propagation_methods: vec!["samen".into()], propagation_note: "\u{00dc}ber Samen vermehren. S\u{00e4}t sich oft selbst aus.".into(),
         },
         CatalogEntry {
-            id: "nasturtium".into(), name_de: "Kapuzinerkresse".into(), name_en: "Nasturtium".into(), category: "blumen".into(), lifecycle: "annual".into(),
+            id: "nasturtium".into(), name_de: "Kapuzinerkresse".into(), name_en: "Nasturtium".into(), name_latin: "Tropaeolum majus".into(), category: "blumen".into(), lifecycle: "annual".into(),
             default_phase: "seed".into(), sow_indoor_months: vec![4], sow_outdoor_months: vec![5], harvest_months: vec![6,7,8,9],
             sun: "full".into(), water: "low".into(), spacing_cm: 30,
             good_neighbors: vec!["apple".into(),"cabbage".into(),"cucumber".into(),"tomato".into()],

@@ -1623,7 +1623,7 @@ async fn subscription_status_smart(state: State<'_, AppLocalState>) -> Result<Su
 }
 
 #[tauri::command]
-async fn subscription_checkout_smart(state: State<'_, AppLocalState>, plan: String) -> Result<serde_json::Value, String> {
+async fn subscription_checkout_smart(state: State<'_, AppLocalState>, plan: String, withdrawal_consent: Option<bool>) -> Result<serde_json::Value, String> {
     let parsed_plan = parse_subscription_plan(&plan);
     let session = {
         let store = state.store.lock().map_err(|_| "failed to lock store".to_string())?;
@@ -1634,7 +1634,7 @@ async fn subscription_checkout_smart(state: State<'_, AppLocalState>, plan: Stri
     let response = client
         .post(format!("{}/subscription/checkout", session.backend_url))
         .bearer_auth(&session.access_token)
-        .json(&serde_json::json!({ "plan": format!("{:?}", parsed_plan).to_lowercase() }))
+        .json(&serde_json::json!({ "plan": format!("{:?}", parsed_plan).to_lowercase(), "withdrawal_consent": withdrawal_consent.unwrap_or(false) }))
         .send()
         .await
         .map_err(|e| e.to_string())?;
