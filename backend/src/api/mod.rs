@@ -896,6 +896,29 @@ pub async fn get_subscription_history(State(state): State<AppState>, session: Se
 #[derive(Deserialize)]
 pub struct CheckoutPayload {
     pub plan: SubscriptionPlan,
+    /// Paid plans: the consumer asked for the subscription to start at once
+    /// and knows a withdrawal then costs the share already used.
+    #[serde(default)]
+    pub withdrawal_consent: bool,
+}
+
+/// Wording version of the checkout consent shown in the app (bump when the
+/// text in the locales changes, so stored proofs name the right wording).
+pub const WITHDRAWAL_TEXT_VERSION: &str = "2026-11-23";
+
+/// Store the consumer's consent before a paid checkout (proof under § 356 BGB).
+pub(crate) async fn record_withdrawal_consent(state: &AppState, user_id: Uuid, kind: &str, plan: Option<&str>) -> anyhow::Result<()> {
+    let email = repos::get_user_email(state, user_id).await?;
+    sqlx::query("INSERT INTO checkout_consents (consent_id, user_id, email, kind, plan, text_version) VALUES ($1,$2,$3,$4,$5,$6)")
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(email)
+        .bind(kind)
+        .bind(plan)
+        .bind(WITHDRAWAL_TEXT_VERSION)
+        .execute(&state.pg)
+        .await?;
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -1028,6 +1051,15 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
     let previous_plan = current_user.plan;
     let normalized_plan = format!("{:?}", payload.plan).to_lowercase();
     let price = checkout_price_eur_month(payload.plan);
+    // Paid plans: proof that the consumer asked for an immediate start (§ 356 Abs. 4 BGB).
+    if payload.plan != SubscriptionPlan::Free {
+        if !payload.withdrawal_consent {
+            return api_error(StatusCode::BAD_REQUEST, "withdrawal_consent_required");
+        }
+        if let Err(err) = record_withdrawal_consent(&state, session.user_id, "subscription", Some(&normalized_plan)).await {
+            return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
+        }
+    }
 
     // Try real Stripe checkout if STRIPE_SECRET_KEY is configured
     if let Some(stripe) = StripeClient::from_env() {
@@ -1065,7 +1097,7 @@ pub async fn post_subscription_checkout(State(state): State<AppState>, session: 
         let success_url = format!("{base_url}/checkout/success?plan={normalized_plan}&user_id={}", session.user_id);
         let cancel_url = format!("{base_url}/checkout/cancel");
 
-        match stripe.create_checkout_session(&email, &price_id, session.user_id, &normalized_plan, &success_url, &cancel_url).await {
+        match stripe.create_checkout_session(&email, &price_id, session.user_id, &normalized_plan, &success_url, &cancel_url, crate::services::stripe::SUBSCRIPTION_NOTE).await {
             Ok(url) => {
                 let _ = repos::record_subscription_history(&state, session.user_id, "stripe_checkout_created", payload.plan, Some(previous_plan), None, Some("stripe"), Some("pending"), Some("Stripe Checkout Session erstellt.")).await;
                 return Json(CheckoutResponse {
@@ -1543,6 +1575,10 @@ pub async fn export_me(
         "desktop_licenses": license_export,
         "voucher": voucher_export,
         "two_factor_enabled": two_factor::is_enabled(&state, session.user_id).await.unwrap_or(false),
+        "checkout_consents": sqlx::query_as::<_, (String, Option<String>, String, chrono::DateTime<Utc>)>(
+            "SELECT kind, plan, text_version, accepted_at FROM checkout_consents WHERE user_id = $1 ORDER BY accepted_at")
+            .bind(session.user_id).fetch_all(&state.pg).await.unwrap_or_default()
+            .into_iter().map(|(kind, plan, version, at)| serde_json::json!({ "kind": kind, "plan": plan, "text_version": version, "accepted_at": at })).collect::<Vec<_>>(),
         "billing_profile": billing_export,
         "invoices": invoice_export,
     });

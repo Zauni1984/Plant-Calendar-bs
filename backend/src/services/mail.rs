@@ -102,6 +102,14 @@ pub fn license_key_mail(key: &str, purchase: bool, max_devices: i32, download_ur
     } else {
         ("hier ist dein Lizenzschlüssel für die Sowling-Desktop-App.", "here is your license key for the Sowling desktop app.")
     };
+    let (waiver_de, waiver_en) = if purchase {
+        (
+            "Vertragsbestätigung: Du hast vor dem Kauf ausdrücklich zugestimmt, dass wir die Desktop-App sofort bereitstellen, und bestätigt zu wissen, dass dein Widerrufsrecht damit erlischt (§ 356 Abs. 5 BGB). Widerrufsbelehrung: https://sowling.com/widerruf/\n\n",
+            "Contract confirmation: before buying you expressly agreed that we supply the desktop app immediately and acknowledged that your right of withdrawal thereby expires. Withdrawal policy: https://sowling.com/en/withdrawal/\n\n",
+        )
+    } else {
+        ("", "")
+    };
     let download_de = download_url.map(|u| format!("Download: {u}\n\n")).unwrap_or_default();
     let download_en = download_url.map(|u| format!("Download: {u}\n\n")).unwrap_or_default();
     Mail {
@@ -110,12 +118,12 @@ pub fn license_key_mail(key: &str, purchase: bool, max_devices: i32, download_ur
             "Hallo,\n\n{intro_de}\n\nDein Lizenzschlüssel:\n\n    {key}\n\n\
              So schaltest du die App frei: Desktop-App öffnen und den Schlüssel im Startfenster eingeben. \
              Er gilt für bis zu {max_devices} Geräte. In der Web-App ({web}) findest du ihn jederzeit im Bereich „Desktop-App“.\n\n\
-             {download_de}Bitte gib den Schlüssel nicht weiter.\n\nViele Grüße\ndein Sowling-Team\n\n\
+             {download_de}{waiver_de}Bitte gib den Schlüssel nicht weiter.\n\nViele Grüße\ndein Sowling-Team\n\n\
              ----------------------------------------\n\n\
              Hello,\n\n{intro_en}\n\nYour license key:\n\n    {key}\n\n\
              To unlock the app, open the desktop app and enter the key in the start window. \
              It works on up to {max_devices} devices. You can always find it in the web app ({web}) under “Desktop app”.\n\n\
-             {download_en}Please do not share the key.\n\nBest regards\nThe Sowling team\n\n{FOOTER}\n"
+             {download_en}{waiver_en}Please do not share the key.\n\nBest regards\nThe Sowling team\n\n{FOOTER}\n"
         ),
     }
 }
@@ -164,10 +172,12 @@ pub fn invoice_mail(number: &str, description: &str, e_invoice: bool, reverse_ch
             "Hallo,\n\nim Anhang findest du die Rechnung {number} für: {description}.\n\
              Der Betrag wurde bereits bezahlt.\n\n{e_de}{rc_de}\
              Alle Rechnungen findest du auch in der Web-App ({web}) unter „Abo“ → „Rechnungen“.\n\n\
+             Widerrufsbelehrung: https://sowling.com/widerruf/\n\n\
              Viele Grüße\ndein Sowling-Team\n\n\
              ----------------------------------------\n\n\
              Hello,\n\nattached is invoice {number} for: {description}.\nThe amount has already been paid.\n\n{e_en}{rc_en}\
              You can also find all invoices in the web app ({web}) under “Plan” → “Invoices”.\n\n\
+             Withdrawal policy: https://sowling.com/en/withdrawal/\n\n\
              Best regards\nThe Sowling team\n\n{FOOTER}\n"
         ),
     }

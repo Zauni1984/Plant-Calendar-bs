@@ -408,9 +408,9 @@ export const webCommands = {
 
   // --- desktop app license (web account card) ---------------------------------
   web_desktop_license: async () => (hasSession() ? api("/licenses/me") : null),
-  web_desktop_checkout: async () => {
+  web_desktop_checkout: async ({ withdrawalConsent } = {}) => {
     requireSession();
-    const r = await api("/licenses/checkout", { method: "POST", body: {} });
+    const r = await api("/licenses/checkout", { method: "POST", body: { withdrawal_consent: !!withdrawalConsent } });
     // Stripe hosts the payment page; development builds grant directly.
     if (r?.checkout_url) window.location.assign(r.checkout_url);
     return r;
@@ -666,9 +666,9 @@ export const webCommands = {
     remaining_slots: 1, over_limit_by: 0, can_create: true, can_reactivate: true,
   })),
   subscription_history_smart: () => (hasSession() ? api("/subscription/history") : Promise.resolve([])),
-  subscription_checkout_smart: ({ plan }) => {
+  subscription_checkout_smart: ({ plan, withdrawalConsent }) => {
     requireSession();
-    return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan) } });
+    return api("/subscription/checkout", { method: "POST", body: { plan: lower(plan), withdrawal_consent: !!withdrawalConsent } });
   },
   two_factor_status: () => api("/me/2fa"),
   two_factor_setup: () => api("/me/2fa/setup", { method: "POST", body: {} }),

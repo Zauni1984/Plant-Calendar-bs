@@ -8993,6 +8993,39 @@ function openFeedingLogFromTask(task) {
   });
 }
 
+// --- Checkout consent (right of withdrawal, § 356 BGB) ----------------------------
+// Before a paid checkout the buyer must tick that the service starts now
+// (subscription) or is supplied now (desktop app). The backend refuses the
+// checkout without it and stores the consent as proof.
+
+function confirmCheckoutConsent({ title, lines = [], kind }) {
+  return new Promise((resolve) => {
+    activeModal = 'checkoutConsent';
+    const policy = currentLang === 'de' ? 'https://sowling.com/widerruf/' : 'https://sowling.com/en/withdrawal/';
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = `
+      ${lines.filter(Boolean).map((l) => `<p style="margin:0 0 8px;">${escapeHtml(l)}</p>`).join('')}
+      <label class="form-check" style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border-radius:10px;background:${TC.surface};border:1px solid rgba(${TC.accentRgb},0.15);cursor:pointer;">
+        <input type="checkbox" id="checkoutConsentBox" style="margin-top:3px;" />
+        <span>${escapeHtml(t(kind === 'desktop' ? 'checkout.consent.desktop' : 'checkout.consent.subscription'))}</span>
+      </label>
+      <div style="margin-top:8px;font-size:12px;"><a href="${policy}" target="_blank" rel="noopener">${escapeHtml(t('checkout.consent.link'))}</a></div>`;
+    document.getElementById('modalFooter').innerHTML = `
+      <button class="btn btn--ghost" id="checkoutConsentCancel">${t('action.cancel')}</button>
+      <button class="btn btn--primary" id="checkoutConsentOk" disabled>${t('checkout.consent.continue')}</button>`;
+    const overlay = document.getElementById('modalOverlay');
+    if (overlay) overlay.style.display = '';
+    const box = document.getElementById('checkoutConsentBox');
+    const ok = document.getElementById('checkoutConsentOk');
+    box.addEventListener('change', () => { ok.disabled = !box.checked; });
+    const finish = (value) => { modalOnClose = null; closeModal(); resolve(value); };
+    // Closing the dialog any other way counts as "no".
+    modalOnClose = () => resolve(false);
+    ok.addEventListener('click', () => finish(box.checked));
+    document.getElementById('checkoutConsentCancel').addEventListener('click', () => finish(false));
+  });
+}
+
 // --- Two-factor sign-in (optional; backend api/two_factor.rs) ---------------------
 // Offered right after registration (can be skipped) and in the settings.
 
@@ -9336,21 +9369,28 @@ subscriptionPanel?.addEventListener("click", async (event) => {
     return;
   }
   const preview = planPreviewFor(plan);
-  const confirmed = window.confirm([
-    `${t('billing.confirmCheckout.title', preview.title)}${preview.price ? ` (${preview.price})` : ""}`,
-    "",
-    preview.summary,
-    preview.cleanupHint,
-    "",
-    t('billing.confirmCheckout.question'),
-  ].join("\n"));
+  const paid = plan !== 'free';
+  const confirmed = paid
+    ? await confirmCheckoutConsent({
+      title: `${t('billing.confirmCheckout.title', preview.title)}${preview.price ? ` (${preview.price})` : ""}`,
+      lines: [preview.summary, preview.cleanupHint],
+      kind: 'subscription',
+    })
+    : window.confirm([
+      t('billing.confirmCheckout.title', preview.title),
+      "",
+      preview.summary,
+      preview.cleanupHint,
+      "",
+      t('billing.confirmCheckout.question'),
+    ].join("\n"));
   if (!confirmed) return;
   showLoading(t('billing.checkout.preparing'));
   try {
     setCheckoutState({ status: "idle", plan, message: t('billing.checkout.pending', preview.title), checkoutUrl: null });
     addCheckoutHistoryEntry({ mode: 'checkout', status: 'pending', plan, message: t('billing.checkout.pending', preview.title) });
     renderSubscriptionPanel();
-    const result = await invoke("subscription_checkout_smart", { plan });
+    const result = await invoke("subscription_checkout_smart", { plan, withdrawalConsent: paid });
     setCheckoutState({
       status: "ready",
       plan,
@@ -10038,8 +10078,12 @@ async function renderDesktopAppCard() {
     const msg = card.querySelector('#desktopAppMsg');
     e.currentTarget.disabled = true;
     const button = e.currentTarget;
+    if (!(await confirmCheckoutConsent({ title: t('checkout.consent.desktopTitle'), lines: [t('checkout.consent.desktopText')], kind: 'desktop' }))) {
+      button.disabled = false;
+      return;
+    }
     const buy = async () => {
-      const r = await invoke('web_desktop_checkout');
+      const r = await invoke('web_desktop_checkout', { withdrawalConsent: true });
       if (r?.granted) await renderDesktopAppCard();
     };
     try {

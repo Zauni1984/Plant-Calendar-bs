@@ -462,15 +462,30 @@ fn purchase_available() -> bool {
 
 // --- POST /licenses/checkout (one-time purchase) ------------------------------------
 
-pub async fn checkout(State(state): State<AppState>, session: SessionUser) -> Response {
+#[derive(serde::Deserialize, Default)]
+pub struct CheckoutPayload {
+    /// The consumer agreed to immediate supply and knows the right of
+    /// withdrawal then expires (§ 356 Abs. 5 BGB).
+    #[serde(default)]
+    withdrawal_consent: bool,
+}
+
+pub async fn checkout(State(state): State<AppState>, session: SessionUser, payload: Option<Json<CheckoutPayload>>) -> Response {
     if let Err(resp) = require_consent(&state, session.user_id, "billing_stripe").await {
         return resp;
+    }
+    let payload = payload.map(|Json(p)| p).unwrap_or_default();
+    if !payload.withdrawal_consent {
+        return api_error(StatusCode::BAD_REQUEST, "withdrawal_consent_required");
     }
     let email = repos::get_user_email(&state, session.user_id).await.ok().flatten().unwrap_or_default();
     match license_for_account(&state, session.user_id, Some(&email).filter(|e| !e.is_empty()).map(|e| e.as_str())).await {
         Ok(Some(_)) => return license_error(StatusCode::CONFLICT, "already_licensed", "this account already has a desktop license"),
         Ok(None) => {}
         Err(err) => return api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+    if let Err(err) = super::record_withdrawal_consent(&state, session.user_id, "desktop", None).await {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
 
     let price = std::env::var("STRIPE_PRICE_DESKTOP").ok().filter(|v| !v.trim().is_empty());
@@ -482,7 +497,7 @@ pub async fn checkout(State(state): State<AppState>, session: SessionUser) -> Re
             let base = std::env::var("CHECKOUT_BASE_URL").unwrap_or_else(|_| "http://localhost:1420".to_string());
             let success = format!("{base}/?desktop_purchase=success");
             let cancel = format!("{base}/?desktop_purchase=cancel");
-            match stripe.create_payment_session(&email, &price_id, session.user_id, "desktop_license", &success, &cancel).await {
+            match stripe.create_payment_session(&email, &price_id, session.user_id, "desktop_license", &success, &cancel, crate::services::stripe::DESKTOP_NOTE).await {
                 Ok(url) => Json(serde_json::json!({ "checkout_url": url })).into_response(),
                 Err(err) => {
                     tracing::error!("stripe desktop checkout: {err}");
