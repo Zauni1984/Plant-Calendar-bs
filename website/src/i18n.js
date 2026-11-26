@@ -19,6 +19,7 @@ export const PAGES = {
   imprint: { de: "/impressum/", en: "/en/imprint/" },
   privacy: { de: "/datenschutz/", en: "/en/privacy/" },
   withdrawal: { de: "/widerruf/", en: "/en/withdrawal/" },
+  terms: { de: "/agb/", en: "/en/terms/" },
 };
 
 export const path = (key, lang) => PAGES[key][lang];
@@ -44,6 +45,7 @@ export const T = {
       imprint: "Impressum",
       privacy: "Datenschutz",
       withdrawal: "Widerrufsrecht",
+      terms: "AGB",
       madeIn: "Entwickelt in Bayern.",
     },
     breadcrumbHome: "Start",
@@ -70,6 +72,7 @@ export const T = {
       imprint: "Imprint",
       privacy: "Privacy",
       withdrawal: "Right of withdrawal",
+      terms: "Terms",
       madeIn: "Made in Bavaria, Germany.",
     },
     breadcrumbHome: "Home",

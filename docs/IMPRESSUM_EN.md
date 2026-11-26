@@ -4,14 +4,14 @@ Information pursuant to § 5 of the German Digital Services Act (DDG).
 
 ## Provider
 
-BlockSocial UG (haftungsbeschränkt)
-Kratzmühlstr. 14
-92339 Beilngries
+BlockSocial UG (haftungsbeschränkt)  
+Kratzmühlstr. 14  
+92339 Beilngries  
 Germany
 
 ## Contact
 
-Phone: +49 176 8327 5353
+Phone: +49 176 8327 5353  
 E-mail: info@blocksocial.eu
 
 ## Represented by
@@ -20,7 +20,7 @@ Managing directors: Alexandre Ederer, Stefan Zaunreither
 
 ## Commercial register
 
-Register court: Amtsgericht Ingolstadt
+Register court: Amtsgericht Ingolstadt  
 Register number: HRB 11740
 
 ## VAT ID

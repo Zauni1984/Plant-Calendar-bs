@@ -9180,6 +9180,7 @@ function confirmCheckoutConsent({ title, lines = [], kind }) {
   return new Promise((resolve) => {
     activeModal = 'checkoutConsent';
     const policy = currentLang === 'de' ? 'https://sowling.com/widerruf/' : 'https://sowling.com/en/withdrawal/';
+    const terms = currentLang === 'de' ? 'https://sowling.com/agb/' : 'https://sowling.com/en/terms/';
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = `
       ${lines.filter(Boolean).map((l) => `<p style="margin:0 0 8px;">${escapeHtml(l)}</p>`).join('')}
@@ -9187,7 +9188,7 @@ function confirmCheckoutConsent({ title, lines = [], kind }) {
         <input type="checkbox" id="checkoutConsentBox" style="margin-top:3px;" />
         <span>${escapeHtml(t(kind === 'desktop' ? 'checkout.consent.desktop' : 'checkout.consent.subscription'))}</span>
       </label>
-      <div style="margin-top:8px;font-size:12px;"><a href="${policy}" target="_blank" rel="noopener">${escapeHtml(t('checkout.consent.link'))}</a></div>`;
+      <div style="margin-top:8px;font-size:12px;">${escapeHtml(t('checkout.consent.terms'))} <a href="${terms}" target="_blank" rel="noopener">${escapeHtml(t('checkout.consent.termsLink'))}</a> · <a href="${policy}" target="_blank" rel="noopener">${escapeHtml(t('checkout.consent.link'))}</a></div>`;
     document.getElementById('modalFooter').innerHTML = `
       <button class="btn btn--ghost" id="checkoutConsentCancel">${t('action.cancel')}</button>
       <button class="btn btn--primary" id="checkoutConsentOk" disabled>${t('checkout.consent.continue')}</button>`;

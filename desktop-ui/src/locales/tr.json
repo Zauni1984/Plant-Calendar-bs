@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "Aboneliğimin hemen başlamasını açıkça talep ediyorum. 14 gün içinde cayarsam, o zamana kadar kullanılan süre için orantılı bir ücret ödeyeceğimi biliyorum.",
   "checkout.consent.desktop": "Masaüstü uygulamasının hemen sağlanmasını açıkça kabul ediyorum. Böylece cayma hakkımı kaybettiğimi biliyorum.",
   "checkout.consent.link": "Cayma koşullarını oku",
+  "checkout.consent.terms": "",
+  "checkout.consent.termsLink": "Koşullarımız geçerlidir",
   "checkout.consent.continue": "Ödemeye devam et",
   "checkout.consent.desktopTitle": "Masaüstü uygulamasını satın al",
   "checkout.consent.desktopText": "Ödemeden sonra lisans anahtarın hemen e-postayla ve hesabında olur.",

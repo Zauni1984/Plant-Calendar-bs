@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "Wyraźnie żądam, aby moja subskrypcja rozpoczęła się natychmiast. Wiem, że przy odstąpieniu w ciągu 14 dni zapłacę proporcjonalnie za wykorzystany czas.",
   "checkout.consent.desktop": "Wyraźnie zgadzam się na natychmiastowe udostępnienie aplikacji desktopowej. Wiem, że tracę przez to prawo odstąpienia.",
   "checkout.consent.link": "Przeczytaj pouczenie o odstąpieniu",
+  "checkout.consent.terms": "Obowiązuje nasz",
+  "checkout.consent.termsLink": "regulamin",
   "checkout.consent.continue": "Przejdź do płatności",
   "checkout.consent.desktopTitle": "Kup aplikację desktopową",
   "checkout.consent.desktopText": "Po płatności od razu otrzymasz klucz licencyjny e-mailem i w koncie.",

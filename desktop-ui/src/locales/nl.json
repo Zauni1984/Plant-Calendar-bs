@@ -701,6 +701,8 @@
   "checkout.consent.subscription": "Ik verzoek uitdrukkelijk dat mijn abonnement direct begint. Ik weet dat ik bij herroeping binnen 14 dagen een evenredig bedrag betaal voor de gebruikte tijd.",
   "checkout.consent.desktop": "Ik ga er uitdrukkelijk mee akkoord dat de desktop-app direct wordt geleverd. Ik weet dat ik daardoor mijn herroepingsrecht verlies.",
   "checkout.consent.link": "Herroepingsbeleid lezen",
+  "checkout.consent.terms": "Onze",
+  "checkout.consent.termsLink": "voorwaarden zijn van toepassing",
   "checkout.consent.continue": "Verder naar betalen",
   "checkout.consent.desktopTitle": "Desktop-app kopen",
   "checkout.consent.desktopText": "Na betaling ontvang je je licentiesleutel direct per e-mail en in je account.",
